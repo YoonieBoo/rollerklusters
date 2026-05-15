@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  downloadCreatorBriefPdf,
+  getCreatorBriefExportData,
+} from '@/lib/creator-brief-export';
 
 type SupabaseRow = Record<string, unknown>;
 
@@ -43,6 +47,8 @@ type BriefView = {
   mentions: string[];
   cta: string;
   status: string | null;
+  completionPercentage: number | null;
+  publishedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -100,6 +106,40 @@ const withSingleInput = (items: string[]) => (items.length > 0 ? items : ['']);
 
 const cleanTextList = (items: string[]) =>
   items.map((item) => item.trim()).filter(Boolean);
+
+const parseRawBrief = (value: unknown) => {
+  const textValue = toText(value);
+
+  if (!textValue) {
+    return {};
+  }
+
+  try {
+    const parsedValue = JSON.parse(textValue);
+
+    return parsedValue && typeof parsedValue === 'object'
+      ? (parsedValue as SupabaseRow)
+      : {};
+  } catch {
+    return {};
+  }
+};
+
+const getObjectValue = (value: unknown) =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as SupabaseRow)
+    : {};
+
+const toNumberValue = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  const textValue = toText(value);
+  const numberValue = Number(textValue);
+
+  return Number.isFinite(numberValue) ? numberValue : null;
+};
 
 const getMissingColumnName = (message: string) => {
   const patterns = [
@@ -184,6 +224,7 @@ export default function BriefsPage() {
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExportingBrief, setIsExportingBrief] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [toast, setToast] = useState<BriefToast | null>(null);
@@ -199,6 +240,8 @@ export default function BriefsPage() {
   const [mentions, setMentions] = useState<string[]>(['']);
   const [cta, setCta] = useState('');
   const [activeStep, setActiveStep] = useState(0);
+  const [editingPublishedBrief, setEditingPublishedBrief] = useState(false);
+  const [publishedCampaignIds, setPublishedCampaignIds] = useState<string[]>([]);
 
   const platformOptions = ['Instagram', 'TikTok', 'YouTube', 'LinkedIn', 'Twitter', 'Facebook'];
 
@@ -254,28 +297,63 @@ export default function BriefsPage() {
       .map((brief) => {
         const briefId = toText(brief.id);
         const campaignId = toText(brief.campaign_id);
+        const rawBrief = parseRawBrief(brief.raw_brief);
+        const rawCriteria = getObjectValue(rawBrief.acceptance_criteria);
+        const rawRequiredElements = getObjectValue(rawCriteria.required_elements);
         const criteria =
           criteriaByBriefId.get(briefId) ?? criteriaByCampaignId.get(campaignId) ?? {};
-        const requiredElements = criteria.required_elements as SupabaseRow | undefined;
-
-        return {
+        const requiredElements = {
+          ...rawRequiredElements,
+          ...getObjectValue(criteria.required_elements),
+        };
+        const normalizedBrief = {
           id: briefId,
           campaignId,
           campaignName: campaignNames.get(campaignId) ?? 'Untitled campaign',
-          objective: toText(brief.objective),
-          targetAudience: toText(brief.target_audience),
-          contentDirection: toTextList(brief.content_direction).join('\n'),
-          platforms: toTextList(brief.platforms),
-          keyMessages: toTextList(criteria.key_messages),
-          brandRulesDo: toTextList(criteria.brand_rules_do),
-          brandRulesDont: toTextList(criteria.brand_rules_dont),
-          hashtags: toTextList(criteria.hashtags ?? requiredElements?.hashtags),
-          mentions: toTextList(criteria.mentions ?? requiredElements?.mentions),
-          cta: toText(criteria.cta ?? requiredElements?.cta),
-          status: toText(brief.status) || null,
+          objective: toText(brief.objective) || toText(rawBrief.objective) || toText(rawBrief.goal),
+          targetAudience:
+            toText(brief.target_audience) ||
+            toText(rawBrief.target_audience) ||
+            toText(rawBrief.audience),
+          contentDirection:
+            toTextList(brief.content_direction).join('\n') ||
+            toTextList(rawBrief.content_direction).join('\n') ||
+            toText(rawBrief.content_direction),
+          platforms: toTextList(brief.platforms).length
+            ? toTextList(brief.platforms)
+            : toTextList(rawBrief.platforms),
+          keyMessages: toTextList(criteria.key_messages).length
+            ? toTextList(criteria.key_messages)
+            : toTextList(rawCriteria.key_messages),
+          brandRulesDo: toTextList(criteria.brand_rules_do).length
+            ? toTextList(criteria.brand_rules_do)
+            : toTextList(rawCriteria.brand_rules_do),
+          brandRulesDont: toTextList(criteria.brand_rules_dont).length
+            ? toTextList(criteria.brand_rules_dont)
+            : toTextList(rawCriteria.brand_rules_dont),
+          hashtags: toTextList(criteria.hashtags ?? requiredElements.hashtags),
+          mentions: toTextList(criteria.mentions ?? requiredElements.mentions),
+          cta: toText(criteria.cta ?? requiredElements.cta),
+          status: toText(brief.status) || toText(rawBrief.status) || null,
+          completionPercentage: toNumberValue(
+            brief.completion_percentage ?? rawBrief.completion_percentage
+          ),
+          publishedAt: toText(brief.published_at ?? rawBrief.published_at) || null,
           createdAt: toText(brief.created_at) || null,
           updatedAt: toText(brief.updated_at) || null,
         };
+
+        if (process.env.NODE_ENV === 'development') {
+          console.info('Fetched normalized brief', {
+            campaignId,
+            rawBrief,
+            databaseBrief: brief,
+            databaseCriteria: criteria,
+            normalizedBrief,
+          });
+        }
+
+        return normalizedBrief;
       })
       .sort((firstBrief, secondBrief) => {
         const firstDate = new Date(firstBrief.updatedAt ?? firstBrief.createdAt ?? 0).getTime();
@@ -309,6 +387,9 @@ export default function BriefsPage() {
 
   const selectedCampaign = campaigns.find((campaign) => campaign.id === selectedCampaignId);
   const selectedBrief = briefs.find((brief) => brief.campaignId === selectedCampaignId);
+  const creatorBriefUrl = selectedCampaignId
+    ? `/creator-brief/${encodeURIComponent(selectedCampaignId)}`
+    : '';
 
   useEffect(() => {
     setObjective(selectedBrief?.objective ?? '');
@@ -323,6 +404,7 @@ export default function BriefsPage() {
     setCta(selectedBrief?.cta ?? '');
     setSaveError(null);
     setActiveStep(0);
+    setEditingPublishedBrief(false);
   }, [selectedCampaignId, selectedBrief]);
 
   useEffect(() => {
@@ -367,6 +449,8 @@ export default function BriefsPage() {
 
   const handleCampaignChange = (campaignId: string) => {
     setSelectedCampaignId(campaignId);
+    setEditingPublishedBrief(false);
+    setShowPublishSuccess(false);
     setSaveError(null);
     setToast(null);
   };
@@ -386,6 +470,39 @@ export default function BriefsPage() {
     setIsSaving(false);
   };
 
+  const handleViewCreatorBrief = () => {
+    if (!creatorBriefUrl) {
+      return;
+    }
+
+    window.open(creatorBriefUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleExportCreatorBrief = async () => {
+    if (!selectedCampaignId) {
+      setSaveError('Please select a campaign');
+      return;
+    }
+
+    setIsExportingBrief(true);
+    setSaveError(null);
+
+    try {
+      const creatorBrief = await getCreatorBriefExportData(selectedCampaignId);
+      downloadCreatorBriefPdf(creatorBrief);
+    } catch (error) {
+      console.error('Creator brief export error:', error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unable to export creator brief. Please try again.';
+      setSaveError(message);
+      showToast({ message, type: 'error' });
+    } finally {
+      setIsExportingBrief(false);
+    }
+  };
+
   useEffect(() => {
     if (!toast) {
       return;
@@ -398,28 +515,78 @@ export default function BriefsPage() {
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
-  const briefComplete = objective.trim() !== '' && 
-    targetAudience.trim() !== '' && 
-    contentDirection.trim() !== '' &&
-    platforms.length > 0 &&
-    keyMessages.some(msg => msg.trim() !== '') &&
-    brandRulesDo.some(rule => rule.trim() !== '') &&
-    brandRulesDont.some(rule => rule.trim() !== '') &&
-    hashtags.some(tag => tag.trim() !== '') &&
-    mentions.some(mention => mention.trim() !== '') &&
-    cta.trim() !== '';
+  const requiredFieldsValidation = useMemo(
+    () => ({
+      objective: objective.trim() !== '',
+      targetAudience: targetAudience.trim() !== '',
+      contentDirection: contentDirection.trim() !== '',
+      platforms: platforms.length > 0,
+      keyMessages: keyMessages.some((msg) => msg.trim() !== ''),
+      brandRulesDo: brandRulesDo.some((rule) => rule.trim() !== ''),
+      brandRulesDont: brandRulesDont.some((rule) => rule.trim() !== ''),
+      hashtags: hashtags.some((tag) => tag.trim() !== ''),
+      mentions: mentions.some((mention) => mention.trim() !== ''),
+      cta: cta.trim() !== '',
+    }),
+    [
+      brandRulesDo,
+      brandRulesDont,
+      contentDirection,
+      cta,
+      hashtags,
+      keyMessages,
+      mentions,
+      objective,
+      platforms,
+      targetAudience,
+    ]
+  );
+  const briefComplete = Object.values(requiredFieldsValidation).every(Boolean);
+  const savedBriefFieldsValidation = useMemo(
+    () => ({
+      objective: (selectedBrief?.objective ?? '').trim() !== '',
+      targetAudience: (selectedBrief?.targetAudience ?? '').trim() !== '',
+      contentDirection: (selectedBrief?.contentDirection ?? '').trim() !== '',
+      platforms: (selectedBrief?.platforms ?? []).length > 0,
+      keyMessages: (selectedBrief?.keyMessages ?? []).some((msg) => msg.trim() !== ''),
+      brandRulesDo: (selectedBrief?.brandRulesDo ?? []).some((rule) => rule.trim() !== ''),
+      brandRulesDont: (selectedBrief?.brandRulesDont ?? []).some((rule) => rule.trim() !== ''),
+      hashtags: (selectedBrief?.hashtags ?? []).some((tag) => tag.trim() !== ''),
+      mentions: (selectedBrief?.mentions ?? []).some((mention) => mention.trim() !== ''),
+      cta: (selectedBrief?.cta ?? '').trim() !== '',
+    }),
+    [selectedBrief]
+  );
+  const savedBriefComplete = Object.values(savedBriefFieldsValidation).every(Boolean);
+  const selectedBriefStatus = (selectedBrief?.status ?? '').toLowerCase().trim();
+  const selectedCampaignStatus = toText(selectedCampaign?.status).toLowerCase().trim();
+  const savedCompletionPercentage = selectedBrief?.completionPercentage ?? 0;
+  const publishActionTriggered =
+    showPublishSuccess || publishedCampaignIds.includes(selectedCampaignId);
+  const databaseIndicatesBriefCompleted =
+    ['published', 'approved', 'ready_for_review'].includes(selectedBriefStatus) ||
+    selectedCampaignStatus === 'ready_for_review' ||
+    savedCompletionPercentage >= 100 ||
+    Boolean(selectedBrief?.publishedAt);
+  const isBriefCompleted =
+    Boolean(selectedCampaignId) &&
+    (databaseIndicatesBriefCompleted ||
+      savedBriefComplete ||
+      briefComplete ||
+      publishActionTriggered);
+  const showPublishedOverview = isBriefCompleted && !editingPublishedBrief;
 
   const criteriaFields = [
-    { label: 'Campaign goal', complete: objective.trim() !== '' },
-    { label: 'Target audience', complete: targetAudience.trim() !== '' },
-    { label: 'Content direction', complete: contentDirection.trim() !== '' },
-    { label: 'Platforms', complete: platforms.length > 0 },
-    { label: 'Key message', complete: keyMessages.some(msg => msg.trim() !== '') },
-    { label: 'Brand do rules', complete: brandRulesDo.some(rule => rule.trim() !== '') },
-    { label: 'Brand don’t rules', complete: brandRulesDont.some(rule => rule.trim() !== '') },
-    { label: 'Hashtags', complete: hashtags.some(tag => tag.trim() !== '') },
-    { label: 'Mentions', complete: mentions.some(mention => mention.trim() !== '') },
-    { label: 'Call to action', complete: cta.trim() !== '' },
+    { label: 'Campaign goal', complete: requiredFieldsValidation.objective },
+    { label: 'Target audience', complete: requiredFieldsValidation.targetAudience },
+    { label: 'Content direction', complete: requiredFieldsValidation.contentDirection },
+    { label: 'Platforms', complete: requiredFieldsValidation.platforms },
+    { label: 'Key message', complete: requiredFieldsValidation.keyMessages },
+    { label: 'Brand do rules', complete: requiredFieldsValidation.brandRulesDo },
+    { label: 'Brand don’t rules', complete: requiredFieldsValidation.brandRulesDont },
+    { label: 'Hashtags', complete: requiredFieldsValidation.hashtags },
+    { label: 'Mentions', complete: requiredFieldsValidation.mentions },
+    { label: 'Call to action', complete: requiredFieldsValidation.cta },
   ];
 
   const completedCount = criteriaFields.filter(f => f.complete).length;
@@ -475,6 +642,52 @@ export default function BriefsPage() {
   const canGoNext = activeStep < briefSteps.length - 1;
   const isFinalStep = activeStep === briefSteps.length - 1;
   const canPublishFromCurrentStep = isFinalStep && briefComplete;
+  const briefDebugSnapshot = useMemo(
+    () => ({
+      selectedBrief,
+      selectedCampaign,
+      briefStatus: selectedBriefStatus,
+      campaignStatus: selectedCampaignStatus,
+      completionPercentage,
+      publishActionTriggered,
+      requiredFieldsValidation,
+      savedBriefFieldsValidation,
+      savedBriefComplete,
+      savedCompletionPercentage,
+      publishedAt: selectedBrief?.publishedAt,
+      briefComplete,
+      databaseIndicatesBriefCompleted,
+      isBriefCompleted,
+      editingPublishedBrief,
+      showPublishedOverview,
+      selectedBriefIsNull: selectedBrief == null,
+    }),
+    [
+      briefComplete,
+      completionPercentage,
+      databaseIndicatesBriefCompleted,
+      editingPublishedBrief,
+      isBriefCompleted,
+      publishActionTriggered,
+      requiredFieldsValidation,
+      savedBriefComplete,
+      savedBriefFieldsValidation,
+      savedCompletionPercentage,
+      selectedBrief,
+      selectedBriefStatus,
+      selectedCampaign,
+      selectedCampaignStatus,
+      showPublishedOverview,
+    ]
+  );
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') {
+      return;
+    }
+
+    console.info('Brief completion debug', briefDebugSnapshot);
+  }, [briefDebugSnapshot]);
 
   const validateBrief = (requireComplete: boolean) => {
     if (!selectedCampaignId) {
@@ -508,11 +721,19 @@ export default function BriefsPage() {
     const brandRulesDontValues = cleanTextList(brandRulesDont);
     const hashtagValues = cleanTextList(hashtags);
     const mentionValues = cleanTextList(mentions);
+    const nextCompletionPercentage = status === 'published' ? 100 : completionPercentage;
+    const nextPublishedAt = status === 'published' ? now : selectedBrief?.publishedAt;
     const rawBrief = {
+      campaign_id: selectedCampaignId,
       objective: objective.trim(),
+      goal: objective.trim(),
       target_audience: targetAudience.trim(),
+      audience: targetAudience.trim(),
       content_direction: contentDirection.trim(),
       platforms,
+      status,
+      completion_percentage: nextCompletionPercentage,
+      published_at: nextPublishedAt,
       acceptance_criteria: {
         key_messages: keyMessageValues,
         brand_rules_do: brandRulesDoValues,
@@ -528,12 +749,39 @@ export default function BriefsPage() {
       campaign_id: selectedCampaignId,
       raw_brief: JSON.stringify(rawBrief),
       objective: objective.trim(),
+      goal: objective.trim(),
       target_audience: targetAudience.trim(),
+      audience: targetAudience.trim(),
       content_direction: contentDirection.trim(),
       platforms,
       status,
+      completion_percentage: nextCompletionPercentage,
+      published_at: nextPublishedAt,
+      approval_notes:
+        keyMessageValues.length > 0
+          ? `Creators must include: ${keyMessageValues.join(', ')}`
+          : '',
       updated_at: now,
     };
+
+    if (process.env.NODE_ENV === 'development') {
+      console.info('Saving brief fields', {
+        status,
+        selectedCampaignId,
+        completionPercentage: nextCompletionPercentage,
+        publishedAt: nextPublishedAt,
+        briefPayload,
+        rawBrief,
+        criteria: {
+          keyMessageValues,
+          brandRulesDoValues,
+          brandRulesDontValues,
+          hashtagValues,
+          mentionValues,
+          cta: cta.trim(),
+        },
+      });
+    }
 
     let savedBrief: SupabaseRow | null = null;
     const existingBriefId = selectedBrief?.id;
@@ -679,6 +927,22 @@ export default function BriefsPage() {
 
     await fetchBriefData();
     if (status === 'published') {
+      if (process.env.NODE_ENV === 'development') {
+        console.info('Brief publish completed', {
+          selectedCampaignId,
+          savedBrief,
+          savedBriefId,
+          requestedStatus: status,
+          campaignStatusRequested: 'ready_for_review',
+        });
+      }
+
+      setPublishedCampaignIds((campaignIds) =>
+        campaignIds.includes(selectedCampaignId)
+          ? campaignIds
+          : [...campaignIds, selectedCampaignId]
+      );
+      setEditingPublishedBrief(false);
       setShowPublishSuccess(true);
     } else {
       showToast({ message: 'Draft saved', type: 'success' });
@@ -728,46 +992,176 @@ export default function BriefsPage() {
                 </h2>
               </div>
               <div className="flex flex-col items-start gap-3 md:items-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
-                  disabled={isSaving}
-                  onClick={() => saveBrief('draft')}
-                >
-                  {isSaving ? 'Saving...' : 'Save draft'}
-                </Button>
-                <div className="flex items-center gap-1.5">
-                  {briefSteps.map((step, index) => (
-                    <button
-                      key={step.title}
+                {!showPublishedOverview && (
+                  <>
+                    <Button
                       type="button"
-                      onClick={() => setActiveStep(index)}
-                      className={`h-2.5 rounded-full transition-all ${
-                        index === activeStep
-                          ? 'w-8 bg-primary'
-                          : step.complete
-                          ? 'w-2.5 bg-green-500'
-                          : 'w-2.5 bg-muted'
-                      }`}
-                      aria-label={`Open ${step.title}`}
-                    />
-                  ))}
-                </div>
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+                      disabled={isSaving}
+                      onClick={() => saveBrief('draft')}
+                    >
+                      {isSaving ? 'Saving...' : 'Save draft'}
+                    </Button>
+                    <div className="flex items-center gap-1.5">
+                      {briefSteps.map((step, index) => (
+                        <button
+                          key={step.title}
+                          type="button"
+                          onClick={() => setActiveStep(index)}
+                          className={`h-2.5 rounded-full transition-all ${
+                            index === activeStep
+                              ? 'w-8 bg-primary'
+                              : step.complete
+                              ? 'w-2.5 bg-green-500'
+                              : 'w-2.5 bg-muted'
+                          }`}
+                          aria-label={`Open ${step.title}`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+                {showPublishedOverview && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditingPublishedBrief(true)}
+                  >
+                    Edit Brief
+                  </Button>
+                )}
+                {isBriefCompleted && !showPublishedOverview && (
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleViewCreatorBrief}
+                    >
+                      View Creator Brief
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={isExportingBrief}
+                      onClick={handleExportCreatorBrief}
+                    >
+                      {isExportingBrief ? 'Exporting...' : 'Export Brief PDF'}
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
 
-            <section className="max-w-3xl">
-              <p className="text-sm font-medium text-muted-foreground">
-                {activeBriefStep.title}
-              </p>
-              <h3 className="mt-2 text-xl font-semibold tracking-normal">
-                {activeBriefStep.question}
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {activeBriefStep.helper}
-              </p>
+            {showPublishedOverview ? (
+              <section className="max-w-4xl">
+                <div className="rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-3">
+                  <p className="text-sm font-medium text-green-700">Brief published</p>
+                  <p className="mt-1 text-sm text-green-700/80">
+                    This campaign brief is complete. You can view the creator-facing document,
+                    export it as a PDF, or edit the brief if campaign details changed.
+                  </p>
+                </div>
+
+                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                  <div className="rounded-lg border border-border bg-background/50 p-4">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Campaign
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-foreground">
+                      {selectedBrief?.campaignName || toText(selectedCampaign.name) || 'Untitled campaign'}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-background/50 p-4">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Last updated
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-foreground">
+                      {formatDate(selectedBrief?.updatedAt ?? selectedBrief?.createdAt ?? null)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-background/50 p-4">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Completion
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-foreground">
+                      {completedCount} of {criteriaFields.length} sections complete
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-5 md:grid-cols-2">
+                  <div>
+                    <p className="text-sm font-medium">Campaign goal</p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {selectedBrief?.objective || 'Not added'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Target audience</p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {selectedBrief?.targetAudience || 'Not added'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Content direction</p>
+                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-muted-foreground">
+                      {selectedBrief?.contentDirection || 'Not added'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Platforms</p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {selectedBrief?.platforms.length
+                        ? selectedBrief.platforms.join(', ')
+                        : 'Not added'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 border-t border-border/60 pt-5">
+                  <p className="text-sm font-medium">Creator brief actions</p>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <Button type="button" onClick={handleViewCreatorBrief}>
+                      View Creator Brief
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isExportingBrief}
+                      onClick={handleExportCreatorBrief}
+                    >
+                      {isExportingBrief ? 'Exporting...' : 'Export Brief PDF'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setEditingPublishedBrief(true)}
+                    >
+                      Edit Brief
+                    </Button>
+                  </div>
+                  {saveError && (
+                    <div className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2">
+                      <p className="text-sm text-red-500">{saveError}</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+            ) : (
+              <section className="max-w-3xl">
+                <p className="text-sm font-medium text-muted-foreground">
+                  {activeBriefStep.title}
+                </p>
+                <h3 className="mt-2 text-xl font-semibold tracking-normal">
+                  {activeBriefStep.question}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {activeBriefStep.helper}
+                </p>
 
               <div className="mt-5">
                 {activeStep === 0 && (
@@ -997,6 +1391,7 @@ export default function BriefsPage() {
                 </div>
               </div>
             </section>
+            )}
           </main>
 
           <aside className="sticky top-6 rounded-xl bg-card/45 p-4 shadow-sm">
@@ -1021,7 +1416,9 @@ export default function BriefsPage() {
 
             <div>
               <div className="flex items-baseline justify-between">
-                <p className="text-sm font-medium">Brief progress</p>
+                <p className="text-sm font-medium">
+                  {isBriefCompleted ? 'Brief status' : 'Brief progress'}
+                </p>
                 <span className="text-sm text-muted-foreground">{completionPercentage}%</span>
               </div>
               <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-background">
@@ -1039,30 +1436,65 @@ export default function BriefsPage() {
               <p className="mt-3 text-sm text-muted-foreground">
                 {completedCount} of {criteriaFields.length} completed
               </p>
-              <p className="mt-2 text-sm text-foreground">{nextActionLabel}</p>
+              <p className="mt-2 text-sm text-foreground">
+                {isBriefCompleted
+                  ? editingPublishedBrief
+                    ? 'Editing published brief'
+                    : 'Published and ready to send'
+                  : nextActionLabel}
+              </p>
             </div>
 
-            <div className="mt-5 border-t border-border/60 pt-5">
-              <p className="text-sm font-medium">Complete these before publishing</p>
-              {remainingFields.length > 0 ? (
-                <ul className="mt-3 space-y-2">
-                  {remainingFields.map((field) => (
-                    <li
-                      key={field.label}
-                      className="flex items-center gap-2 text-sm text-muted-foreground"
-                    >
-                      <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
-                      {field.label}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-3 flex items-center gap-2 text-sm text-green-500">
-                  <span className="h-2 w-2 rounded-full bg-green-500" />
-                  Everything is complete.
+            {!showPublishedOverview && (
+              <div className="mt-5 border-t border-border/60 pt-5">
+                <p className="text-sm font-medium">Complete these before publishing</p>
+                {remainingFields.length > 0 ? (
+                  <ul className="mt-3 space-y-2">
+                    {remainingFields.map((field) => (
+                      <li
+                        key={field.label}
+                        className="flex items-center gap-2 text-sm text-muted-foreground"
+                      >
+                        <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                        {field.label}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 flex items-center gap-2 text-sm text-green-500">
+                    <span className="h-2 w-2 rounded-full bg-green-500" />
+                    Everything is complete.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {isBriefCompleted && (
+              <div className="mt-5 border-t border-border/60 pt-5">
+                <p className="text-sm font-medium">Creator brief document</p>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  Share the published creator-facing brief with campaign creators.
                 </p>
-              )}
-            </div>
+                <div className="mt-3 space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleViewCreatorBrief}
+                  >
+                    View Creator Brief
+                  </Button>
+                  <Button
+                    type="button"
+                    className="w-full"
+                    disabled={isExportingBrief}
+                    onClick={handleExportCreatorBrief}
+                  >
+                    {isExportingBrief ? 'Exporting...' : 'Export Brief PDF'}
+                  </Button>
+                </div>
+              </div>
+            )}
 
           </aside>
         </div>
@@ -1103,22 +1535,21 @@ export default function BriefsPage() {
           <DialogHeader>
             <DialogTitle>Brief published successfully</DialogTitle>
             <DialogDescription>
-              Your campaign brief is now ready for review.
+              Your creator-facing brief document is ready to view, export, and send.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:justify-end">
             <Button
               variant="outline"
-              onClick={() => router.push('/campaigns')}
+              onClick={handleViewCreatorBrief}
             >
-              Back to Campaigns
+              View Creator Brief
             </Button>
             <Button
-              onClick={() =>
-                router.push(`/reviews?campaign=${encodeURIComponent(selectedCampaignId)}`)
-              }
+              disabled={isExportingBrief}
+              onClick={handleExportCreatorBrief}
             >
-              Go to Reviews
+              {isExportingBrief ? 'Exporting...' : 'Export Brief PDF'}
             </Button>
           </div>
         </DialogContent>
