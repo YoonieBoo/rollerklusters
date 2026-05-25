@@ -640,7 +640,7 @@ export default function DashboardPage() {
                   <TableHead className="py-2">Client</TableHead>
                   <TableHead className="py-2">Status</TableHead>
                   <TableHead className="py-2">Brief</TableHead>
-                  <TableHead className="py-2">Approval</TableHead>
+                  <TableHead className="py-2">Review Status</TableHead>
                   <TableHead className="py-2">Submissions</TableHead>
                   <TableHead className="py-2">Last Updated</TableHead>
                 </TableRow>
