@@ -263,255 +263,474 @@ const cleanPdfText = (text: string) =>
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
     .replace(/[–—]/g, '-')
-    .replace(/[•]/g, '-')
+    .replace(/[•]/g, '')
     .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, '');
 
-const escapePdfText = (text: string) =>
-  cleanPdfText(text).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-
-const wrapPdfText = (text: string, maxCharacters: number) => {
-  const words = cleanPdfText(text).split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let currentLine = '';
-
-  words.forEach((word) => {
-    const nextLine = currentLine ? `${currentLine} ${word}` : word;
-
-    if (nextLine.length > maxCharacters && currentLine) {
-      lines.push(currentLine);
-      currentLine = word;
-      return;
-    }
-
-    currentLine = nextLine;
-  });
-
-  if (currentLine) {
-    lines.push(currentLine);
-  }
-
-  return lines.length > 0 ? lines : [''];
-};
-
-const buildPdfBlob = (pages: string[]) => {
-  const encoder = new TextEncoder();
-  const objects: string[] = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
-  ];
-  const pageObjectNumbers: number[] = [];
-
-  pages.forEach((pageContent) => {
-    const contentObjectNumber = objects.length + 1;
-    const pageObjectNumber = objects.length + 2;
-    const contentLength = encoder.encode(pageContent).length;
-
-    objects.push(`<< /Length ${contentLength} >>\nstream\n${pageContent}\nendstream`);
-    objects.push(
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`
-    );
-    pageObjectNumbers.push(pageObjectNumber);
-  });
-
-  objects[1] =
-    `<< /Type /Pages /Kids [${pageObjectNumbers.map((objectNumber) => `${objectNumber} 0 R`).join(' ')}] /Count ${pageObjectNumbers.length} >>`;
-
-  let pdf = '%PDF-1.4\n';
-  const offsets = [0];
-
-  objects.forEach((object, index) => {
-    offsets.push(encoder.encode(pdf).length);
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  });
-
-  const xrefOffset = encoder.encode(pdf).length;
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  offsets.slice(1).forEach((offset) => {
-    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
-  });
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
-
-  return new Blob([pdf], { type: 'application/pdf' });
-};
-
-export const createCreatorBriefPdf = (brief: CreatorBriefDocument) => {
-  const pageWidth = 595;
-  const marginX = 48;
-  const pageTop = 794;
-  const bottomMargin = 54;
+export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
+  const { jsPDF } = await import('jspdf/dist/jspdf.es.min.js');
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const marginX = 46;
+  const topMargin = 46;
   const contentWidth = pageWidth - marginX * 2;
-  const black: [number, number, number] = [0.08, 0.08, 0.08];
-  const muted: [number, number, number] = [0.38, 0.38, 0.38];
-  const blue: [number, number, number] = [0.10, 0.30, 0.70];
-  const lightLine: [number, number, number] = [0.86, 0.88, 0.92];
-  let cursorY = pageTop;
-  let currentPage = '';
-  const pages: string[] = [];
+  const bottomMargin = 64;
+  const black = '#111827';
+  const dark = '#1f2937';
+  const muted = '#667085';
+  const blue = '#2563eb';
+  const line = '#e6e8ee';
+  const cardBorder = '#e4e7ec';
+  const cardFill = '#f8fafc';
+  let cursorY = topMargin;
 
-  const addRaw = (content: string) => {
-    currentPage += `${content}\n`;
+  const setFont = (size: number, style: 'normal' | 'bold' = 'normal', color = black) => {
+    pdf.setFont('helvetica', style);
+    pdf.setFontSize(size);
+    pdf.setTextColor(color);
   };
 
-  const addPdfText = (
-    text: string,
-    x: number,
-    y: number,
-    size = 10,
-    bold = false,
-    color: [number, number, number] = black
-  ) => {
-    addRaw(
-      `BT /${bold ? 'F2' : 'F1'} ${size} Tf ${color.join(' ')} rg 1 0 0 1 ${x} ${y} Tm (${escapePdfText(text)}) Tj ET`
-    );
-  };
-
-  const addLine = (
-    x1: number,
-    y: number,
-    x2: number,
-    color: [number, number, number] = lightLine
-  ) => {
-    addRaw(`${color.join(' ')} RG ${x1} ${y} m ${x2} ${y} l S`);
-  };
-
-  const startPage = () => {
-    currentPage = '';
-    cursorY = pageTop;
-    addRaw('1 1 1 rg 0 0 595 842 re f');
-  };
-
-  const finishPage = () => {
-    addLine(marginX, 38, pageWidth - marginX);
-    addPdfText('RollerKluster Creator Brief', marginX, 24, 8, false, muted);
-    pages.push(currentPage);
-  };
+  const remainingPageHeight = () => pageHeight - bottomMargin - cursorY;
+  const usablePageHeight = () => pageHeight - bottomMargin - topMargin;
 
   const ensureSpace = (heightNeeded: number) => {
-    if (cursorY - heightNeeded >= bottomMargin) {
+    if (cursorY + heightNeeded <= pageHeight - bottomMargin) {
       return;
     }
 
-    finishPage();
-    startPage();
+    pdf.addPage();
+    cursorY = topMargin;
   };
 
-  const addWrapped = (
+  const cleanPdfDisplayText = (text: string) =>
+    cleanPdfText(text)
+      .split(/\n+/)
+      .map((lineText) => lineText.replace(/^\s*[-]+\s*/, '').trim())
+      .filter(Boolean)
+      .join('\n');
+
+  const getWrappedLines = (
     text: string,
+    width: number,
     options: {
-      x?: number;
-      maxCharacters?: number;
       size?: number;
-      bold?: boolean;
-      color?: [number, number, number];
-      gap?: number;
-      lineHeight?: number;
+      style?: 'normal' | 'bold';
+      color?: string;
     } = {}
   ) => {
-    const x = options.x ?? marginX;
-    const size = options.size ?? 10;
-    const lineHeight = options.lineHeight ?? Math.max(size + 5, 14);
-    const lines = cleanPdfText(text)
-      .split(/\n+/)
-      .flatMap((line) => wrapPdfText(line, options.maxCharacters ?? 90));
+    setFont(options.size ?? 10.2, options.style ?? 'normal', options.color ?? dark);
 
-    lines.forEach((line) => {
-      ensureSpace(lineHeight + (options.gap ?? 8));
-      addPdfText(line, x, cursorY, size, options.bold, options.color ?? black);
-      cursorY -= lineHeight;
-    });
-    ensureSpace(options.gap ?? 8);
-    cursorY -= options.gap ?? 8;
+    return cleanPdfDisplayText(text || 'To be confirmed')
+      .split(/\n+/)
+      .flatMap((textLine) => pdf.splitTextToSize(textLine || ' ', width) as string[]);
   };
 
-  const addSection = (title: string, content: string | string[]) => {
-    ensureSpace(50);
-    addPdfText(title.toUpperCase(), marginX, cursorY, 10.5, true, blue);
-    cursorY -= 13;
-    addLine(marginX, cursorY, pageWidth - marginX);
-    cursorY -= 18;
-
+  const getContentParagraphs = (content: string | string[]) => {
     if (Array.isArray(content)) {
-      const items = content.length > 0 ? content : ['To be confirmed'];
+      const items = content.map((item) => cleanPdfDisplayText(item)).filter(Boolean);
 
-      items.forEach((item) => {
-        addWrapped(`- ${item}`, { maxCharacters: 86, size: 10, lineHeight: 14, gap: 2 });
+      return items.length > 0 ? [items.join(', ')] : ['To be confirmed'];
+    }
+
+    const text = cleanPdfDisplayText(content).trim();
+
+    return text ? text.split(/\n+/) : ['To be confirmed'];
+  };
+
+  const addFooter = () => {
+    const pageCount = pdf.getNumberOfPages();
+
+    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+      pdf.setPage(pageNumber);
+      pdf.setDrawColor(line);
+      pdf.line(marginX, pageHeight - 42, pageWidth - marginX, pageHeight - 42);
+      setFont(8.5, 'normal', muted);
+      pdf.text('Generated by RollerKluster', marginX, pageHeight - 25);
+
+      if (pageCount > 1) {
+        pdf.text(`Page ${pageNumber} of ${pageCount}`, pageWidth - marginX, pageHeight - 25, {
+          align: 'right',
+        });
+      }
+    }
+  };
+
+  const drawHeader = () => {
+    pdf.setFillColor('#ffffff');
+    pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+
+    setFont(9.5, 'bold', blue);
+    pdf.text('ROLLERKLUSTER', marginX, cursorY);
+    setFont(9.5, 'normal', muted);
+    pdf.text('Creator Campaign Brief', marginX, cursorY + 16);
+    cursorY += 48;
+
+    const titleLines = getWrappedLines(brief.campaignName, contentWidth - 24, {
+      size: 27,
+      style: 'bold',
+      color: black,
+    });
+    setFont(27, 'bold', black);
+    titleLines.forEach((lineText) => {
+      pdf.text(lineText, marginX, cursorY);
+      cursorY += 32;
+    });
+    cursorY += 8;
+
+    const summaryItems = [
+      { label: 'Client', value: brief.clientName },
+      { label: 'Campaign Timeline', value: brief.timeline },
+    ];
+
+    summaryItems.forEach((item) => {
+      const label = `${item.label}:`;
+
+      setFont(10.5, 'bold', dark);
+      pdf.text(label, marginX, cursorY);
+      setFont(10.5, 'normal', dark);
+      pdf.text(cleanPdfDisplayText(item.value || 'To be confirmed'), marginX + pdf.getTextWidth(label) + 5, cursorY, {
+        maxWidth: contentWidth - pdf.getTextWidth(label) - 5,
       });
-      cursorY -= 8;
+      cursorY += 18;
+    });
+
+    cursorY += 18;
+    pdf.setDrawColor(line);
+    pdf.line(marginX, cursorY, pageWidth - marginX, cursorY);
+    cursorY += 26;
+  };
+
+  const addGroupTitle = (title: string) => {
+    setFont(12, 'bold', black);
+    pdf.text(title, marginX, cursorY);
+    cursorY += 20;
+  };
+
+  const measureFieldCardHeight = ({
+    label,
+    content,
+    width,
+  }: {
+    label: string;
+    content: string | string[];
+    width: number;
+  }) => {
+    const bodyWidth = width - 44;
+    const labelHeight = 13;
+    const paragraphs = getContentParagraphs(content);
+    const bodyHeight = paragraphs.reduce((total, paragraph) => {
+      const lines = getWrappedLines(paragraph, bodyWidth, {
+        size: 10.2,
+        color: dark,
+      });
+
+      return total + lines.length * 14.5 + 5;
+    }, 0);
+
+    return Math.max(66, labelHeight + bodyHeight + 30);
+  };
+
+  const addFieldCard = ({
+    label,
+    content,
+    x = marginX,
+    width = contentWidth,
+  }: {
+    label: string;
+    content: string | string[];
+    x?: number;
+    width?: number;
+  }) => {
+    const height = measureFieldCardHeight({ label, content, width });
+    const maxCardHeight = pageHeight - topMargin - bottomMargin;
+
+    if (height > maxCardHeight) {
+      ensureSpace(110);
+
+      const bodyX = x + 18;
+      const bodyWidth = width - 44;
+      const lineHeight = 14.5;
+      let startY = cursorY;
+      let textY = startY + 50;
+
+      const startLongCardPage = (continued: boolean) => {
+        startY = cursorY;
+        textY = startY + 50;
+        pdf.setFillColor(cardFill);
+        pdf.setDrawColor(cardBorder);
+        pdf.roundedRect(
+          x,
+          startY,
+          width,
+          pageHeight - bottomMargin - startY,
+          8,
+          8,
+          'FD'
+        );
+        setFont(8.4, 'bold', blue);
+        pdf.text(`${label.toUpperCase()}${continued ? ' (CONTINUED)' : ''}`, x + 16, startY + 27);
+      };
+
+      startLongCardPage(false);
+      getContentParagraphs(content).forEach((paragraph) => {
+        const lines = getWrappedLines(paragraph, bodyWidth, {
+          size: 10.2,
+          color: dark,
+        });
+
+        lines.forEach((lineText) => {
+          if (textY + lineHeight > pageHeight - bottomMargin - 12) {
+            pdf.addPage();
+            cursorY = topMargin;
+            startLongCardPage(true);
+          }
+
+          setFont(10.2, 'normal', dark);
+          pdf.text(lineText, bodyX, textY);
+          textY += lineHeight;
+        });
+        textY += 5;
+      });
+
+      cursorY = textY + 12;
       return;
     }
 
-    addWrapped(content || 'To be confirmed', {
-      maxCharacters: 90,
-      size: 10,
-      lineHeight: 15,
-      gap: 12,
+    ensureSpace(height + 12);
+
+    const startY = cursorY;
+    pdf.setFillColor(cardFill);
+    pdf.setDrawColor(cardBorder);
+    pdf.roundedRect(x, startY, width, height, 8, 8, 'FD');
+
+    setFont(8.4, 'bold', blue);
+    pdf.text(label.toUpperCase(), x + 16, startY + 27);
+
+    const bodyX = x + 18;
+    const bodyWidth = width - 44;
+    let textY = startY + 50;
+    const paragraphs = getContentParagraphs(content);
+
+    paragraphs.forEach((paragraph) => {
+      const lines = getWrappedLines(paragraph, bodyWidth, {
+        size: 10.2,
+        color: dark,
+      });
+
+      lines.forEach((lineText) => {
+        setFont(10.2, 'normal', dark);
+        pdf.text(lineText, bodyX, textY);
+        textY += 14.5;
+      });
+      textY += 5;
     });
+
+    cursorY = startY + height + 12;
   };
 
-  startPage();
-  addPdfText('ROLLERKLUSTER CREATOR BRIEF', marginX, cursorY, 10, true, blue);
-  cursorY -= 30;
-  addWrapped(brief.campaignName, {
-    maxCharacters: 42,
-    size: 25,
-    bold: true,
-    lineHeight: 30,
-    gap: 12,
-  });
+  const addFieldCards = (fields: Array<{ label: string; content: string | string[] }>) => {
+    fields.forEach((field) => addFieldCard(field));
+    cursorY += 8;
+  };
 
-  const metadata = [
-    ['Brand / Client', brief.clientName],
-    ['Campaign Timeline', brief.timeline],
-    ['Updated', formatDate(brief.updatedAt)],
-  ];
-  const metaColumnWidth = contentWidth / metadata.length;
+  const ensureSectionStart = (heightNeeded: number) => {
+    if (heightNeeded <= remainingPageHeight()) {
+      return;
+    }
 
-  metadata.forEach(([label, value], index) => {
-    const x = marginX + metaColumnWidth * index;
+    pdf.addPage();
+    cursorY = topMargin;
+  };
 
-    addPdfText(label.toUpperCase(), x, cursorY, 7.5, true, muted);
-    addPdfText(value || 'To be confirmed', x, cursorY - 16, 9.5, false, black);
-  });
-  cursorY -= 44;
-  addLine(marginX, cursorY, pageWidth - marginX);
-  cursorY -= 32;
+  const addFieldCardSection = (
+    title: string,
+    fields: Array<{ label: string; content: string | string[] }>
+  ) => {
+    const titleHeight = 20;
+    const firstCardHeight =
+      titleHeight +
+      measureFieldCardHeight({
+        label: fields[0].label,
+        content: fields[0].content,
+        width: contentWidth,
+      }) +
+      12;
 
-  addSection('Campaign Goal', brief.campaignGoal);
-  addSection('Target Audience', brief.targetAudience);
-  addSection('Content Direction', [
-    brief.contentDirection,
-    brief.platforms.length > 0 ? `Platforms: ${brief.platforms.join(', ')}` : '',
-  ].filter(Boolean));
-  addSection('Key Messages', brief.keyMessages);
-  addSection('Brand Rules', [
+    ensureSectionStart(firstCardHeight);
+    addGroupTitle(title);
+    addFieldCards(fields);
+  };
+
+  const addTwoColumnCards = (fields: Array<{ label: string; content: string | string[] }>) => {
+    const gutter = 14;
+    const columnWidth = (contentWidth - gutter) / 2;
+
+    for (let index = 0; index < fields.length; index += 2) {
+      const firstField = fields[index];
+      const secondField = fields[index + 1];
+      const firstHeight = measureFieldCardHeight({
+        label: firstField.label,
+        content: firstField.content,
+        width: columnWidth,
+      });
+      const secondHeight = secondField
+        ? measureFieldCardHeight({
+            label: secondField.label,
+            content: secondField.content,
+            width: columnWidth,
+          })
+        : 0;
+      const rowHeight = Math.max(firstHeight, secondHeight);
+      const rowStartY = cursorY;
+
+      if (rowHeight > pageHeight - topMargin - bottomMargin) {
+        addFieldCard(firstField);
+
+        if (secondField) {
+          addFieldCard(secondField);
+        }
+
+        continue;
+      }
+
+      ensureSpace(rowHeight + 12);
+      addFieldCard({ ...firstField, x: marginX, width: columnWidth });
+
+      if (secondField) {
+        const nextY = cursorY;
+        cursorY = rowStartY;
+        addFieldCard({ ...secondField, x: marginX + columnWidth + gutter, width: columnWidth });
+        cursorY = Math.max(cursorY, nextY);
+      }
+    }
+
+    cursorY += 8;
+  };
+
+  const measureTwoColumnCardsHeight = (
+    fields: Array<{ label: string; content: string | string[] }>
+  ) => {
+    const gutter = 14;
+    const columnWidth = (contentWidth - gutter) / 2;
+    let totalHeight = 8;
+
+    for (let index = 0; index < fields.length; index += 2) {
+      const firstField = fields[index];
+      const secondField = fields[index + 1];
+      const firstHeight = measureFieldCardHeight({
+        label: firstField.label,
+        content: firstField.content,
+        width: columnWidth,
+      });
+      const secondHeight = secondField
+        ? measureFieldCardHeight({
+            label: secondField.label,
+            content: secondField.content,
+            width: columnWidth,
+          })
+        : 0;
+
+      totalHeight += Math.max(firstHeight, secondHeight) + 12;
+    }
+
+    return totalHeight;
+  };
+
+  const addTwoColumnCardSection = (
+    title: string,
+    fields: Array<{ label: string; content: string | string[] }>
+  ) => {
+    const titleHeight = 20;
+    const gutter = 14;
+    const columnWidth = (contentWidth - gutter) / 2;
+    const firstRowHeight = Math.max(
+      measureFieldCardHeight({
+        label: fields[0].label,
+        content: fields[0].content,
+        width: columnWidth,
+      }),
+      fields[1]
+        ? measureFieldCardHeight({
+            label: fields[1].label,
+            content: fields[1].content,
+            width: columnWidth,
+          })
+        : 0
+    );
+    const fullSectionHeight = titleHeight + measureTwoColumnCardsHeight(fields);
+
+    ensureSectionStart(
+      fullSectionHeight <= usablePageHeight() ? fullSectionHeight : titleHeight + firstRowHeight + 12
+    );
+    addGroupTitle(title);
+    addTwoColumnCards(fields);
+  };
+
+  const acceptanceCriteria = [
+    ...brief.keyMessages.map((message) => `Key message: ${message}`),
     ...brief.brandRulesDo.map((rule) => `Do: ${rule}`),
-    ...brief.brandRulesDont.map((rule) => `Do not: ${rule}`),
-  ]);
-  addSection('Hashtags & Mentions', [
+    ...brief.brandRulesDont.map((rule) => `Don't: ${rule}`),
     brief.hashtags.length > 0 ? `Hashtags: ${brief.hashtags.join(' ')}` : '',
     brief.mentions.length > 0 ? `Mentions: ${brief.mentions.join(' ')}` : '',
-  ].filter(Boolean));
-  addSection('Call To Action', brief.callToAction);
-  addSection('Submission Deadline', brief.submissionDeadline);
-  addSection('Approval Notes', brief.approvalNotes);
-  addSection('Contact / Support', brief.contactSupport);
+    brief.callToAction ? `CTA: ${brief.callToAction}` : '',
+  ].filter(Boolean);
 
-  finishPage();
-  return buildPdfBlob(pages);
+  drawHeader();
+
+  addFieldCardSection('Brief Overview', [
+    { label: 'Campaign Goal', content: brief.campaignGoal },
+    { label: 'Target Audience', content: brief.targetAudience },
+    { label: 'Key Message', content: brief.keyMessages },
+  ]);
+
+  addFieldCardSection('Creator Direction', [
+    { label: 'Content Direction / Themes', content: brief.contentDirection },
+    { label: 'Platforms', content: brief.platforms },
+    { label: 'Call To Action', content: brief.callToAction },
+  ]);
+
+  addTwoColumnCardSection('Brand Guidelines', [
+    { label: 'Brand Do Rules', content: brief.brandRulesDo },
+    { label: "Brand Don't Rules", content: brief.brandRulesDont },
+  ]);
+
+  addTwoColumnCardSection('Required Elements', [
+    { label: 'Required Hashtags', content: brief.hashtags },
+    { label: 'Required Mentions', content: brief.mentions },
+  ]);
+
+  addFieldCardSection('Approval & Acceptance Criteria', [
+    { label: 'Approval Notes', content: brief.approvalNotes },
+    { label: 'Acceptance Criteria', content: acceptanceCriteria },
+  ]);
+
+  addFieldCardSection('Timeline & Support', [
+    { label: 'Submission Deadline', content: brief.submissionDeadline },
+    { label: 'Campaign Timeline', content: brief.timeline },
+    { label: 'Contact / Support', content: brief.contactSupport },
+  ]);
+
+  addFooter();
+  return pdf.output('blob');
 };
 
-export const downloadCreatorBriefPdf = (brief: CreatorBriefDocument) => {
-  const pdfBlob = createCreatorBriefPdf(brief);
+const sanitizeFileSegment = (value: string) => {
+  const sanitizedValue = value
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return sanitizedValue || 'RollerKluster';
+};
+
+export const downloadCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
+  const pdfBlob = await createCreatorBriefPdf(brief);
   const pdfUrl = URL.createObjectURL(pdfBlob);
   const element = document.createElement('a');
+  const fileBaseName = sanitizeFileSegment(brief.campaignName);
 
   element.href = pdfUrl;
-  element.download = `creator-brief-${brief.campaignName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')}.pdf`;
+  element.download = `${fileBaseName}${/brief$/i.test(fileBaseName) ? '' : '-Brief'}.pdf`;
   element.style.display = 'none';
   document.body.appendChild(element);
   element.click();

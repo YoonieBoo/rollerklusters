@@ -22,8 +22,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import {
   downloadCreatorBriefPdf,
-  getCreatorBriefExportData,
 } from '@/lib/creator-brief-export';
+import type { CreatorBriefDocument } from '@/lib/creator-brief-export';
 
 type SupabaseRow = Record<string, unknown>;
 
@@ -478,9 +478,64 @@ export default function BriefsPage() {
     window.open(creatorBriefUrl, '_blank', 'noopener,noreferrer');
   };
 
+  const buildCurrentCreatorBriefDocument = (): CreatorBriefDocument => {
+    const keyMessageValues = cleanTextList(keyMessages);
+    const brandRulesDoValues = cleanTextList(brandRulesDo);
+    const brandRulesDontValues = cleanTextList(brandRulesDont);
+    const hashtagValues = cleanTextList(hashtags);
+    const mentionValues = cleanTextList(mentions);
+    const campaignName =
+      selectedBrief?.campaignName || toText(selectedCampaign?.name) || 'Untitled campaign';
+    const generatedApprovalNotes = [
+      keyMessageValues.length > 0 ? 'Include the key messages listed in this brief.' : '',
+      brandRulesDoValues.length > 0 ? 'Follow all brand do rules.' : '',
+      brandRulesDontValues.length > 0 ? 'Avoid all listed brand restrictions.' : '',
+      'Submit content for review before posting unless your campaign manager says otherwise.',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    return {
+      campaignId: selectedCampaignId,
+      briefId: selectedBrief?.id ?? '',
+      campaignName,
+      clientName:
+        toText(selectedCampaign?.client_name) ||
+        toText(selectedCampaign?.client) ||
+        'Brand to be confirmed',
+      timeline: selectedBrief?.publishedAt
+        ? `Published ${formatDate(selectedBrief.publishedAt)}`
+        : 'Timeline to be confirmed',
+      campaignGoal: objective.trim(),
+      targetAudience: targetAudience.trim(),
+      contentDirection: contentDirection.trim(),
+      platforms,
+      keyMessages: keyMessageValues,
+      brandRulesDo: brandRulesDoValues,
+      brandRulesDont: brandRulesDontValues,
+      hashtags: hashtagValues,
+      mentions: mentionValues,
+      callToAction: cta.trim(),
+      submissionDeadline: toText(selectedCampaign?.deadline) || 'To be confirmed by the campaign manager.',
+      approvalNotes: generatedApprovalNotes,
+      contactSupport:
+        toText(selectedCampaign?.contact) ||
+        toText(selectedCampaign?.support_contact) ||
+        toText(selectedCampaign?.manager_email) ||
+        'Contact your campaign manager for questions, approvals, or submission support.',
+      status: selectedBrief?.status ?? 'draft',
+      updatedAt: selectedBrief?.updatedAt ?? new Date().toISOString(),
+    };
+  };
+
   const handleExportCreatorBrief = async () => {
     if (!selectedCampaignId) {
       setSaveError('Please select a campaign');
+      return;
+    }
+
+    if (!briefComplete) {
+      setSaveError('Complete all required brief sections before downloading.');
       return;
     }
 
@@ -488,14 +543,11 @@ export default function BriefsPage() {
     setSaveError(null);
 
     try {
-      const creatorBrief = await getCreatorBriefExportData(selectedCampaignId);
-      downloadCreatorBriefPdf(creatorBrief);
+      const creatorBrief = buildCurrentCreatorBriefDocument();
+      await downloadCreatorBriefPdf(creatorBrief);
     } catch (error) {
       console.error('Creator brief export error:', error);
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Unable to export creator brief. Please try again.';
+      const message = 'Could not generate PDF. Please try again.';
       setSaveError(message);
       showToast({ message, type: 'error' });
     } finally {
@@ -1046,10 +1098,10 @@ export default function BriefsPage() {
                     <Button
                       type="button"
                       size="sm"
-                      disabled={isExportingBrief}
+                      disabled={isExportingBrief || !briefComplete}
                       onClick={handleExportCreatorBrief}
                     >
-                      {isExportingBrief ? 'Exporting...' : 'Export Brief PDF'}
+                      {isExportingBrief ? 'Generating...' : 'Download Brief PDF'}
                     </Button>
                   </div>
                 )}
@@ -1131,10 +1183,10 @@ export default function BriefsPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={isExportingBrief}
+                      disabled={isExportingBrief || !briefComplete}
                       onClick={handleExportCreatorBrief}
                     >
-                      {isExportingBrief ? 'Exporting...' : 'Export Brief PDF'}
+                      {isExportingBrief ? 'Generating...' : 'Download Brief PDF'}
                     </Button>
                     <Button
                       type="button"
@@ -1469,13 +1521,15 @@ export default function BriefsPage() {
               </div>
             )}
 
-            {isBriefCompleted && (
-              <div className="mt-5 border-t border-border/60 pt-5">
-                <p className="text-sm font-medium">Creator brief document</p>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  Share the published creator-facing brief with campaign creators.
-                </p>
-                <div className="mt-3 space-y-2">
+            <div className="mt-5 border-t border-border/60 pt-5">
+              <p className="text-sm font-medium">Creator brief document</p>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                {briefComplete
+                  ? 'Download a professional PDF brief for clients and creators.'
+                  : 'Complete all required brief sections before downloading.'}
+              </p>
+              <div className="mt-3 space-y-2">
+                {isBriefCompleted && (
                   <Button
                     type="button"
                     variant="outline"
@@ -1484,17 +1538,17 @@ export default function BriefsPage() {
                   >
                     View Creator Brief
                   </Button>
-                  <Button
-                    type="button"
-                    className="w-full"
-                    disabled={isExportingBrief}
-                    onClick={handleExportCreatorBrief}
-                  >
-                    {isExportingBrief ? 'Exporting...' : 'Export Brief PDF'}
-                  </Button>
-                </div>
+                )}
+                <Button
+                  type="button"
+                  className="w-full"
+                  disabled={isExportingBrief || !briefComplete}
+                  onClick={handleExportCreatorBrief}
+                >
+                  {isExportingBrief ? 'Generating...' : 'Download Brief PDF'}
+                </Button>
               </div>
-            )}
+            </div>
 
           </aside>
         </div>
@@ -1546,10 +1600,10 @@ export default function BriefsPage() {
               View Creator Brief
             </Button>
             <Button
-              disabled={isExportingBrief}
+              disabled={isExportingBrief || !briefComplete}
               onClick={handleExportCreatorBrief}
             >
-              {isExportingBrief ? 'Exporting...' : 'Export Brief PDF'}
+              {isExportingBrief ? 'Generating...' : 'Download Brief PDF'}
             </Button>
           </div>
         </DialogContent>

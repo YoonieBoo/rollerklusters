@@ -88,7 +88,7 @@ export default function CreatorBriefPage() {
     setIsExporting(true);
 
     try {
-      downloadCreatorBriefPdf(brief);
+      await downloadCreatorBriefPdf(brief);
     } finally {
       setIsExporting(false);
     }
