@@ -802,6 +802,9 @@ export default function BriefsPage() {
       cta: getCurrentOrSavedText(cta, selectedBrief?.cta) !== '',
       submissionDeadline:
         getCurrentOrSavedText(submissionDeadline, selectedBrief?.submissionDeadline) !== '',
+      posterImages:
+        (posterImageUrls.length > 0 ? posterImageUrls : selectedBrief?.posterImageUrls ?? [])
+          .length > 0,
     }),
     [
       brandRulesDo,
@@ -813,6 +816,7 @@ export default function BriefsPage() {
       mentions,
       objective,
       platforms,
+      posterImageUrls,
       selectedBrief,
       submissionDeadline,
       targetAudience,
@@ -832,6 +836,7 @@ export default function BriefsPage() {
       mentions: (selectedBrief?.mentions ?? []).some((mention) => mention.trim() !== ''),
       cta: (selectedBrief?.cta ?? '').trim() !== '',
       submissionDeadline: (selectedBrief?.submissionDeadline ?? '').trim() !== '',
+      posterImages: (selectedBrief?.posterImageUrls ?? []).length > 0,
     }),
     [selectedBrief]
   );
@@ -862,6 +867,7 @@ export default function BriefsPage() {
     { label: 'Mentions', complete: requiredFieldsValidation.mentions },
     { label: 'Call to action', complete: requiredFieldsValidation.cta },
     { label: 'Submission deadline', complete: requiredFieldsValidation.submissionDeadline },
+    { label: 'Posters / Campaign Images', complete: requiredFieldsValidation.posterImages },
   ];
 
   const completedCount = criteriaFields.filter(f => f.complete).length;
@@ -916,7 +922,8 @@ export default function BriefsPage() {
         hashtags.some((tag) => tag.trim() !== '') &&
         mentions.some((mention) => mention.trim() !== '') &&
         cta.trim() !== '' &&
-        submissionDeadline.trim() !== '',
+        submissionDeadline.trim() !== '' &&
+        posterImageUrls.length > 0,
     },
   ];
   const activeBriefStep = briefSteps[activeStep] ?? briefSteps[0];
