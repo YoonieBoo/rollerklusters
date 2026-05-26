@@ -46,6 +46,9 @@ type BriefView = {
   hashtags: string[];
   mentions: string[];
   cta: string;
+  submissionDeadline: string;
+  contactSupport: string;
+  posterImageUrls: string[];
   status: string | null;
   completionPercentage: number | null;
   publishedAt: string | null;
@@ -215,9 +218,74 @@ const formatDate = (date: string | null) => {
   return parsedDate.toLocaleDateString();
 };
 
+const formatCampaignDate = (date: string | null) => {
+  if (!date) {
+    return '';
+  }
+
+  const dateOnlyMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const parsedDate = dateOnlyMatch
+    ? new Date(
+        Number(dateOnlyMatch[1]),
+        Number(dateOnlyMatch[2]) - 1,
+        Number(dateOnlyMatch[3])
+      )
+    : new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(parsedDate);
+};
+
+const buildCampaignTimeline = (campaign: CampaignRow | undefined) => {
+  const startDate = formatCampaignDate(toText(campaign?.campaign_start_date) || null);
+  const endDate = formatCampaignDate(toText(campaign?.campaign_end_date) || null);
+
+  if (startDate && endDate) {
+    return `${startDate} – ${endDate}`;
+  }
+
+  if (startDate) {
+    return `From ${startDate}`;
+  }
+
+  if (endDate) {
+    return `Until ${endDate}`;
+  }
+
+  return 'Not set';
+};
+
+const posterBucketName = 'brief-posters';
+const posterUploadErrorMessage = 'Please upload a PNG, JPG, JPEG, or WebP image under 5MB.';
+const acceptedPosterMimeTypes = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp',
+]);
+
+const getPosterStoragePath = (url: string) => {
+  const bucketPath = `/storage/v1/object/public/${posterBucketName}/`;
+  const pathStart = url.indexOf(bucketPath);
+
+  if (pathStart === -1) {
+    return '';
+  }
+
+  return decodeURIComponent(url.slice(pathStart + bucketPath.length));
+};
+
 export default function BriefsPage() {
   const router = useRouter();
   const firstBriefSectionRef = useRef<HTMLElement | null>(null);
+  const posterFileInputRef = useRef<HTMLInputElement | null>(null);
   const hasScrolledToBriefRef = useRef(false);
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [briefs, setBriefs] = useState<BriefView[]>([]);
@@ -239,6 +307,11 @@ export default function BriefsPage() {
   const [hashtags, setHashtags] = useState<string[]>(['']);
   const [mentions, setMentions] = useState<string[]>(['']);
   const [cta, setCta] = useState('');
+  const [submissionDeadline, setSubmissionDeadline] = useState('');
+  const [contactSupport, setContactSupport] = useState('');
+  const [posterImageUrls, setPosterImageUrls] = useState<string[]>([]);
+  const [posterUploadError, setPosterUploadError] = useState<string | null>(null);
+  const [isUploadingPosters, setIsUploadingPosters] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [editingPublishedBrief, setEditingPublishedBrief] = useState(false);
   const [publishedCampaignIds, setPublishedCampaignIds] = useState<string[]>([]);
@@ -334,6 +407,17 @@ export default function BriefsPage() {
           hashtags: toTextList(criteria.hashtags ?? requiredElements.hashtags),
           mentions: toTextList(criteria.mentions ?? requiredElements.mentions),
           cta: toText(criteria.cta ?? requiredElements.cta),
+          submissionDeadline:
+            toText(brief.submission_deadline) ||
+            toText(rawBrief.submission_deadline) ||
+            '',
+          contactSupport:
+            toText(brief.contact_support) ||
+            toText(rawBrief.contact_support) ||
+            '',
+          posterImageUrls: toTextList(brief.poster_image_urls).length
+            ? toTextList(brief.poster_image_urls)
+            : toTextList(rawBrief.poster_image_urls),
           status: toText(brief.status) || toText(rawBrief.status) || null,
           completionPercentage: toNumberValue(
             brief.completion_percentage ?? rawBrief.completion_percentage
@@ -402,6 +486,10 @@ export default function BriefsPage() {
     setHashtags(withSingleInput(selectedBrief?.hashtags ?? []));
     setMentions(withSingleInput(selectedBrief?.mentions ?? []));
     setCta(selectedBrief?.cta ?? '');
+    setSubmissionDeadline(selectedBrief?.submissionDeadline ?? '');
+    setContactSupport(selectedBrief?.contactSupport ?? '');
+    setPosterImageUrls(selectedBrief?.posterImageUrls ?? []);
+    setPosterUploadError(null);
     setSaveError(null);
     setActiveStep(0);
     setEditingPublishedBrief(false);
@@ -459,6 +547,123 @@ export default function BriefsPage() {
     setToast(nextToast);
   };
 
+  const persistPosterImageUrls = async (nextPosterImageUrls: string[]) => {
+    if (!selectedBrief?.id) {
+      return;
+    }
+
+    const updateResult = await saveWithOptionalColumns(
+      'briefs',
+      {
+        poster_image_urls: nextPosterImageUrls,
+        updated_at: new Date().toISOString(),
+      },
+      async (payload) =>
+        supabase
+          .from('briefs')
+          .update(payload)
+          .eq('id', selectedBrief.id)
+          .select('id')
+          .maybeSingle()
+    );
+
+    if (updateResult.error) {
+      throw updateResult.error;
+    }
+  };
+
+  const handlePosterUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    setPosterUploadError(null);
+
+    const selectedFiles = Array.from(files);
+    const availableSlots = 5 - posterImageUrls.length;
+
+    if (
+      availableSlots <= 0 ||
+      selectedFiles.length > availableSlots ||
+      selectedFiles.some(
+        (file) =>
+          !acceptedPosterMimeTypes.has(file.type) ||
+          file.size > 5 * 1024 * 1024
+      )
+    ) {
+      setPosterUploadError(posterUploadErrorMessage);
+      return;
+    }
+
+    setIsUploadingPosters(true);
+
+    try {
+      const uploadedUrls: string[] = [];
+
+      for (const file of selectedFiles) {
+        const extension = file.name.split('.').pop()?.toLowerCase() || 'png';
+        const uniqueId =
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const filePath = `${selectedCampaignId || 'unassigned'}/${uniqueId}.${extension}`;
+        const uploadResult = await supabase.storage
+          .from(posterBucketName)
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false,
+          });
+
+        if (uploadResult.error) {
+          throw uploadResult.error;
+        }
+
+        const { data } = supabase.storage
+          .from(posterBucketName)
+          .getPublicUrl(filePath);
+        uploadedUrls.push(data.publicUrl);
+      }
+
+      const nextPosterImageUrls = [...posterImageUrls, ...uploadedUrls];
+      setPosterImageUrls(nextPosterImageUrls);
+      await persistPosterImageUrls(nextPosterImageUrls);
+    } catch (error) {
+      console.error('Poster upload error:', error);
+      setPosterUploadError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to upload image. Please try again.'
+      );
+    } finally {
+      setIsUploadingPosters(false);
+
+      if (posterFileInputRef.current) {
+        posterFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemovePosterImage = async (url: string) => {
+    setPosterUploadError(null);
+
+    const nextPosterImageUrls = posterImageUrls.filter((imageUrl) => imageUrl !== url);
+    setPosterImageUrls(nextPosterImageUrls);
+
+    try {
+      await persistPosterImageUrls(nextPosterImageUrls);
+
+      const storagePath = getPosterStoragePath(url);
+
+      if (storagePath) {
+        await supabase.storage.from(posterBucketName).remove([storagePath]);
+      }
+    } catch (error) {
+      console.error('Poster remove error:', error);
+      setPosterUploadError('Unable to remove image. Please try again.');
+      setPosterImageUrls(posterImageUrls);
+    }
+  };
+
   const handleSaveFailure = (
     label: string,
     error: { message: string; code?: string } | null
@@ -478,19 +683,38 @@ export default function BriefsPage() {
     window.open(creatorBriefUrl, '_blank', 'noopener,noreferrer');
   };
 
+  const getCurrentOrSavedText = (currentValue: string, savedValue?: string) =>
+    currentValue.trim() || savedValue?.trim() || '';
+
+  const getCurrentOrSavedList = (currentValues: string[], savedValues?: string[]) => {
+    const currentCleanValues = cleanTextList(currentValues);
+
+    return currentCleanValues.length > 0 ? currentCleanValues : savedValues ?? [];
+  };
+
   const buildCurrentCreatorBriefDocument = (): CreatorBriefDocument => {
-    const keyMessageValues = cleanTextList(keyMessages);
-    const brandRulesDoValues = cleanTextList(brandRulesDo);
-    const brandRulesDontValues = cleanTextList(brandRulesDont);
-    const hashtagValues = cleanTextList(hashtags);
-    const mentionValues = cleanTextList(mentions);
+    const keyMessageValues = getCurrentOrSavedList(keyMessages, selectedBrief?.keyMessages);
+    const brandRulesDoValues = getCurrentOrSavedList(brandRulesDo, selectedBrief?.brandRulesDo);
+    const brandRulesDontValues = getCurrentOrSavedList(
+      brandRulesDont,
+      selectedBrief?.brandRulesDont
+    );
+    const hashtagValues = getCurrentOrSavedList(hashtags, selectedBrief?.hashtags);
+    const mentionValues = getCurrentOrSavedList(mentions, selectedBrief?.mentions);
+    const submissionDeadlineValue = getCurrentOrSavedText(
+      submissionDeadline,
+      selectedBrief?.submissionDeadline
+    );
+    const contactSupportValue = getCurrentOrSavedText(
+      contactSupport,
+      selectedBrief?.contactSupport
+    );
     const campaignName =
       selectedBrief?.campaignName || toText(selectedCampaign?.name) || 'Untitled campaign';
     const generatedApprovalNotes = [
       keyMessageValues.length > 0 ? 'Include the key messages listed in this brief.' : '',
       brandRulesDoValues.length > 0 ? 'Follow all brand do rules.' : '',
       brandRulesDontValues.length > 0 ? 'Avoid all listed brand restrictions.' : '',
-      'Submit content for review before posting unless your campaign manager says otherwise.',
     ]
       .filter(Boolean)
       .join(' ');
@@ -503,26 +727,21 @@ export default function BriefsPage() {
         toText(selectedCampaign?.client_name) ||
         toText(selectedCampaign?.client) ||
         'Brand to be confirmed',
-      timeline: selectedBrief?.publishedAt
-        ? `Published ${formatDate(selectedBrief.publishedAt)}`
-        : 'Timeline to be confirmed',
-      campaignGoal: objective.trim(),
-      targetAudience: targetAudience.trim(),
-      contentDirection: contentDirection.trim(),
-      platforms,
+      timeline: buildCampaignTimeline(selectedCampaign),
+      campaignGoal: getCurrentOrSavedText(objective, selectedBrief?.objective),
+      targetAudience: getCurrentOrSavedText(targetAudience, selectedBrief?.targetAudience),
+      contentDirection: getCurrentOrSavedText(contentDirection, selectedBrief?.contentDirection),
+      platforms: platforms.length > 0 ? platforms : selectedBrief?.platforms ?? [],
       keyMessages: keyMessageValues,
       brandRulesDo: brandRulesDoValues,
       brandRulesDont: brandRulesDontValues,
       hashtags: hashtagValues,
       mentions: mentionValues,
-      callToAction: cta.trim(),
-      submissionDeadline: toText(selectedCampaign?.deadline) || 'To be confirmed by the campaign manager.',
-      approvalNotes: generatedApprovalNotes,
-      contactSupport:
-        toText(selectedCampaign?.contact) ||
-        toText(selectedCampaign?.support_contact) ||
-        toText(selectedCampaign?.manager_email) ||
-        'Contact your campaign manager for questions, approvals, or submission support.',
+      callToAction: getCurrentOrSavedText(cta, selectedBrief?.cta),
+      submissionDeadline: formatCampaignDate(submissionDeadlineValue || null) || 'Not set',
+      approvalNotes: generatedApprovalNotes || 'Not set',
+      contactSupport: contactSupportValue || 'Not set',
+      posterImageUrls,
       status: selectedBrief?.status ?? 'draft',
       updatedAt: selectedBrief?.updatedAt ?? new Date().toISOString(),
     };
@@ -534,7 +753,7 @@ export default function BriefsPage() {
       return;
     }
 
-    if (!briefComplete) {
+    if (!isBriefCompleted) {
       setSaveError('Complete all required brief sections before downloading.');
       return;
     }
@@ -579,6 +798,7 @@ export default function BriefsPage() {
       hashtags: hashtags.some((tag) => tag.trim() !== ''),
       mentions: mentions.some((mention) => mention.trim() !== ''),
       cta: cta.trim() !== '',
+      submissionDeadline: submissionDeadline.trim() !== '',
     }),
     [
       brandRulesDo,
@@ -590,6 +810,7 @@ export default function BriefsPage() {
       mentions,
       objective,
       platforms,
+      submissionDeadline,
       targetAudience,
     ]
   );
@@ -606,6 +827,7 @@ export default function BriefsPage() {
       hashtags: (selectedBrief?.hashtags ?? []).some((tag) => tag.trim() !== ''),
       mentions: (selectedBrief?.mentions ?? []).some((mention) => mention.trim() !== ''),
       cta: (selectedBrief?.cta ?? '').trim() !== '',
+      submissionDeadline: (selectedBrief?.submissionDeadline ?? '').trim() !== '',
     }),
     [selectedBrief]
   );
@@ -639,10 +861,23 @@ export default function BriefsPage() {
     { label: 'Hashtags', complete: requiredFieldsValidation.hashtags },
     { label: 'Mentions', complete: requiredFieldsValidation.mentions },
     { label: 'Call to action', complete: requiredFieldsValidation.cta },
+    { label: 'Submission deadline', complete: requiredFieldsValidation.submissionDeadline },
   ];
 
   const completedCount = criteriaFields.filter(f => f.complete).length;
   const completionPercentage = Math.round((completedCount / criteriaFields.length) * 100);
+  const displayedCompletedCount = isBriefCompleted ? criteriaFields.length : completedCount;
+  const displayedCompletionPercentage = isBriefCompleted ? 100 : completionPercentage;
+  const overviewObjective = getCurrentOrSavedText(objective, selectedBrief?.objective);
+  const overviewTargetAudience = getCurrentOrSavedText(
+    targetAudience,
+    selectedBrief?.targetAudience
+  );
+  const overviewContentDirection = getCurrentOrSavedText(
+    contentDirection,
+    selectedBrief?.contentDirection
+  );
+  const overviewPlatforms = platforms.length > 0 ? platforms : selectedBrief?.platforms ?? [];
   const remainingFields = criteriaFields.filter((field) => !field.complete);
   const remainingLabels = remainingFields.map((field) => field.label);
   const briefSteps = [
@@ -680,7 +915,8 @@ export default function BriefsPage() {
         brandRulesDont.some((rule) => rule.trim() !== '') &&
         hashtags.some((tag) => tag.trim() !== '') &&
         mentions.some((mention) => mention.trim() !== '') &&
-        cta.trim() !== '',
+        cta.trim() !== '' &&
+        submissionDeadline.trim() !== '',
     },
   ];
   const activeBriefStep = briefSteps[activeStep] ?? briefSteps[0];
@@ -783,6 +1019,9 @@ export default function BriefsPage() {
       audience: targetAudience.trim(),
       content_direction: contentDirection.trim(),
       platforms,
+      submission_deadline: submissionDeadline || null,
+      contact_support: contactSupport.trim(),
+      poster_image_urls: posterImageUrls,
       status,
       completion_percentage: nextCompletionPercentage,
       published_at: nextPublishedAt,
@@ -806,6 +1045,9 @@ export default function BriefsPage() {
       audience: targetAudience.trim(),
       content_direction: contentDirection.trim(),
       platforms,
+      submission_deadline: submissionDeadline || null,
+      contact_support: contactSupport.trim(),
+      poster_image_urls: posterImageUrls,
       status,
       completion_percentage: nextCompletionPercentage,
       published_at: nextPublishedAt,
@@ -1098,7 +1340,7 @@ export default function BriefsPage() {
                     <Button
                       type="button"
                       size="sm"
-                      disabled={isExportingBrief || !briefComplete}
+                      disabled={isExportingBrief || !isBriefCompleted}
                       onClick={handleExportCreatorBrief}
                     >
                       {isExportingBrief ? 'Generating...' : 'Download Brief PDF'}
@@ -1140,7 +1382,7 @@ export default function BriefsPage() {
                       Completion
                     </p>
                     <p className="mt-2 text-sm font-medium text-foreground">
-                      {completedCount} of {criteriaFields.length} sections complete
+                      {displayedCompletedCount} of {criteriaFields.length} sections complete
                     </p>
                   </div>
                 </div>
@@ -1149,26 +1391,26 @@ export default function BriefsPage() {
                   <div>
                     <p className="text-sm font-medium">Campaign goal</p>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {selectedBrief?.objective || 'Not added'}
+                      {overviewObjective || 'Not added'}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm font-medium">Target audience</p>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {selectedBrief?.targetAudience || 'Not added'}
+                      {overviewTargetAudience || 'Not added'}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm font-medium">Content direction</p>
                     <p className="mt-2 whitespace-pre-line text-sm leading-6 text-muted-foreground">
-                      {selectedBrief?.contentDirection || 'Not added'}
+                      {overviewContentDirection || 'Not added'}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm font-medium">Platforms</p>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {selectedBrief?.platforms.length
-                        ? selectedBrief.platforms.join(', ')
+                      {overviewPlatforms.length
+                        ? overviewPlatforms.join(', ')
                         : 'Not added'}
                     </p>
                   </div>
@@ -1183,7 +1425,7 @@ export default function BriefsPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={isExportingBrief || !briefComplete}
+                      disabled={isExportingBrief || !isBriefCompleted}
                       onClick={handleExportCreatorBrief}
                     >
                       {isExportingBrief ? 'Generating...' : 'Download Brief PDF'}
@@ -1397,6 +1639,99 @@ export default function BriefsPage() {
                         className="bg-background/50"
                       />
                     </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Submission Deadline</label>
+                      <Input
+                        type="date"
+                        value={submissionDeadline}
+                        onChange={(e) => setSubmissionDeadline(e.target.value)}
+                        className="bg-background/50"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        When should creators submit their draft content for review?
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-sm font-medium">Contact / Support</label>
+                      <Textarea
+                        placeholder="Example: yoonie@rollerkluster.com or your campaign manager's name"
+                        value={contactSupport}
+                        onChange={(e) => setContactSupport(e.target.value)}
+                        className="min-h-24 resize-none bg-background/50"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Who should creators contact if they have questions?
+                      </p>
+                    </div>
+
+                    <div className="space-y-3 md:col-span-2">
+                      <div>
+                        <label className="text-sm font-medium">Posters / Campaign Images</label>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Attach any campaign posters, key visuals, or reference images creators should follow.
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-dashed border-border bg-background/50 px-4 py-4">
+                        <input
+                          ref={posterFileInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg,image/webp"
+                          multiple
+                          className="hidden"
+                          onChange={(event) => handlePosterUpload(event.target.files)}
+                        />
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">
+                              Upload images
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              PNG, JPG, JPEG, or WebP. Up to 5 images, 5MB each.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isUploadingPosters || posterImageUrls.length >= 5}
+                            onClick={() => posterFileInputRef.current?.click()}
+                          >
+                            {isUploadingPosters ? 'Uploading...' : 'Choose images'}
+                          </Button>
+                        </div>
+                        {posterUploadError && (
+                          <p className="mt-3 text-sm text-red-500">{posterUploadError}</p>
+                        )}
+                        {posterImageUrls.length > 0 && (
+                          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                            {posterImageUrls.map((url) => (
+                              <div
+                                key={url}
+                                className="overflow-hidden rounded-md border border-border bg-card"
+                              >
+                                <img
+                                  src={url}
+                                  alt="Uploaded campaign visual"
+                                  className="h-32 w-full object-cover"
+                                />
+                                <div className="flex items-center justify-end px-3 py-2">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 text-xs text-muted-foreground hover:text-red-500"
+                                    onClick={() => handleRemovePosterImage(url)}
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1471,22 +1806,24 @@ export default function BriefsPage() {
                 <p className="text-sm font-medium">
                   {isBriefCompleted ? 'Brief status' : 'Brief progress'}
                 </p>
-                <span className="text-sm text-muted-foreground">{completionPercentage}%</span>
+                <span className="text-sm text-muted-foreground">
+                  {displayedCompletionPercentage}%
+                </span>
               </div>
               <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-background">
                 <div
                   className={`h-full transition-all duration-300 ${
-                    completionPercentage === 100
+                    displayedCompletionPercentage === 100
                       ? 'bg-green-500'
-                      : completionPercentage >= 60
+                      : displayedCompletionPercentage >= 60
                       ? 'bg-blue-500'
                       : 'bg-yellow-500'
                   }`}
-                  style={{ width: `${completionPercentage}%` }}
+                  style={{ width: `${displayedCompletionPercentage}%` }}
                 />
               </div>
               <p className="mt-3 text-sm text-muted-foreground">
-                {completedCount} of {criteriaFields.length} completed
+                {displayedCompletedCount} of {criteriaFields.length} completed
               </p>
               <p className="mt-2 text-sm text-foreground">
                 {isBriefCompleted
@@ -1524,7 +1861,7 @@ export default function BriefsPage() {
             <div className="mt-5 border-t border-border/60 pt-5">
               <p className="text-sm font-medium">Creator brief document</p>
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                {briefComplete
+                {isBriefCompleted
                   ? 'Download a professional PDF brief for clients and creators.'
                   : 'Complete all required brief sections before downloading.'}
               </p>
@@ -1542,7 +1879,7 @@ export default function BriefsPage() {
                 <Button
                   type="button"
                   className="w-full"
-                  disabled={isExportingBrief || !briefComplete}
+                  disabled={isExportingBrief || !isBriefCompleted}
                   onClick={handleExportCreatorBrief}
                 >
                   {isExportingBrief ? 'Generating...' : 'Download Brief PDF'}
@@ -1600,7 +1937,7 @@ export default function BriefsPage() {
               View Creator Brief
             </Button>
             <Button
-              disabled={isExportingBrief || !briefComplete}
+              disabled={isExportingBrief || !isBriefCompleted}
               onClick={handleExportCreatorBrief}
             >
               {isExportingBrief ? 'Generating...' : 'Download Brief PDF'}

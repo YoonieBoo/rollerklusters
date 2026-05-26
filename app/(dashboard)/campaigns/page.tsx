@@ -46,6 +46,8 @@ type CampaignRow = {
   id: string;
   name: string | null;
   client_name: string | null;
+  campaign_start_date?: string | null;
+  campaign_end_date?: string | null;
   status: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -106,6 +108,8 @@ export default function CampaignsPage() {
   const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
   const [newCampaignName, setNewCampaignName] = useState('');
   const [newClientName, setNewClientName] = useState('');
+  const [newCampaignStartDate, setNewCampaignStartDate] = useState('');
+  const [newCampaignEndDate, setNewCampaignEndDate] = useState('');
 
   const fetchCampaigns = async () => {
     setIsLoading(true);
@@ -113,7 +117,7 @@ export default function CampaignsPage() {
 
     const { data, error } = await supabase
       .from('campaigns')
-      .select('id, name, client_name, status, created_at, updated_at')
+      .select('*')
       .order('updated_at', { ascending: false });
 
     if (error) {
@@ -135,6 +139,8 @@ export default function CampaignsPage() {
     setEditingCampaignId(null);
     setNewCampaignName('');
     setNewClientName('');
+    setNewCampaignStartDate('');
+    setNewCampaignEndDate('');
     setCreateError(null);
   };
 
@@ -145,6 +151,8 @@ export default function CampaignsPage() {
     setEditingCampaignId(campaign.id);
     setNewCampaignName(campaign.name ?? '');
     setNewClientName(campaign.client_name ?? '');
+    setNewCampaignStartDate(campaign.campaign_start_date ?? '');
+    setNewCampaignEndDate(campaign.campaign_end_date ?? '');
     setShowCreateDialog(true);
   };
 
@@ -166,9 +174,22 @@ export default function CampaignsPage() {
       return;
     }
 
+    if (
+      newCampaignStartDate &&
+      newCampaignEndDate &&
+      newCampaignEndDate < newCampaignStartDate
+    ) {
+      setCreateError('End date must be after the start date.');
+      return;
+    }
+
     setIsCreating(true);
 
     const now = new Date().toISOString();
+    const timelinePayload = {
+      campaign_start_date: newCampaignStartDate || null,
+      campaign_end_date: newCampaignEndDate || null,
+    };
 
     if (editingCampaignId) {
       const { error } = await supabase
@@ -176,6 +197,7 @@ export default function CampaignsPage() {
         .update({
           name: campaignName,
           client_name: clientName,
+          ...timelinePayload,
           updated_at: now,
         })
         .eq('id', editingCampaignId);
@@ -199,6 +221,7 @@ export default function CampaignsPage() {
       .insert({
         name: campaignName,
         client_name: clientName,
+        ...timelinePayload,
         status: 'active',
         created_at: now,
         updated_at: now,
@@ -620,6 +643,41 @@ export default function CampaignsPage() {
               />
               <p className="text-xs text-muted-foreground">
                 The client, brand, or organization running this campaign
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground block">
+                Campaign Timeline
+              </label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground block">
+                    Start date
+                  </label>
+                  <Input
+                    type="date"
+                    value={newCampaignStartDate}
+                    onChange={(event) => setNewCampaignStartDate(event.target.value)}
+                    className="bg-muted border-border"
+                    disabled={isCreating}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground block">
+                    End date
+                  </label>
+                  <Input
+                    type="date"
+                    value={newCampaignEndDate}
+                    min={newCampaignStartDate || undefined}
+                    onChange={(event) => setNewCampaignEndDate(event.target.value)}
+                    className="bg-muted border-border"
+                    disabled={isCreating}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                These dates appear in the creator brief PDF.
               </p>
             </div>
             {createError && (

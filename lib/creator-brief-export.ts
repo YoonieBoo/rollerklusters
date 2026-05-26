@@ -21,6 +21,7 @@ export type CreatorBriefDocument = {
   submissionDeadline: string;
   approvalNotes: string;
   contactSupport: string;
+  posterImageUrls: string[];
   status: string;
   updatedAt: string | null;
 };
@@ -82,6 +83,31 @@ export const formatDate = (date: string | null) => {
   return parsedDate.toLocaleDateString();
 };
 
+const formatCampaignDate = (date: string | null) => {
+  if (!date) {
+    return '';
+  }
+
+  const dateOnlyMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const parsedDate = dateOnlyMatch
+    ? new Date(
+        Number(dateOnlyMatch[1]),
+        Number(dateOnlyMatch[2]) - 1,
+        Number(dateOnlyMatch[3])
+      )
+    : new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(parsedDate);
+};
+
 const getFirstText = (row: SupabaseRow | null | undefined, keys: string[]) => {
   if (!row) {
     return '';
@@ -124,21 +150,54 @@ const getRequiredElements = (criteria: SupabaseRow | null | undefined) => {
   return {};
 };
 
-const buildTimeline = (campaign: SupabaseRow, brief: SupabaseRow) => {
-  const startDate = getFirstText(campaign, ['start_date', 'start_at', 'created_at']);
-  const endDate = getFirstText(campaign, ['end_date', 'end_at', 'deadline']);
-  const publishedDate = getFirstText(brief, ['published_at', 'updated_at']);
+const buildTimeline = (campaign: SupabaseRow) => {
+  const startDate = formatCampaignDate(
+    getFirstText(campaign, ['campaign_start_date', 'start_date', 'start_at'])
+  );
+  const endDate = formatCampaignDate(
+    getFirstText(campaign, ['campaign_end_date', 'end_date', 'end_at', 'deadline'])
+  );
 
   if (startDate && endDate) {
-    return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+    return `${startDate} – ${endDate}`;
   }
 
-  if (publishedDate) {
-    return `Published ${formatDate(publishedDate)}`;
+  if (startDate) {
+    return `From ${startDate}`;
   }
 
-  return 'Timeline to be confirmed';
+  if (endDate) {
+    return `Until ${endDate}`;
+  }
+
+  return 'Not set';
 };
+
+const buildAcceptanceCriteria = ({
+  keyMessages,
+  brandRulesDo,
+  brandRulesDont,
+  hashtags,
+  mentions,
+  callToAction,
+}: {
+  keyMessages: string[];
+  brandRulesDo: string[];
+  brandRulesDont: string[];
+  hashtags: string[];
+  mentions: string[];
+  callToAction: string;
+}) =>
+  [
+    keyMessages.length > 0 ? `Key message: ${keyMessages.join(', ')}` : '',
+    brandRulesDo.length > 0 ? `Brand do rules: ${brandRulesDo.join(', ')}` : '',
+    brandRulesDont.length > 0 ? `Brand don't rules: ${brandRulesDont.join(', ')}` : '',
+    hashtags.length > 0 ? `Required hashtags: ${hashtags.join(', ')}` : '',
+    mentions.length > 0 ? `Required mentions: ${mentions.join(', ')}` : '',
+    callToAction ? `Call to action: ${callToAction}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 
 export const buildCreatorBriefDocument = ({
   campaign,
@@ -162,13 +221,30 @@ export const buildCreatorBriefDocument = ({
   const keyMessages = toTextList(criteria?.key_messages ?? rawCriteria?.key_messages);
   const hashtags = toTextList(criteria?.hashtags ?? requiredElements.hashtags);
   const mentions = toTextList(criteria?.mentions ?? requiredElements.mentions);
+  const callToAction = toText(criteria?.cta ?? requiredElements.cta);
+  const submissionDeadline =
+    formatCampaignDate(
+      getFirstText(brief, ['submission_deadline']) ||
+        getFirstText(rawBrief, ['submission_deadline'])
+    ) || 'Not set';
+  const contactSupport =
+    getFirstText(brief, ['contact_support']) ||
+    getFirstText(rawBrief, ['contact_support']) ||
+    'Not set';
+  const approvalNotes = [
+    keyMessages.length > 0 ? 'Include the key messages listed in this brief.' : '',
+    brandRulesDo.length > 0 ? 'Follow all brand do rules.' : '',
+    brandRulesDont.length > 0 ? 'Avoid all listed brand restrictions.' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return {
     campaignId: toText(campaign.id),
     briefId: toText(brief.id),
     campaignName: toText(campaign.name) || 'Untitled campaign',
     clientName: toText(campaign.client_name) || toText(campaign.client) || 'Brand to be confirmed',
-    timeline: buildTimeline(campaign, brief),
+    timeline: buildTimeline(campaign),
     campaignGoal:
       toText(brief.objective) ||
       toText(rawBrief.objective) ||
@@ -189,25 +265,11 @@ export const buildCreatorBriefDocument = ({
     brandRulesDont,
     hashtags,
     mentions,
-    callToAction:
-      toText(criteria?.cta ?? requiredElements.cta) ||
-      'Call to action to be confirmed.',
-    submissionDeadline:
-      getFirstText(brief, ['submission_deadline', 'deadline', 'due_date']) ||
-      getFirstText(campaign, ['submission_deadline', 'deadline', 'due_date', 'end_date']) ||
-      'To be confirmed by the campaign manager.',
-    approvalNotes:
-      [
-        keyMessages.length > 0 ? 'Include the key messages listed in this brief.' : '',
-        brandRulesDo.length > 0 ? 'Follow all brand do rules.' : '',
-        brandRulesDont.length > 0 ? 'Avoid all listed brand restrictions.' : '',
-        'Submit content for review before posting unless your campaign manager says otherwise.',
-      ]
-        .filter(Boolean)
-        .join(' '),
-    contactSupport:
-      getFirstText(campaign, ['contact', 'support_contact', 'manager_email']) ||
-      'Contact your campaign manager for questions, approvals, or submission support.',
+    callToAction: callToAction || 'Not set',
+    submissionDeadline,
+    approvalNotes: approvalNotes || 'Not set',
+    contactSupport,
+    posterImageUrls: toTextList(brief.poster_image_urls ?? rawBrief.poster_image_urls),
     status: toText(brief.status) || 'draft',
     updatedAt: toText(brief.updated_at) || null,
   };
@@ -266,6 +328,79 @@ const cleanPdfText = (text: string) =>
     .replace(/[•]/g, '')
     .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, '');
 
+type LoadedPosterImage = {
+  dataUrl: string;
+  width: number;
+  height: number;
+};
+
+const readBlobAsDataUrl = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Unable to read image data.'));
+      }
+    };
+    reader.onerror = () => reject(new Error('Unable to read image data.'));
+    reader.readAsDataURL(blob);
+  });
+
+const loadImageElement = (source: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Unable to load image.'));
+    image.src = source;
+  });
+
+const loadPosterImageForPdf = async (url: string): Promise<LoadedPosterImage | null> => {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return null;
+  }
+
+  try {
+    const response = await fetch(url, { mode: 'cors' });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const blob = await response.blob();
+    const source = await readBlobAsDataUrl(blob);
+    const image = await loadImageElement(source);
+    const canvas = document.createElement('canvas');
+    const width = image.naturalWidth || image.width;
+    const height = image.naturalHeight || image.height;
+
+    if (width <= 0 || height <= 0) {
+      return null;
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+
+    if (!context) {
+      return null;
+    }
+
+    context.drawImage(image, 0, 0, width, height);
+
+    return {
+      dataUrl: canvas.toDataURL('image/png'),
+      width,
+      height,
+    };
+  } catch {
+    return null;
+  }
+};
+
 export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
   const { jsPDF } = await import('jspdf/dist/jspdf.es.min.js');
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
@@ -281,7 +416,18 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
   const blue = '#2563eb';
   const line = '#e6e8ee';
   const cardBorder = '#e4e7ec';
-  const cardFill = '#f8fafc';
+  const cardFill = '#fafbfc';
+  const spaceXs = 5;
+  const spaceSm = 8;
+  const cardPaddingX = 16;
+  const cardPaddingTop = 18;
+  const cardLabelGap = 14;
+  const cardGap = 10;
+  const cardRadius = 2;
+  const sectionGapBefore = 20;
+  const sectionGapAfterTitle = 14;
+  const bodyFontSize = 11.2;
+  const bodyLineHeight = 16.2;
   let cursorY = topMargin;
 
   const setFont = (size: number, style: 'normal' | 'bold' = 'normal', color = black) => {
@@ -318,7 +464,7 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
       color?: string;
     } = {}
   ) => {
-    setFont(options.size ?? 10.2, options.style ?? 'normal', options.color ?? dark);
+    setFont(options.size ?? bodyFontSize, options.style ?? 'normal', options.color ?? dark);
 
     return cleanPdfDisplayText(text || 'To be confirmed')
       .split(/\n+/)
@@ -344,7 +490,7 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
       pdf.setPage(pageNumber);
       pdf.setDrawColor(line);
       pdf.line(marginX, pageHeight - 42, pageWidth - marginX, pageHeight - 42);
-      setFont(8.5, 'normal', muted);
+      setFont(9.5, 'normal', muted);
       pdf.text('Generated by RollerKluster', marginX, pageHeight - 25);
 
       if (pageCount > 1) {
@@ -359,23 +505,23 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
     pdf.setFillColor('#ffffff');
     pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
-    setFont(9.5, 'bold', blue);
+    setFont(10.5, 'bold', blue);
     pdf.text('ROLLERKLUSTER', marginX, cursorY);
-    setFont(9.5, 'normal', muted);
-    pdf.text('Creator Campaign Brief', marginX, cursorY + 16);
-    cursorY += 48;
+    setFont(10.5, 'normal', muted);
+    pdf.text('Creator Campaign Brief', marginX, cursorY + 17);
+    cursorY += 60;
 
     const titleLines = getWrappedLines(brief.campaignName, contentWidth - 24, {
-      size: 27,
+      size: 28,
       style: 'bold',
       color: black,
     });
-    setFont(27, 'bold', black);
+    setFont(28, 'bold', black);
     titleLines.forEach((lineText) => {
       pdf.text(lineText, marginX, cursorY);
       cursorY += 32;
     });
-    cursorY += 8;
+    cursorY += 18;
 
     const summaryItems = [
       { label: 'Client', value: brief.clientName },
@@ -385,25 +531,28 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
     summaryItems.forEach((item) => {
       const label = `${item.label}:`;
 
-      setFont(10.5, 'bold', dark);
+      setFont(11.5, 'bold', dark);
       pdf.text(label, marginX, cursorY);
-      setFont(10.5, 'normal', dark);
-      pdf.text(cleanPdfDisplayText(item.value || 'To be confirmed'), marginX + pdf.getTextWidth(label) + 5, cursorY, {
-        maxWidth: contentWidth - pdf.getTextWidth(label) - 5,
+      const labelWidth = pdf.getTextWidth(label);
+      const valueX = marginX + Math.max(labelWidth + 8, 128);
+      setFont(11.5, 'normal', dark);
+      pdf.text(cleanPdfDisplayText(item.value || 'To be confirmed'), valueX, cursorY, {
+        maxWidth: pageWidth - marginX - valueX,
       });
-      cursorY += 18;
+      cursorY += 20;
     });
 
-    cursorY += 18;
+    cursorY += 20;
     pdf.setDrawColor(line);
     pdf.line(marginX, cursorY, pageWidth - marginX, cursorY);
-    cursorY += 26;
+    cursorY += 28;
   };
 
   const addGroupTitle = (title: string) => {
-    setFont(12, 'bold', black);
+    cursorY += sectionGapBefore;
+    setFont(13, 'bold', black);
     pdf.text(title, marginX, cursorY);
-    cursorY += 20;
+    cursorY += sectionGapAfterTitle;
   };
 
   const measureFieldCardHeight = ({
@@ -415,19 +564,19 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
     content: string | string[];
     width: number;
   }) => {
-    const bodyWidth = width - 44;
+    const bodyWidth = width - cardPaddingX * 2;
     const labelHeight = 13;
     const paragraphs = getContentParagraphs(content);
     const bodyHeight = paragraphs.reduce((total, paragraph) => {
       const lines = getWrappedLines(paragraph, bodyWidth, {
-        size: 10.2,
+        size: bodyFontSize,
         color: dark,
       });
 
-      return total + lines.length * 14.5 + 5;
+      return total + lines.length * bodyLineHeight + spaceXs;
     }, 0);
 
-    return Math.max(66, labelHeight + bodyHeight + 30);
+    return Math.max(56, cardPaddingTop + labelHeight + cardLabelGap + bodyHeight + spaceSm);
   };
 
   const addFieldCard = ({
@@ -447,15 +596,15 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
     if (height > maxCardHeight) {
       ensureSpace(110);
 
-      const bodyX = x + 18;
-      const bodyWidth = width - 44;
-      const lineHeight = 14.5;
+      const bodyX = x + cardPaddingX;
+      const bodyWidth = width - cardPaddingX * 2;
+      const lineHeight = bodyLineHeight;
       let startY = cursorY;
-      let textY = startY + 50;
+      let textY = startY + cardPaddingTop + 13 + cardLabelGap;
 
       const startLongCardPage = (continued: boolean) => {
         startY = cursorY;
-        textY = startY + 50;
+        textY = startY + cardPaddingTop + 13 + cardLabelGap;
         pdf.setFillColor(cardFill);
         pdf.setDrawColor(cardBorder);
         pdf.roundedRect(
@@ -463,18 +612,22 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
           startY,
           width,
           pageHeight - bottomMargin - startY,
-          8,
-          8,
+          cardRadius,
+          cardRadius,
           'FD'
         );
-        setFont(8.4, 'bold', blue);
-        pdf.text(`${label.toUpperCase()}${continued ? ' (CONTINUED)' : ''}`, x + 16, startY + 27);
+        setFont(9.4, 'bold', blue);
+        pdf.text(
+          `${label.toUpperCase()}${continued ? ' (CONTINUED)' : ''}`,
+          x + cardPaddingX,
+          startY + cardPaddingTop
+        );
       };
 
       startLongCardPage(false);
       getContentParagraphs(content).forEach((paragraph) => {
         const lines = getWrappedLines(paragraph, bodyWidth, {
-          size: 10.2,
+          size: bodyFontSize,
           color: dark,
         });
 
@@ -485,52 +638,51 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
             startLongCardPage(true);
           }
 
-          setFont(10.2, 'normal', dark);
+          setFont(bodyFontSize, 'normal', dark);
           pdf.text(lineText, bodyX, textY);
           textY += lineHeight;
         });
-        textY += 5;
+        textY += spaceXs;
       });
 
       cursorY = textY + 12;
       return;
     }
 
-    ensureSpace(height + 12);
+    ensureSpace(height + cardGap);
 
     const startY = cursorY;
     pdf.setFillColor(cardFill);
     pdf.setDrawColor(cardBorder);
-    pdf.roundedRect(x, startY, width, height, 8, 8, 'FD');
+    pdf.roundedRect(x, startY, width, height, cardRadius, cardRadius, 'FD');
 
-    setFont(8.4, 'bold', blue);
-    pdf.text(label.toUpperCase(), x + 16, startY + 27);
+    setFont(9.4, 'bold', blue);
+    pdf.text(label.toUpperCase(), x + cardPaddingX, startY + cardPaddingTop);
 
-    const bodyX = x + 18;
-    const bodyWidth = width - 44;
-    let textY = startY + 50;
+    const bodyX = x + cardPaddingX;
+    const bodyWidth = width - cardPaddingX * 2;
+    let textY = startY + cardPaddingTop + 13 + cardLabelGap;
     const paragraphs = getContentParagraphs(content);
 
     paragraphs.forEach((paragraph) => {
       const lines = getWrappedLines(paragraph, bodyWidth, {
-        size: 10.2,
+        size: bodyFontSize,
         color: dark,
       });
 
       lines.forEach((lineText) => {
-        setFont(10.2, 'normal', dark);
+        setFont(bodyFontSize, 'normal', dark);
         pdf.text(lineText, bodyX, textY);
-        textY += 14.5;
+        textY += bodyLineHeight;
       });
-      textY += 5;
+      textY += spaceXs;
     });
 
-    cursorY = startY + height + 12;
+    cursorY = startY + height + cardGap;
   };
 
   const addFieldCards = (fields: Array<{ label: string; content: string | string[] }>) => {
     fields.forEach((field) => addFieldCard(field));
-    cursorY += 8;
   };
 
   const ensureSectionStart = (heightNeeded: number) => {
@@ -546,7 +698,7 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
     title: string,
     fields: Array<{ label: string; content: string | string[] }>
   ) => {
-    const titleHeight = 20;
+    const titleHeight = sectionGapBefore + 12 + sectionGapAfterTitle;
     const firstCardHeight =
       titleHeight +
       measureFieldCardHeight({
@@ -554,7 +706,7 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
         content: fields[0].content,
         width: contentWidth,
       }) +
-      12;
+      cardGap;
 
     ensureSectionStart(firstCardHeight);
     addGroupTitle(title);
@@ -593,7 +745,7 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
         continue;
       }
 
-      ensureSpace(rowHeight + 12);
+      ensureSpace(rowHeight + cardGap);
       addFieldCard({ ...firstField, x: marginX, width: columnWidth });
 
       if (secondField) {
@@ -604,7 +756,6 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
       }
     }
 
-    cursorY += 8;
   };
 
   const measureTwoColumnCardsHeight = (
@@ -612,7 +763,7 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
   ) => {
     const gutter = 14;
     const columnWidth = (contentWidth - gutter) / 2;
-    let totalHeight = 8;
+    let totalHeight = 0;
 
     for (let index = 0; index < fields.length; index += 2) {
       const firstField = fields[index];
@@ -630,7 +781,7 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
           })
         : 0;
 
-      totalHeight += Math.max(firstHeight, secondHeight) + 12;
+      totalHeight += Math.max(firstHeight, secondHeight) + cardGap;
     }
 
     return totalHeight;
@@ -640,7 +791,7 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
     title: string,
     fields: Array<{ label: string; content: string | string[] }>
   ) => {
-    const titleHeight = 20;
+    const titleHeight = sectionGapBefore + 12 + sectionGapAfterTitle;
     const gutter = 14;
     const columnWidth = (contentWidth - gutter) / 2;
     const firstRowHeight = Math.max(
@@ -660,20 +811,67 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
     const fullSectionHeight = titleHeight + measureTwoColumnCardsHeight(fields);
 
     ensureSectionStart(
-      fullSectionHeight <= usablePageHeight() ? fullSectionHeight : titleHeight + firstRowHeight + 12
+      fullSectionHeight <= usablePageHeight()
+        ? fullSectionHeight
+        : titleHeight + firstRowHeight + cardGap
     );
     addGroupTitle(title);
     addTwoColumnCards(fields);
   };
 
-  const acceptanceCriteria = [
-    ...brief.keyMessages.map((message) => `Key message: ${message}`),
-    ...brief.brandRulesDo.map((rule) => `Do: ${rule}`),
-    ...brief.brandRulesDont.map((rule) => `Don't: ${rule}`),
-    brief.hashtags.length > 0 ? `Hashtags: ${brief.hashtags.join(' ')}` : '',
-    brief.mentions.length > 0 ? `Mentions: ${brief.mentions.join(' ')}` : '',
-    brief.callToAction ? `CTA: ${brief.callToAction}` : '',
-  ].filter(Boolean);
+  const addPosterImageSection = (images: LoadedPosterImage[]) => {
+    if (images.length === 0) {
+      return;
+    }
+
+    const imageGap = 14;
+    const imageWidth = (contentWidth - imageGap) / 2;
+    const imageMaxHeight = 190;
+    const getDisplayHeight = (image: LoadedPosterImage) =>
+      Math.min(imageMaxHeight, (image.height / image.width) * imageWidth);
+    const firstRowHeight = Math.max(
+      getDisplayHeight(images[0]),
+      images[1] ? getDisplayHeight(images[1]) : 0
+    );
+
+    ensureSectionStart(sectionGapBefore + 12 + sectionGapAfterTitle + firstRowHeight + cardGap);
+    addGroupTitle('Posters / Campaign Images');
+
+    for (let index = 0; index < images.length; index += 2) {
+      const firstImage = images[index];
+      const secondImage = images[index + 1];
+      const firstHeight = getDisplayHeight(firstImage);
+      const secondHeight = secondImage ? getDisplayHeight(secondImage) : 0;
+      const rowHeight = Math.max(firstHeight, secondHeight);
+
+      ensureSpace(rowHeight + cardGap);
+      pdf.setDrawColor(cardBorder);
+      pdf.addImage(firstImage.dataUrl, 'PNG', marginX, cursorY, imageWidth, firstHeight);
+      pdf.rect(marginX, cursorY, imageWidth, firstHeight);
+
+      if (secondImage) {
+        const secondX = marginX + imageWidth + imageGap;
+        pdf.addImage(secondImage.dataUrl, 'PNG', secondX, cursorY, imageWidth, secondHeight);
+        pdf.rect(secondX, cursorY, imageWidth, secondHeight);
+      }
+
+      cursorY += rowHeight + cardGap;
+    }
+  };
+
+  const acceptanceCriteria =
+    buildAcceptanceCriteria({
+      keyMessages: brief.keyMessages,
+      brandRulesDo: brief.brandRulesDo,
+      brandRulesDont: brief.brandRulesDont,
+      hashtags: brief.hashtags,
+      mentions: brief.mentions,
+      callToAction: brief.callToAction === 'Not set' ? '' : brief.callToAction,
+    }) || 'Not set';
+
+  const posterImages = (
+    await Promise.all(brief.posterImageUrls.map((url) => loadPosterImageForPdf(url)))
+  ).filter((image): image is LoadedPosterImage => image !== null);
 
   drawHeader();
 
@@ -688,6 +886,8 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
     { label: 'Platforms', content: brief.platforms },
     { label: 'Call To Action', content: brief.callToAction },
   ]);
+
+  addPosterImageSection(posterImages);
 
   addTwoColumnCardSection('Brand Guidelines', [
     { label: 'Brand Do Rules', content: brief.brandRulesDo },
