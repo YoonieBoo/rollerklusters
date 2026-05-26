@@ -824,39 +824,45 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
       return;
     }
 
-    const imageGap = 14;
-    const imageWidth = (contentWidth - imageGap) / 2;
-    const imageMaxHeight = 190;
-    const getDisplayHeight = (image: LoadedPosterImage) =>
-      Math.min(imageMaxHeight, (image.height / image.width) * imageWidth);
-    const firstRowHeight = Math.max(
-      getDisplayHeight(images[0]),
-      images[1] ? getDisplayHeight(images[1]) : 0
+    const imageWidth = contentWidth * 0.82;
+    const maxImageHeight = usablePageHeight() * 0.72;
+    const imagePadding = 8;
+    const imageGap = 22;
+    const getImageSize = (image: LoadedPosterImage) => {
+      const widthScale = imageWidth / image.width;
+      const heightScale = maxImageHeight / image.height;
+      const scale = Math.min(widthScale, heightScale, 1);
+
+      return {
+        width: image.width * scale,
+        height: image.height * scale,
+      };
+    };
+    const firstImageSize = getImageSize(images[0]);
+    const firstBlockHeight = firstImageSize.height + imagePadding * 2;
+
+    ensureSectionStart(
+      sectionGapBefore + 12 + sectionGapAfterTitle + firstBlockHeight + imageGap
     );
-
-    ensureSectionStart(sectionGapBefore + 12 + sectionGapAfterTitle + firstRowHeight + cardGap);
     addGroupTitle('Posters / Campaign Images');
+    cursorY += 4;
 
-    for (let index = 0; index < images.length; index += 2) {
-      const firstImage = images[index];
-      const secondImage = images[index + 1];
-      const firstHeight = getDisplayHeight(firstImage);
-      const secondHeight = secondImage ? getDisplayHeight(secondImage) : 0;
-      const rowHeight = Math.max(firstHeight, secondHeight);
+    images.forEach((image) => {
+      const imageSize = getImageSize(image);
+      const blockWidth = imageSize.width + imagePadding * 2;
+      const blockHeight = imageSize.height + imagePadding * 2;
+      const blockX = marginX + (contentWidth - blockWidth) / 2;
+      const imageX = blockX + imagePadding;
+      const imageY = cursorY + imagePadding;
 
-      ensureSpace(rowHeight + cardGap);
+      ensureSpace(blockHeight + imageGap);
+      pdf.setFillColor('#f9fafb');
       pdf.setDrawColor(cardBorder);
-      pdf.addImage(firstImage.dataUrl, 'PNG', marginX, cursorY, imageWidth, firstHeight);
-      pdf.rect(marginX, cursorY, imageWidth, firstHeight);
+      pdf.rect(blockX, cursorY, blockWidth, blockHeight, 'FD');
+      pdf.addImage(image.dataUrl, 'PNG', imageX, imageY, imageSize.width, imageSize.height);
 
-      if (secondImage) {
-        const secondX = marginX + imageWidth + imageGap;
-        pdf.addImage(secondImage.dataUrl, 'PNG', secondX, cursorY, imageWidth, secondHeight);
-        pdf.rect(secondX, cursorY, imageWidth, secondHeight);
-      }
-
-      cursorY += rowHeight + cardGap;
-    }
+      cursorY += blockHeight + imageGap;
+    });
   };
 
   const acceptanceCriteria =
