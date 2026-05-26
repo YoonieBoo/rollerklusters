@@ -528,21 +528,22 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
       { label: 'Campaign Timeline', value: brief.timeline },
     ];
 
+    const metadataLabelWidth = 118;
+    const metadataValueX = marginX + metadataLabelWidth;
+
     summaryItems.forEach((item) => {
       const label = `${item.label}:`;
 
       setFont(11.5, 'bold', dark);
       pdf.text(label, marginX, cursorY);
-      const labelWidth = pdf.getTextWidth(label);
-      const valueX = marginX + Math.max(labelWidth + 8, 128);
       setFont(11.5, 'normal', dark);
-      pdf.text(cleanPdfDisplayText(item.value || 'To be confirmed'), valueX, cursorY, {
-        maxWidth: pageWidth - marginX - valueX,
+      pdf.text(cleanPdfDisplayText(item.value || 'To be confirmed'), metadataValueX, cursorY, {
+        maxWidth: pageWidth - marginX - metadataValueX,
       });
-      cursorY += 20;
+      cursorY += 17;
     });
 
-    cursorY += 20;
+    cursorY += 18;
     pdf.setDrawColor(line);
     pdf.line(marginX, cursorY, pageWidth - marginX, cursorY);
     cursorY += 28;
