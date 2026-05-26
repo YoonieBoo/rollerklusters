@@ -788,17 +788,20 @@ export default function BriefsPage() {
 
   const requiredFieldsValidation = useMemo(
     () => ({
-      objective: objective.trim() !== '',
-      targetAudience: targetAudience.trim() !== '',
-      contentDirection: contentDirection.trim() !== '',
-      platforms: platforms.length > 0,
-      keyMessages: keyMessages.some((msg) => msg.trim() !== ''),
-      brandRulesDo: brandRulesDo.some((rule) => rule.trim() !== ''),
-      brandRulesDont: brandRulesDont.some((rule) => rule.trim() !== ''),
-      hashtags: hashtags.some((tag) => tag.trim() !== ''),
-      mentions: mentions.some((mention) => mention.trim() !== ''),
-      cta: cta.trim() !== '',
-      submissionDeadline: submissionDeadline.trim() !== '',
+      objective: getCurrentOrSavedText(objective, selectedBrief?.objective) !== '',
+      targetAudience: getCurrentOrSavedText(targetAudience, selectedBrief?.targetAudience) !== '',
+      contentDirection:
+        getCurrentOrSavedText(contentDirection, selectedBrief?.contentDirection) !== '',
+      platforms: (platforms.length > 0 ? platforms : selectedBrief?.platforms ?? []).length > 0,
+      keyMessages: getCurrentOrSavedList(keyMessages, selectedBrief?.keyMessages).length > 0,
+      brandRulesDo: getCurrentOrSavedList(brandRulesDo, selectedBrief?.brandRulesDo).length > 0,
+      brandRulesDont:
+        getCurrentOrSavedList(brandRulesDont, selectedBrief?.brandRulesDont).length > 0,
+      hashtags: getCurrentOrSavedList(hashtags, selectedBrief?.hashtags).length > 0,
+      mentions: getCurrentOrSavedList(mentions, selectedBrief?.mentions).length > 0,
+      cta: getCurrentOrSavedText(cta, selectedBrief?.cta) !== '',
+      submissionDeadline:
+        getCurrentOrSavedText(submissionDeadline, selectedBrief?.submissionDeadline) !== '',
     }),
     [
       brandRulesDo,
@@ -810,6 +813,7 @@ export default function BriefsPage() {
       mentions,
       objective,
       platforms,
+      selectedBrief,
       submissionDeadline,
       targetAudience,
     ]
@@ -843,11 +847,7 @@ export default function BriefsPage() {
     savedCompletionPercentage >= 100 ||
     Boolean(selectedBrief?.publishedAt);
   const isBriefCompleted =
-    Boolean(selectedCampaignId) &&
-    (databaseIndicatesBriefCompleted ||
-      savedBriefComplete ||
-      briefComplete ||
-      publishActionTriggered);
+    Boolean(selectedCampaignId) && briefComplete;
   const showPublishedOverview = isBriefCompleted && !editingPublishedBrief;
 
   const criteriaFields = [
