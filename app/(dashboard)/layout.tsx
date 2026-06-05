@@ -130,7 +130,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       try {
         const { data, error } = await supabase
           .from('users')
-          .select('id, full_name, email, created_at')
+          .select('id, name, email, created_at')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -140,7 +140,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         const profile = data as SupabaseRow | null;
 
-        setProfileName(toText(profile?.full_name) || null);
+        setProfileName(toText(profile?.name) || null);
         setProfileRole(null);
       } catch (error) {
         logOptionalProfileWarning('Optional user profile fetch issue:', error);

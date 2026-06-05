@@ -2,6 +2,7 @@ import {
   Campaign,
   Brief,
   Submission,
+  CreatorProfile,
   Report,
   User,
   DashboardMetrics,
@@ -177,11 +178,49 @@ export const briefs: Brief[] = [
   },
 ];
 
+export const creatorProfiles: CreatorProfile[] = [
+  {
+    id: 'creator-001',
+    name: 'Sarah Chen',
+    email: 'sarah.chen@example.com',
+    handle: '@sarahchen_content',
+    niche: 'Sustainable fashion',
+  },
+  {
+    id: 'creator-002',
+    name: 'Marcus Williams',
+    email: 'marcus.williams@example.com',
+    handle: '@marcuswilliams',
+    niche: 'Lifestyle',
+  },
+  {
+    id: 'creator-003',
+    name: 'Jade Martinez',
+    email: 'jade.martinez@example.com',
+    handle: '@jademartinez',
+    niche: 'Beauty and TikTok',
+  },
+  {
+    id: 'creator-004',
+    name: 'Alex Rivera',
+    email: 'alex.rivera@example.com',
+    handle: '@alexrivera_studio',
+    niche: 'Creative direction',
+  },
+  {
+    id: 'creator-005',
+    name: 'Emma Thompson',
+    email: 'emma.thompson@example.com',
+    handle: '@emmathompson_luxury',
+    niche: 'Luxury lifestyle',
+  },
+];
+
 export const submissions: Submission[] = [
   {
     id: 'sub-1',
     campaignId: 'camp-1',
-    creatorReference: 'Creator_001 - Sarah Chen',
+    creatorReference: 'creator-001',
     submissionLink: 'https://instagram.com/sarahchen_content/p/abc123',
     status: 'approved',
     submittedAt: new Date('2024-03-15'),
@@ -191,7 +230,7 @@ export const submissions: Submission[] = [
   {
     id: 'sub-2',
     campaignId: 'camp-1',
-    creatorReference: 'Creator_002 - Marcus Williams',
+    creatorReference: 'creator-002',
     submissionLink: 'https://instagram.com/marcuswilliams/p/def456',
     status: 'in-review',
     submittedAt: new Date('2024-03-20'),
@@ -199,7 +238,7 @@ export const submissions: Submission[] = [
   {
     id: 'sub-3',
     campaignId: 'camp-1',
-    creatorReference: 'Creator_003 - Jade Martinez',
+    creatorReference: 'creator-003',
     submissionLink: 'https://tiktok.com/@jademartinez/video/ghi789',
     status: 'rejected',
     feedback:
@@ -211,7 +250,7 @@ export const submissions: Submission[] = [
   {
     id: 'sub-4',
     campaignId: 'camp-1',
-    creatorReference: 'Creator_004 - Alex Rivera',
+    creatorReference: 'creator-004',
     submissionLink: 'https://instagram.com/alexrivera_studio/p/jkl012',
     status: 'in-review',
     submittedAt: new Date('2024-03-24'),
@@ -219,7 +258,7 @@ export const submissions: Submission[] = [
   {
     id: 'sub-5',
     campaignId: 'camp-2',
-    creatorReference: 'Creator_005 - Emma Thompson',
+    creatorReference: 'creator-005',
     submissionLink: 'https://instagram.com/emmathompson_luxury/p/mno345',
     status: 'approved',
     submittedAt: new Date('2024-04-02'),

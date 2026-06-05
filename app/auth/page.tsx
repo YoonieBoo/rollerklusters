@@ -47,7 +47,7 @@ const syncUserProfile = async ({
     const { error } = await supabase.from('users').upsert(
       {
         id: userId,
-        full_name: fullName,
+        name: fullName,
         email,
         created_at: new Date().toISOString(),
       },
