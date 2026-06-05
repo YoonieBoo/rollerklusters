@@ -36,9 +36,8 @@ import {
   getCampaignReportExportData,
 } from '@/lib/report-export';
 import {
-  getCreatorDisplayName,
-  getCreatorSubtitle,
   getProfileIds,
+  getSubmissionCreatorName,
   getSubmissionCreatorReference,
 } from '@/lib/creator-names';
 
@@ -49,8 +48,7 @@ type ReviewSubmission = {
   campaignId: string;
   campaignName: string;
   clientName: string;
-  creatorName: string;
-  creatorSubtitle: string;
+  creatorReference: string;
   submissionLink: string;
   status: string;
   submittedAt: string | null;
@@ -222,7 +220,6 @@ export default function ReviewsPage() {
   const [submissions, setSubmissions] = useState<SupabaseRow[]>([]);
   const [reviews, setReviews] = useState<SupabaseRow[]>([]);
   const [creatorProfiles, setCreatorProfiles] = useState<SupabaseRow[]>([]);
-  const [users, setUsers] = useState<SupabaseRow[]>([]);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState('');
   const [campaignFilter, setCampaignFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -291,7 +288,6 @@ export default function ReviewsPage() {
       setSubmissions([]);
       setReviews([]);
       setCreatorProfiles([]);
-      setUsers([]);
       setIsLoading(false);
       return;
     }
@@ -314,7 +310,6 @@ export default function ReviewsPage() {
     setSubmissions(submissionRows);
     setReviews(reviewRows);
     setCreatorProfiles(profileRows);
-    setUsers(usersResult.error ? [] : ((usersResult.data ?? []) as SupabaseRow[]));
     if (queryCampaignId) {
       setCampaignFilter(queryCampaignId);
     }
@@ -349,7 +344,6 @@ export default function ReviewsPage() {
     const campaignsById = new Map(
       campaigns.map((campaign) => [toText(campaign.id), campaign])
     );
-    const usersById = new Map(users.map((user) => [toText(user.id), user]));
     const creatorProfilesById = new Map<string, SupabaseRow>();
 
     creatorProfiles.forEach((profile) => {
@@ -382,23 +376,13 @@ export default function ReviewsPage() {
       const creatorProfile = creatorReference
         ? creatorProfilesById.get(creatorReference)
         : null;
-      const creatorUser =
-        (creatorReference ? usersById.get(creatorReference) : null) ||
-        (creatorProfile ? usersById.get(toText(creatorProfile.user_id)) : null) ||
-        null;
-      const enrichedSubmission = {
-        ...submission,
-        creator: creatorUser,
-        profile: creatorProfile,
-      };
 
       return {
         id: submissionId,
         campaignId,
         campaignName: toText(campaign?.name) || 'Untitled campaign',
         clientName: toText(campaign?.client_name) || toText(campaign?.client) || 'N/A',
-        creatorName: getCreatorDisplayName(enrichedSubmission),
-        creatorSubtitle: getCreatorSubtitle(enrichedSubmission),
+        creatorReference: getSubmissionCreatorName(submission, creatorProfile),
         submissionLink: toText(submission.submission_link),
         status:
           latestStatus ||
@@ -409,7 +393,7 @@ export default function ReviewsPage() {
         feedback: latestFeedback || toText(latestReview?.feedback_notes),
       };
     });
-  }, [campaigns, submissions, reviews, creatorProfiles, users]);
+  }, [campaigns, submissions, reviews, creatorProfiles]);
 
   const getSubmissionPlatform = (link: string) => {
     const normalizedLink = link.toLowerCase();
@@ -443,8 +427,7 @@ export default function ReviewsPage() {
     const matchesStatus =
       statusFilter === 'all' || submission.status === statusFilter;
     const searchText = [
-      submission.creatorName,
-      submission.creatorSubtitle,
+      submission.creatorReference,
       submission.campaignName,
       getSubmissionPlatform(submission.submissionLink),
       submission.status,
@@ -715,13 +698,8 @@ export default function ReviewsPage() {
                     >
                       <TableCell>
                         <p className="font-medium text-foreground">
-                          {submission.creatorName}
+                          {submission.creatorReference}
                         </p>
-                        {submission.creatorSubtitle && (
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {submission.creatorSubtitle}
-                          </p>
-                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">{platform}</Badge>
@@ -770,11 +748,9 @@ export default function ReviewsPage() {
               <SheetHeader className="border-b border-border px-5 py-4">
                 <div className="flex items-start justify-between gap-4 pr-8">
                   <div>
-                    <SheetTitle>{selectedSubmission.creatorName}</SheetTitle>
+                    <SheetTitle>{selectedSubmission.creatorReference}</SheetTitle>
                     <SheetDescription>
-                      {[selectedSubmission.creatorSubtitle, selectedPlatform, formatDate(selectedSubmission.submittedAt)]
-                        .filter(Boolean)
-                        .join(' • ')}
+                      {selectedPlatform} • {formatDate(selectedSubmission.submittedAt)}
                     </SheetDescription>
                   </div>
                   <StatusBadge status={selectedSubmission.status} />

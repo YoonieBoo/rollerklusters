@@ -55,14 +55,6 @@ export interface Submission {
   reviewedBy?: string;
 }
 
-export interface CreatorProfile {
-  id: string;
-  name: string;
-  email?: string;
-  handle?: string;
-  niche?: string;
-}
-
 export interface ReportSection {
   title: string;
   content: string;

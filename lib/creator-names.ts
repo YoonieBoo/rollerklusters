@@ -12,15 +12,6 @@ const nameKeys = [
   'email',
 ];
 
-const subtitleKeys = [
-  'handle',
-  'username',
-  'email',
-  'niche',
-  'category',
-  'platform',
-];
-
 const referenceKeys = [
   'creator_ref',
   'creator_reference',
@@ -52,38 +43,12 @@ export const toText = (value: unknown): string => {
 const isPlaceholderReference = (value: string) =>
   uuidPattern.test(value) || placeholderCreatorPattern.test(value);
 
-const getNestedRow = (row: SupabaseRow, key: string) => {
-  const value = row[key];
-
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    return value as SupabaseRow;
-  }
-
-  return null;
-};
-
 export const getProfileName = (profile: SupabaseRow | null | undefined) => {
   if (!profile) {
     return '';
   }
 
   for (const key of nameKeys) {
-    const value = toText(profile[key]);
-
-    if (value) {
-      return value;
-    }
-  }
-
-  return '';
-};
-
-export const getProfileSubtitle = (profile: SupabaseRow | null | undefined) => {
-  if (!profile) {
-    return '';
-  }
-
-  for (const key of subtitleKeys) {
     const value = toText(profile[key]);
 
     if (value) {
@@ -109,31 +74,29 @@ export const getSubmissionCreatorReference = (submission: SupabaseRow) => {
   return '';
 };
 
-export const getCreatorDisplayName = (submission: SupabaseRow) => {
-  const creator = getNestedRow(submission, 'creator');
-  const profile = getNestedRow(submission, 'profile');
-  const user = getNestedRow(submission, 'user');
+export const getSubmissionCreatorName = (
+  submission: SupabaseRow,
+  profile?: SupabaseRow | null
+) => {
+  for (const key of nameKeys) {
+    const value = toText(submission[key]);
 
-  return (
-    getProfileName(creator) ||
-    getProfileName(profile) ||
-    getProfileName(user) ||
-    'Unknown Creator'
-  );
+    if (value) {
+      return value;
+    }
+  }
+
+  const profileName = getProfileName(profile);
+
+  if (profileName) {
+    return profileName;
+  }
+
+  const reference = getSubmissionCreatorReference(submission);
+
+  if (reference && !isPlaceholderReference(reference)) {
+    return reference;
+  }
+
+  return 'Unknown creator';
 };
-
-export const getCreatorSubtitle = (submission: SupabaseRow) => {
-  const creator = getNestedRow(submission, 'creator');
-  const profile = getNestedRow(submission, 'profile');
-  const user = getNestedRow(submission, 'user');
-
-  return (
-    getProfileSubtitle(creator) ||
-    getProfileSubtitle(profile) ||
-    getProfileSubtitle(user) ||
-    ''
-  );
-};
-
-export const isCreatorReferenceOnly = (value: string) =>
-  Boolean(value) && isPlaceholderReference(value);
