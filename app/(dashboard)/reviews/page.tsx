@@ -35,6 +35,11 @@ import {
   downloadCampaignReportPdf,
   getCampaignReportExportData,
 } from '@/lib/report-export';
+import {
+  getProfileIds,
+  getSubmissionCreatorName,
+  getSubmissionCreatorReference,
+} from '@/lib/creator-names';
 
 type SupabaseRow = Record<string, unknown>;
 
@@ -58,9 +63,11 @@ const StatusBadge = ({ status }: { status: string }) => {
     approved: { bg: 'bg-green-500/10', text: 'text-green-500' },
     rejected: { bg: 'bg-red-500/10', text: 'text-red-500' },
     changes_requested: { bg: 'bg-red-500/10', text: 'text-red-500' },
+    pending_review: { bg: 'bg-yellow-500/10', text: 'text-yellow-500' },
   };
   const labels: Record<string, string> = {
     pending: 'Pending Review',
+    pending_review: 'Pending Review',
     'in-review': 'In Review',
     approved: 'Approved',
     rejected: 'Changes Requested',
@@ -212,6 +219,7 @@ export default function ReviewsPage() {
   const [campaigns, setCampaigns] = useState<SupabaseRow[]>([]);
   const [submissions, setSubmissions] = useState<SupabaseRow[]>([]);
   const [reviews, setReviews] = useState<SupabaseRow[]>([]);
+  const [creatorProfiles, setCreatorProfiles] = useState<SupabaseRow[]>([]);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState('');
   const [campaignFilter, setCampaignFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -234,13 +242,21 @@ export default function ReviewsPage() {
         ? new URLSearchParams(window.location.search).get('campaign')
         : null;
 
-    const [campaignsResult, submissionsResult, reviewsResult] = await Promise.all([
+    const [
+      campaignsResult,
+      submissionsResult,
+      reviewsResult,
+      usersResult,
+      creatorProfilesResult,
+    ] = await Promise.all([
       supabase.from('campaigns').select('id, name, client_name'),
       supabase
         .from('submissions')
-        .select('id, campaign_id, creator_ref, submission_link, submitted_at, status')
+        .select('*')
         .order('submitted_at', { ascending: false }),
       supabase.from('reviews').select('id, submission_id, approved, feedback_notes, reviewed_at'),
+      supabase.from('users').select('*'),
+      supabase.from('creator_profiles').select('*'),
     ]);
 
     if (campaignsResult.error) {
@@ -255,11 +271,23 @@ export default function ReviewsPage() {
       console.error('Supabase reviews fetch error on reviews page:', reviewsResult.error);
     }
 
+    if (usersResult.error) {
+      console.warn('Optional users fetch skipped on reviews page:', usersResult.error);
+    }
+
+    if (creatorProfilesResult.error) {
+      console.warn(
+        'Optional creator profiles fetch skipped on reviews page:',
+        creatorProfilesResult.error
+      );
+    }
+
     if (submissionsResult.error) {
       setErrorMessage(submissionsResult.error.message);
       setCampaigns([]);
       setSubmissions([]);
       setReviews([]);
+      setCreatorProfiles([]);
       setIsLoading(false);
       return;
     }
@@ -271,10 +299,17 @@ export default function ReviewsPage() {
     const reviewRows = reviewsResult.error
       ? []
       : ((reviewsResult.data ?? []) as SupabaseRow[]);
+    const profileRows = [
+      ...(usersResult.error ? [] : ((usersResult.data ?? []) as SupabaseRow[])),
+      ...(creatorProfilesResult.error
+        ? []
+        : ((creatorProfilesResult.data ?? []) as SupabaseRow[])),
+    ];
 
     setCampaigns(campaignRows);
     setSubmissions(submissionRows);
     setReviews(reviewRows);
+    setCreatorProfiles(profileRows);
     if (queryCampaignId) {
       setCampaignFilter(queryCampaignId);
     }
@@ -309,6 +344,13 @@ export default function ReviewsPage() {
     const campaignsById = new Map(
       campaigns.map((campaign) => [toText(campaign.id), campaign])
     );
+    const creatorProfilesById = new Map<string, SupabaseRow>();
+
+    creatorProfiles.forEach((profile) => {
+      getProfileIds(profile).forEach((profileId) => {
+        creatorProfilesById.set(profileId, profile);
+      });
+    });
 
     const reviewsBySubmissionId = new Map<string, SupabaseRow[]>();
     reviews.forEach((review) => {
@@ -330,14 +372,17 @@ export default function ReviewsPage() {
       const latestStatus = getReviewStatus(latestReview ?? {});
       const latestFeedback = toText(latestReview?.feedback_notes);
       const reviewedAt = getReviewTimestamp(latestReview ?? {});
+      const creatorReference = getSubmissionCreatorReference(submission);
+      const creatorProfile = creatorReference
+        ? creatorProfilesById.get(creatorReference)
+        : null;
 
       return {
         id: submissionId,
         campaignId,
         campaignName: toText(campaign?.name) || 'Untitled campaign',
         clientName: toText(campaign?.client_name) || toText(campaign?.client) || 'N/A',
-        creatorReference:
-          toText(submission.creator_ref) || 'Unknown creator',
+        creatorReference: getSubmissionCreatorName(submission, creatorProfile),
         submissionLink: toText(submission.submission_link),
         status:
           latestStatus ||
@@ -348,7 +393,7 @@ export default function ReviewsPage() {
         feedback: latestFeedback || toText(latestReview?.feedback_notes),
       };
     });
-  }, [campaigns, submissions, reviews]);
+  }, [campaigns, submissions, reviews, creatorProfiles]);
 
   const getSubmissionPlatform = (link: string) => {
     const normalizedLink = link.toLowerCase();
