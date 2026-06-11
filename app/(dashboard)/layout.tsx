@@ -13,6 +13,7 @@ import {
   FileText,
   CheckSquare,
   Users,
+  UserPlus,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
@@ -27,6 +28,7 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/campaigns', label: 'Campaigns', icon: FolderOpen },
   { href: '/creators', label: 'Creators', icon: Users },
+  { href: '/creator-signups', label: 'Signups', icon: UserPlus },
   { href: '/briefs', label: 'Briefs', icon: FileText },
   { href: '/reviews', label: 'Reviews', icon: CheckSquare },
 ];
