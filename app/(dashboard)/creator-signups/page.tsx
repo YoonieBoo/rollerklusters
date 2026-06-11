@@ -17,18 +17,12 @@ type CreatorSignup = {
   id?: string | number | null;
   display_name?: string | null;
   email?: string | null;
+  signup_type?: string | null;
   location?: string | null;
-  university_program?: string | null;
-  year?: string | number | null;
-  phone_number?: string | null;
-  line_id?: string | null;
   instagram_handle?: string | null;
   tiktok_handle?: string | null;
   primary_creative_focus?: unknown;
   follower_count?: string | number | null;
-  experience_level?: string | null;
-  hours_available?: string | number | null;
-  interested_content_types?: unknown;
   status?: string | null;
   created_at?: string | null;
 };
@@ -172,18 +166,12 @@ export default function CreatorSignupsPage() {
               <TableRow className="h-10 hover:bg-muted/60">
                 <TableHead className="py-2">Name</TableHead>
                 <TableHead className="py-2">Email</TableHead>
+                <TableHead className="py-2">Signup Type</TableHead>
                 <TableHead className="py-2">Location</TableHead>
-                <TableHead className="py-2">University Program</TableHead>
-                <TableHead className="py-2">Year</TableHead>
-                <TableHead className="py-2">Phone</TableHead>
-                <TableHead className="py-2">Line ID</TableHead>
                 <TableHead className="py-2">Instagram</TableHead>
                 <TableHead className="py-2">TikTok</TableHead>
-                <TableHead className="py-2">Creative Focus</TableHead>
                 <TableHead className="py-2">Followers</TableHead>
-                <TableHead className="py-2">Experience</TableHead>
-                <TableHead className="py-2">Hours</TableHead>
-                <TableHead className="py-2">Content Types</TableHead>
+                <TableHead className="py-2">Creative Focus</TableHead>
                 <TableHead className="py-2">Status</TableHead>
                 <TableHead className="py-2">Created</TableHead>
               </TableRow>
@@ -201,19 +189,10 @@ export default function CreatorSignupsPage() {
                     {formatValue(signup.email)}
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
+                    {formatLabel(signup.signup_type)}
+                  </TableCell>
+                  <TableCell className="py-2 text-muted-foreground">
                     {formatValue(signup.location)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.university_program)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.year)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.phone_number)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.line_id)}
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
                     {formatValue(signup.instagram_handle)}
@@ -221,23 +200,12 @@ export default function CreatorSignupsPage() {
                   <TableCell className="py-2 text-muted-foreground">
                     {formatValue(signup.tiktok_handle)}
                   </TableCell>
-                  <TableCell className="max-w-56 py-2 text-muted-foreground">
-                    <span className="block truncate">
-                      {formatValue(signup.primary_creative_focus)}
-                    </span>
-                  </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
                     {formatFollowers(signup.follower_count)}
                   </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatLabel(signup.experience_level)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.hours_available)}
-                  </TableCell>
                   <TableCell className="max-w-56 py-2 text-muted-foreground">
                     <span className="block truncate">
-                      {formatValue(signup.interested_content_types)}
+                      {formatValue(signup.primary_creative_focus)}
                     </span>
                   </TableCell>
                   <TableCell className="py-2">
