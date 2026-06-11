@@ -12,6 +12,7 @@ import {
   Bell,
   FileText,
   CheckSquare,
+  Users,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
@@ -25,6 +26,7 @@ import {
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/campaigns', label: 'Campaigns', icon: FolderOpen },
+  { href: '/creators', label: 'Creators', icon: Users },
   { href: '/briefs', label: 'Briefs', icon: FileText },
   { href: '/reviews', label: 'Reviews', icon: CheckSquare },
 ];
