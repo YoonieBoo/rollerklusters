@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import {
   Table,
@@ -19,11 +18,18 @@ type CreatorSignup = {
   email?: string | null;
   signup_type?: string | null;
   location?: string | null;
+  line_id?: string | null;
   instagram_handle?: string | null;
   tiktok_handle?: string | null;
+  other_platforms?: unknown;
   primary_creative_focus?: unknown;
   follower_count?: string | number | null;
-  status?: string | null;
+  experience_level?: string | null;
+  hours_available?: string | number | null;
+  portfolio_links?: unknown;
+  contribution?: unknown;
+  interested_content_types?: unknown;
+  additional_notes?: unknown;
   created_at?: string | null;
 };
 
@@ -97,21 +103,6 @@ const formatDate = (date: string | null | undefined) => {
   return parsedDate.toLocaleDateString();
 };
 
-const SignupStatusBadge = ({ status }: { status: string | null | undefined }) => {
-  const normalizedStatus = toText(status).trim().toLowerCase() || 'pending_review';
-  const styles: Record<string, string> = {
-    pending_review: 'bg-yellow-500/10 text-yellow-600',
-    approved: 'bg-green-500/10 text-green-600',
-    rejected: 'bg-red-500/10 text-red-600',
-  };
-
-  return (
-    <Badge className={`${styles[normalizedStatus] ?? styles.pending_review} border-0`}>
-      {formatLabel(normalizedStatus)}
-    </Badge>
-  );
-};
-
 export default function CreatorSignupsPage() {
   const [signups, setSignups] = useState<CreatorSignup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -168,11 +159,18 @@ export default function CreatorSignupsPage() {
                 <TableHead className="py-2">Email</TableHead>
                 <TableHead className="py-2">Signup Type</TableHead>
                 <TableHead className="py-2">Location</TableHead>
+                <TableHead className="py-2">Line ID</TableHead>
                 <TableHead className="py-2">Instagram</TableHead>
                 <TableHead className="py-2">TikTok</TableHead>
-                <TableHead className="py-2">Followers</TableHead>
+                <TableHead className="py-2">Other Platforms</TableHead>
                 <TableHead className="py-2">Creative Focus</TableHead>
-                <TableHead className="py-2">Status</TableHead>
+                <TableHead className="py-2">Followers</TableHead>
+                <TableHead className="py-2">Experience</TableHead>
+                <TableHead className="py-2">Hours</TableHead>
+                <TableHead className="py-2">Portfolio</TableHead>
+                <TableHead className="py-2">Contribution</TableHead>
+                <TableHead className="py-2">Content Types</TableHead>
+                <TableHead className="py-2">Notes</TableHead>
                 <TableHead className="py-2">Created</TableHead>
               </TableRow>
             </TableHeader>
@@ -195,21 +193,52 @@ export default function CreatorSignupsPage() {
                     {formatValue(signup.location)}
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
+                    {formatValue(signup.line_id)}
+                  </TableCell>
+                  <TableCell className="py-2 text-muted-foreground">
                     {formatValue(signup.instagram_handle)}
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
                     {formatValue(signup.tiktok_handle)}
                   </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatFollowers(signup.follower_count)}
+                  <TableCell className="max-w-48 py-2 text-muted-foreground">
+                    <span className="block truncate">
+                      {formatValue(signup.other_platforms)}
+                    </span>
                   </TableCell>
                   <TableCell className="max-w-56 py-2 text-muted-foreground">
                     <span className="block truncate">
                       {formatValue(signup.primary_creative_focus)}
                     </span>
                   </TableCell>
-                  <TableCell className="py-2">
-                    <SignupStatusBadge status={signup.status} />
+                  <TableCell className="py-2 text-muted-foreground">
+                    {formatFollowers(signup.follower_count)}
+                  </TableCell>
+                  <TableCell className="py-2 text-muted-foreground">
+                    {formatLabel(signup.experience_level)}
+                  </TableCell>
+                  <TableCell className="py-2 text-muted-foreground">
+                    {formatValue(signup.hours_available)}
+                  </TableCell>
+                  <TableCell className="max-w-56 py-2 text-muted-foreground">
+                    <span className="block truncate">
+                      {formatValue(signup.portfolio_links)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="max-w-56 py-2 text-muted-foreground">
+                    <span className="block truncate">
+                      {formatValue(signup.contribution)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="max-w-56 py-2 text-muted-foreground">
+                    <span className="block truncate">
+                      {formatValue(signup.interested_content_types)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="max-w-56 py-2 text-muted-foreground">
+                    <span className="block truncate">
+                      {formatValue(signup.additional_notes)}
+                    </span>
                   </TableCell>
                   <TableCell className="py-2 text-sm text-muted-foreground">
                     {formatDate(signup.created_at)}
