@@ -212,7 +212,7 @@ export default function CreatorsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Creators</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Onboarded Creators</h1>
       </div>
 
       <Card className="gap-0 overflow-hidden border-border bg-card py-0">
