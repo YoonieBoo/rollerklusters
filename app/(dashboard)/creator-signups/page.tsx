@@ -17,7 +17,12 @@ type CreatorSignup = {
   display_name?: string | null;
   email?: string | null;
   signup_type?: string | null;
+  role_label?: string | null;
   location?: string | null;
+  nickname?: string | null;
+  university_program?: string | null;
+  year?: string | number | null;
+  phone_number?: string | null;
   line_id?: string | null;
   instagram_handle?: string | null;
   tiktok_handle?: string | null;
@@ -30,8 +35,11 @@ type CreatorSignup = {
   contribution?: unknown;
   interested_content_types?: unknown;
   additional_notes?: unknown;
+  status?: string | null;
   created_at?: string | null;
 };
+
+const SIGNUPS_PAGE_SIZE = 1000;
 
 const toText = (value: unknown): string => {
   if (typeof value === 'string') {
@@ -103,6 +111,31 @@ const formatDate = (date: string | null | undefined) => {
   return parsedDate.toLocaleDateString();
 };
 
+const fetchAllCreatorSignups = async () => {
+  const signups: CreatorSignup[] = [];
+
+  for (let page = 0; ; page += 1) {
+    const from = page * SIGNUPS_PAGE_SIZE;
+    const to = from + SIGNUPS_PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from('creator_signups')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    const pageRows = (data ?? []) as CreatorSignup[];
+    signups.push(...pageRows);
+
+    if (pageRows.length < SIGNUPS_PAGE_SIZE) {
+      return { data: signups, error: null };
+    }
+  }
+};
+
 export default function CreatorSignupsPage() {
   const [signups, setSignups] = useState<CreatorSignup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -113,10 +146,7 @@ export default function CreatorSignupsPage() {
       setIsLoading(true);
       setErrorMessage(null);
 
-      const { data, error } = await supabase
-        .from('creator_signups')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data, error } = await fetchAllCreatorSignups();
 
       if (error) {
         console.error('Supabase creator signups fetch error:', error);
@@ -152,13 +182,19 @@ export default function CreatorSignupsPage() {
             <p className="mt-1 text-sm text-muted-foreground">{errorMessage}</p>
           </div>
         ) : signups.length > 0 ? (
-          <Table>
+          <div className="overflow-x-auto">
+          <Table className="min-w-[1800px]">
             <TableHeader className="bg-muted/60">
               <TableRow className="h-10 hover:bg-muted/60">
                 <TableHead className="py-2">Name</TableHead>
                 <TableHead className="py-2">Email</TableHead>
                 <TableHead className="py-2">Signup Type</TableHead>
+                <TableHead className="py-2">Role</TableHead>
                 <TableHead className="py-2">Location</TableHead>
+                <TableHead className="py-2">Nickname</TableHead>
+                <TableHead className="py-2">Program</TableHead>
+                <TableHead className="py-2">Year</TableHead>
+                <TableHead className="py-2">Phone</TableHead>
                 <TableHead className="py-2">Line ID</TableHead>
                 <TableHead className="py-2">Instagram</TableHead>
                 <TableHead className="py-2">TikTok</TableHead>
@@ -171,6 +207,7 @@ export default function CreatorSignupsPage() {
                 <TableHead className="py-2">Contribution</TableHead>
                 <TableHead className="py-2">Content Types</TableHead>
                 <TableHead className="py-2">Notes</TableHead>
+                <TableHead className="py-2">Status</TableHead>
                 <TableHead className="py-2">Created</TableHead>
               </TableRow>
             </TableHeader>
@@ -190,7 +227,22 @@ export default function CreatorSignupsPage() {
                     {formatLabel(signup.signup_type)}
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
+                    {formatValue(signup.role_label)}
+                  </TableCell>
+                  <TableCell className="py-2 text-muted-foreground">
                     {formatValue(signup.location)}
+                  </TableCell>
+                  <TableCell className="py-2 text-muted-foreground">
+                    {formatValue(signup.nickname)}
+                  </TableCell>
+                  <TableCell className="py-2 text-muted-foreground">
+                    {formatValue(signup.university_program)}
+                  </TableCell>
+                  <TableCell className="py-2 text-muted-foreground">
+                    {formatValue(signup.year)}
+                  </TableCell>
+                  <TableCell className="py-2 text-muted-foreground">
+                    {formatValue(signup.phone_number)}
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
                     {formatValue(signup.line_id)}
@@ -240,6 +292,9 @@ export default function CreatorSignupsPage() {
                       {formatValue(signup.additional_notes)}
                     </span>
                   </TableCell>
+                  <TableCell className="py-2 text-muted-foreground">
+                    {formatLabel(signup.status)}
+                  </TableCell>
                   <TableCell className="py-2 text-sm text-muted-foreground">
                     {formatDate(signup.created_at)}
                   </TableCell>
@@ -247,6 +302,7 @@ export default function CreatorSignupsPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         ) : (
           <div className="p-6 text-center">
             <p className="text-muted-foreground">No creator signups yet.</p>
