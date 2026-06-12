@@ -40,6 +40,8 @@ type CreatorSignup = {
 };
 
 const SIGNUPS_PAGE_SIZE = 1000;
+const PRIORITY_SIGNUP_IDS = new Set(['3af1db2d-6489-4a49-9ef7-0581cc61614a']);
+const PRIORITY_SIGNUP_EMAILS = new Set(['jirathip2548@gmail.com']);
 const HIDDEN_SIGNUP_IDS = new Set(['f6f0a00b-094e-4921-b50d-14d6ff6a5fbe']);
 const HIDDEN_SIGNUP_EMAILS = new Set(['nangnommaung@gmail.com']);
 
@@ -117,6 +119,21 @@ const shouldShowSignup = (signup: CreatorSignup) =>
   !HIDDEN_SIGNUP_IDS.has(toText(signup.id)) &&
   !HIDDEN_SIGNUP_EMAILS.has(toText(signup.email).trim().toLowerCase());
 
+const isPrioritySignup = (signup: CreatorSignup) =>
+  PRIORITY_SIGNUP_IDS.has(toText(signup.id)) ||
+  PRIORITY_SIGNUP_EMAILS.has(toText(signup.email).trim().toLowerCase());
+
+const sortSignups = (firstSignup: CreatorSignup, secondSignup: CreatorSignup) => {
+  const firstIsPriority = isPrioritySignup(firstSignup);
+  const secondIsPriority = isPrioritySignup(secondSignup);
+
+  if (firstIsPriority !== secondIsPriority) {
+    return firstIsPriority ? -1 : 1;
+  }
+
+  return 0;
+};
+
 const fetchAllCreatorSignups = async () => {
   const signups: CreatorSignup[] = [];
 
@@ -137,7 +154,7 @@ const fetchAllCreatorSignups = async () => {
     signups.push(...pageRows.filter(shouldShowSignup));
 
     if (pageRows.length < SIGNUPS_PAGE_SIZE) {
-      return { data: signups, error: null };
+      return { data: signups.sort(sortSignups), error: null };
     }
   }
 };
