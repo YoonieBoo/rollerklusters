@@ -89,6 +89,26 @@ const getCreatorName = (creator: CreatorProfile) =>
   toText(creator.social_handle).trim() ||
   'Unnamed creator';
 
+const normalizeCreatorIdentifier = (value: unknown) =>
+  toText(value).trim().toLowerCase().replace(/^@/, '');
+
+const withoutFirstAustinProtocolCreator = (creators: CreatorProfile[]) => {
+  let hasRemovedCreator = false;
+
+  return creators.filter((creator) => {
+    const isAustinProtocol =
+      normalizeCreatorIdentifier(creator.display_name) === 'austin_protocol' ||
+      normalizeCreatorIdentifier(creator.social_handle) === 'austin_protocol';
+
+    if (isAustinProtocol && !hasRemovedCreator) {
+      hasRemovedCreator = true;
+      return false;
+    }
+
+    return true;
+  });
+};
+
 const StatusBadge = ({ status }: { status: string | null | undefined }) => {
   const normalizedStatus = toText(status).trim().toLowerCase() || 'unknown';
   const styles: Record<string, string> = {
@@ -150,7 +170,7 @@ export default function CreatorsPage() {
         setErrorMessage(error.message);
         setCreators([]);
       } else {
-        setCreators((data ?? []) as CreatorProfile[]);
+        setCreators(withoutFirstAustinProtocolCreator((data ?? []) as CreatorProfile[]));
       }
 
       setIsLoading(false);
