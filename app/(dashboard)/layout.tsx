@@ -33,6 +33,9 @@ const navItems = [
   { href: '/reviews', label: 'Reviews', icon: CheckSquare },
 ];
 
+const hiddenSignupId = 'f6f0a00b-094e-4921-b50d-14d6ff6a5fbe';
+const hiddenSignupEmail = 'nangnommaung@gmail.com';
+
 type SupabaseRow = Record<string, unknown>;
 
 const logOptionalProfileWarning = (label: string, error: unknown) => {
@@ -70,6 +73,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifications, setNotifications] = useState<WorkflowUpdate[]>([]);
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
+  const [signupCount, setSignupCount] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -172,6 +176,57 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     fetchNotifications();
   }, [pathname, user]);
+
+  const fetchSignupCount = async () => {
+    if (!user) {
+      setSignupCount(0);
+      return;
+    }
+
+    try {
+      const { count, error } = await supabase
+        .from('creator_signups')
+        .select('id', { count: 'exact', head: true })
+        .neq('id', hiddenSignupId)
+        .neq('email', hiddenSignupEmail);
+
+      if (error) {
+        console.error('Creator signup count fetch error:', error);
+        setSignupCount(0);
+        return;
+      }
+
+      setSignupCount(count ?? 0);
+    } catch (error) {
+      console.error('Creator signup count fetch issue:', error);
+      setSignupCount(0);
+    }
+  };
+
+  useEffect(() => {
+    fetchSignupCount();
+  }, [pathname, user]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const channel = supabase
+      .channel('creator-signups-count')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'creator_signups' },
+        () => {
+          fetchSignupCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const unreadCount = useMemo(
     () =>
@@ -277,7 +332,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   `}
                 >
                   <Icon size={20} />
-                  <span className="text-sm font-medium">{item.label}</span>
+                  <span className="flex-1 text-left text-sm font-medium">{item.label}</span>
+                  {item.href === '/creator-signups' && signupCount > 0 && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-700 px-1.5 text-[10px] font-semibold leading-none text-white">
+                      {signupCount > 9 ? '9+' : signupCount}
+                    </span>
+                  )}
                 </button>
               </Link>
             );
