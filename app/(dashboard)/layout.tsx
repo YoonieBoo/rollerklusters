@@ -284,11 +284,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-dvh min-w-0 bg-background">
       {/* Sidebar */}
       <aside
         className={`
-          fixed md:relative left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border shadow-sm
+          fixed left-0 top-0 h-dvh w-[min(18rem,calc(100vw-2rem))] bg-sidebar border-r border-sidebar-border shadow-sm md:relative md:w-64
           transition-all duration-300 z-50 flex flex-col
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
@@ -399,7 +399,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <button
           onClick={() => setSidebarOpen(true)}
           className="fixed left-4 top-4 z-30 rounded-lg border border-border bg-card p-2 shadow-sm hover:bg-muted md:hidden"
@@ -409,8 +409,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </button>
 
         {/* Content */}
-        <main className="flex-1 overflow-auto">
-          <div className="w-full max-w-7xl mx-auto px-4 pb-5 pt-14 sm:px-5 md:px-6 md:pt-6 lg:px-7 lg:pb-6">
+        <main className="min-w-0 flex-1 overflow-auto">
+          <div className="mx-auto w-full max-w-7xl px-3 pb-5 pt-14 sm:px-5 md:px-6 md:pt-6 lg:px-7 lg:pb-6">
             {children}
           </div>
         </main>

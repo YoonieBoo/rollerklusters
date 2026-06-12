@@ -115,6 +115,15 @@ const formatDate = (date: string | null | undefined) => {
   return parsedDate.toLocaleDateString();
 };
 
+const SignupDetail = ({ label, value }: { label: string; value: unknown }) => (
+  <div className="min-w-0">
+    <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">
+      {label}
+    </p>
+    <p className="mt-1 break-words text-sm text-foreground">{formatValue(value)}</p>
+  </div>
+);
+
 const shouldShowSignup = (signup: CreatorSignup) =>
   !HIDDEN_SIGNUP_IDS.has(toText(signup.id)) &&
   !HIDDEN_SIGNUP_EMAILS.has(toText(signup.email).trim().toLowerCase());
@@ -205,8 +214,56 @@ export default function CreatorSignupsPage() {
             <p className="mt-1 text-sm text-muted-foreground">{errorMessage}</p>
           </div>
         ) : signups.length > 0 ? (
-          <div className="overflow-x-auto">
-            <Table className="min-w-[2200px]">
+          <>
+            <div className="divide-y divide-border lg:hidden">
+              {signups.map((signup, index) => (
+                <div
+                  key={toText(signup.id) || `${signup.email ?? 'signup'}-${index}`}
+                  className="space-y-4 px-4 py-4"
+                >
+                  <div className="min-w-0">
+                    <p className="break-words font-medium text-foreground">
+                      {formatValue(signup.display_name)}
+                    </p>
+                    <p className="mt-1 break-all text-sm text-muted-foreground">
+                      {formatValue(signup.email)}
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <SignupDetail label="Role" value={signup.role_label} />
+                    <SignupDetail label="Location" value={signup.location} />
+                    <SignupDetail label="Nickname" value={signup.nickname} />
+                    <SignupDetail label="Program" value={signup.university_program} />
+                    <SignupDetail label="Year" value={signup.year} />
+                    <SignupDetail label="Phone" value={signup.phone_number} />
+                    <SignupDetail label="Line ID" value={signup.line_id} />
+                    <SignupDetail label="Instagram" value={signup.instagram_handle} />
+                    <SignupDetail label="TikTok" value={signup.tiktok_handle} />
+                    <SignupDetail label="Other Platforms" value={signup.other_platforms} />
+                    <SignupDetail
+                      label="Creative Focus"
+                      value={signup.primary_creative_focus}
+                    />
+                    <SignupDetail
+                      label="Followers"
+                      value={formatFollowers(signup.follower_count)}
+                    />
+                    <SignupDetail label="Experience" value={signup.experience_level} />
+                    <SignupDetail label="Hours" value={signup.hours_available} />
+                    <SignupDetail label="Contribution" value={signup.contribution} />
+                    <SignupDetail
+                      label="Content Types"
+                      value={signup.interested_content_types}
+                    />
+                    <SignupDetail label="Notes" value={signup.additional_notes} />
+                    <SignupDetail label="Status" value={formatLabel(signup.status)} />
+                    <SignupDetail label="Created" value={formatDate(signup.created_at)} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto lg:block">
+              <Table className="min-w-[2200px]">
               <TableHeader className="bg-muted/60">
                 <TableRow className="h-10 hover:bg-muted/60">
                   <TableHead className="py-2">Name</TableHead>
@@ -308,8 +365,9 @@ export default function CreatorSignupsPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
-          </div>
+              </Table>
+            </div>
+          </>
         ) : (
           <div className="p-6 text-center">
             <p className="text-muted-foreground">No creator signups yet.</p>

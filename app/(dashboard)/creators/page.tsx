@@ -151,6 +151,15 @@ const getCreatorVideoCount = (creator: CreatorProfile) =>
     ])
   );
 
+const CreatorMetric = ({ label, value }: { label: string; value: string }) => (
+  <div className="min-w-0">
+    <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">
+      {label}
+    </p>
+    <p className="mt-1 break-words text-sm font-medium text-foreground">{value}</p>
+  </div>
+);
+
 const normalizeCreatorIdentifier = (value: unknown) =>
   toText(value).trim().toLowerCase().replace(/^@/, '');
 
@@ -220,53 +229,88 @@ export default function CreatorsPage() {
             <p className="mt-1 text-sm text-muted-foreground">{errorMessage}</p>
           </div>
         ) : creators.length > 0 ? (
-          <Table>
-            <TableHeader className="bg-muted/60">
-              <TableRow className="h-10 hover:bg-muted/60">
-                <TableHead className="py-2">Creator</TableHead>
-                <TableHead className="py-2">Platform</TableHead>
-                <TableHead className="py-2">Social handle</TableHead>
-                <TableHead className="py-2">Followers</TableHead>
-                <TableHead className="py-2">Rank</TableHead>
-                <TableHead className="py-2">Consistency</TableHead>
-                <TableHead className="py-2">Video Count</TableHead>
-                <TableHead className="py-2">Signed up date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <>
+            <div className="divide-y divide-border md:hidden">
               {creators.map((creator, index) => (
-                <TableRow
+                <div
                   key={toText(creator.id) || `${creator.social_handle ?? 'creator'}-${index}`}
-                  className="h-11 border-border hover:bg-muted/40"
+                  className="space-y-4 px-4 py-4"
                 >
-                  <TableCell className="py-2 font-medium text-foreground">
-                    {getCreatorName(creator)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatLabel(creator.platform)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {toText(creator.social_handle).trim() || 'N/A'}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatFollowers(creator)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatLabel(creator.creator_rank)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {getCreatorConsistency(creator)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {getCreatorVideoCount(creator)}
-                  </TableCell>
-                  <TableCell className="py-2 text-sm text-muted-foreground">
-                    {formatDate(creator.created_at)}
-                  </TableCell>
-                </TableRow>
+                  <div className="min-w-0">
+                    <p className="break-words font-medium text-foreground">
+                      {getCreatorName(creator)}
+                    </p>
+                    <p className="mt-1 break-words text-sm text-muted-foreground">
+                      {toText(creator.social_handle).trim() || 'N/A'} ·{' '}
+                      {formatLabel(creator.platform)}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <CreatorMetric label="Followers" value={formatFollowers(creator)} />
+                    <CreatorMetric label="Rank" value={formatLabel(creator.creator_rank)} />
+                    <CreatorMetric
+                      label="Consistency"
+                      value={getCreatorConsistency(creator)}
+                    />
+                    <CreatorMetric
+                      label="Videos"
+                      value={getCreatorVideoCount(creator)}
+                    />
+                  </div>
+                  <CreatorMetric label="Signed up" value={formatDate(creator.created_at)} />
+                </div>
               ))}
-            </TableBody>
-          </Table>
+            </div>
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader className="bg-muted/60">
+                  <TableRow className="h-10 hover:bg-muted/60">
+                    <TableHead className="py-2">Creator</TableHead>
+                    <TableHead className="py-2">Platform</TableHead>
+                    <TableHead className="py-2">Social handle</TableHead>
+                    <TableHead className="py-2">Followers</TableHead>
+                    <TableHead className="py-2">Rank</TableHead>
+                    <TableHead className="py-2">Consistency</TableHead>
+                    <TableHead className="py-2">Video Count</TableHead>
+                    <TableHead className="py-2">Signed up date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {creators.map((creator, index) => (
+                    <TableRow
+                      key={toText(creator.id) || `${creator.social_handle ?? 'creator'}-${index}`}
+                      className="h-11 border-border hover:bg-muted/40"
+                    >
+                      <TableCell className="py-2 font-medium text-foreground">
+                        {getCreatorName(creator)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatLabel(creator.platform)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {toText(creator.social_handle).trim() || 'N/A'}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatFollowers(creator)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatLabel(creator.creator_rank)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {getCreatorConsistency(creator)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {getCreatorVideoCount(creator)}
+                      </TableCell>
+                      <TableCell className="py-2 text-sm text-muted-foreground">
+                        {formatDate(creator.created_at)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         ) : (
           <div className="p-6 text-center">
             <p className="text-muted-foreground">No signed-up creators yet.</p>
