@@ -213,9 +213,6 @@ export default function CreatorsPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Creators</h1>
-        <p className="text-sm text-muted-foreground">
-          View creators who signed up from RollerKluster.
-        </p>
       </div>
 
       <Card className="gap-0 overflow-hidden border-border bg-card py-0">

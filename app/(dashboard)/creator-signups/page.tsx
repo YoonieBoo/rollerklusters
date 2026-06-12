@@ -198,9 +198,6 @@ export default function CreatorSignupsPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Creator Signups</h1>
-        <p className="text-sm text-muted-foreground">
-          Review raw creator applications submitted from the public website.
-        </p>
       </div>
 
       <Card className="gap-0 overflow-hidden border-border bg-card py-0">
