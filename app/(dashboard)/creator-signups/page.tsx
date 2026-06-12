@@ -183,40 +183,40 @@ export default function CreatorSignupsPage() {
           </div>
         ) : signups.length > 0 ? (
           <div className="overflow-x-auto">
-          <Table className="min-w-[1800px]">
-            <TableHeader className="bg-muted/60">
-              <TableRow className="h-10 hover:bg-muted/60">
-                <TableHead className="py-2">Name</TableHead>
-                <TableHead className="py-2">Email</TableHead>
-                <TableHead className="py-2">Signup Type</TableHead>
-                <TableHead className="py-2">Role</TableHead>
-                <TableHead className="py-2">Location</TableHead>
-                <TableHead className="py-2">Nickname</TableHead>
-                <TableHead className="py-2">Program</TableHead>
-                <TableHead className="py-2">Year</TableHead>
-                <TableHead className="py-2">Phone</TableHead>
-                <TableHead className="py-2">Line ID</TableHead>
-                <TableHead className="py-2">Instagram</TableHead>
-                <TableHead className="py-2">TikTok</TableHead>
-                <TableHead className="py-2">Other Platforms</TableHead>
-                <TableHead className="py-2">Creative Focus</TableHead>
-                <TableHead className="py-2">Followers</TableHead>
-                <TableHead className="py-2">Experience</TableHead>
-                <TableHead className="py-2">Hours</TableHead>
-                <TableHead className="py-2">Portfolio</TableHead>
-                <TableHead className="py-2">Contribution</TableHead>
-                <TableHead className="py-2">Content Types</TableHead>
-                <TableHead className="py-2">Notes</TableHead>
-                <TableHead className="py-2">Status</TableHead>
-                <TableHead className="py-2">Created</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {signups.map((signup, index) => (
-                <TableRow
-                  key={toText(signup.id) || `${signup.email ?? 'signup'}-${index}`}
-                  className="h-11 border-border hover:bg-muted/40"
-                >
+            <Table className="min-w-[2200px]">
+              <TableHeader className="bg-muted/60">
+                <TableRow className="h-10 hover:bg-muted/60">
+                  <TableHead className="py-2">Name</TableHead>
+                  <TableHead className="py-2">Email</TableHead>
+                  <TableHead className="py-2">Signup Type</TableHead>
+                  <TableHead className="py-2">Role</TableHead>
+                  <TableHead className="py-2">Location</TableHead>
+                  <TableHead className="py-2">Nickname</TableHead>
+                  <TableHead className="py-2">Program</TableHead>
+                  <TableHead className="py-2">Year</TableHead>
+                  <TableHead className="py-2">Phone</TableHead>
+                  <TableHead className="py-2">Line ID</TableHead>
+                  <TableHead className="py-2">Instagram</TableHead>
+                  <TableHead className="py-2">TikTok</TableHead>
+                  <TableHead className="py-2">Other Platforms</TableHead>
+                  <TableHead className="py-2">Creative Focus</TableHead>
+                  <TableHead className="py-2">Followers</TableHead>
+                  <TableHead className="py-2">Experience</TableHead>
+                  <TableHead className="py-2">Hours</TableHead>
+                  <TableHead className="py-2">Portfolio</TableHead>
+                  <TableHead className="py-2">Contribution</TableHead>
+                  <TableHead className="py-2">Content Types</TableHead>
+                  <TableHead className="py-2">Notes</TableHead>
+                  <TableHead className="py-2">Status</TableHead>
+                  <TableHead className="py-2">Created</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {signups.map((signup, index) => (
+                  <TableRow
+                    key={toText(signup.id) || `${signup.email ?? 'signup'}-${index}`}
+                    className="border-border align-top hover:bg-muted/40"
+                  >
                   <TableCell className="py-2 font-medium text-foreground">
                     {formatValue(signup.display_name)}
                   </TableCell>
@@ -253,15 +253,11 @@ export default function CreatorSignupsPage() {
                   <TableCell className="py-2 text-muted-foreground">
                     {formatValue(signup.tiktok_handle)}
                   </TableCell>
-                  <TableCell className="max-w-48 py-2 text-muted-foreground">
-                    <span className="block truncate">
-                      {formatValue(signup.other_platforms)}
-                    </span>
+                  <TableCell className="max-w-56 whitespace-normal break-words py-2 text-muted-foreground">
+                    {formatValue(signup.other_platforms)}
                   </TableCell>
-                  <TableCell className="max-w-56 py-2 text-muted-foreground">
-                    <span className="block truncate">
-                      {formatValue(signup.primary_creative_focus)}
-                    </span>
+                  <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
+                    {formatValue(signup.primary_creative_focus)}
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
                     {formatFollowers(signup.follower_count)}
@@ -272,25 +268,17 @@ export default function CreatorSignupsPage() {
                   <TableCell className="py-2 text-muted-foreground">
                     {formatValue(signup.hours_available)}
                   </TableCell>
-                  <TableCell className="max-w-56 py-2 text-muted-foreground">
-                    <span className="block truncate">
-                      {formatValue(signup.portfolio_links)}
-                    </span>
+                  <TableCell className="max-w-72 whitespace-normal break-all py-2 text-muted-foreground">
+                    {formatValue(signup.portfolio_links)}
                   </TableCell>
-                  <TableCell className="max-w-56 py-2 text-muted-foreground">
-                    <span className="block truncate">
-                      {formatValue(signup.contribution)}
-                    </span>
+                  <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
+                    {formatValue(signup.contribution)}
                   </TableCell>
-                  <TableCell className="max-w-56 py-2 text-muted-foreground">
-                    <span className="block truncate">
-                      {formatValue(signup.interested_content_types)}
-                    </span>
+                  <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
+                    {formatValue(signup.interested_content_types)}
                   </TableCell>
-                  <TableCell className="max-w-56 py-2 text-muted-foreground">
-                    <span className="block truncate">
-                      {formatValue(signup.additional_notes)}
-                    </span>
+                  <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
+                    {formatValue(signup.additional_notes)}
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
                     {formatLabel(signup.status)}
@@ -298,10 +286,10 @@ export default function CreatorSignupsPage() {
                   <TableCell className="py-2 text-sm text-muted-foreground">
                     {formatDate(signup.created_at)}
                   </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         ) : (
           <div className="p-6 text-center">
