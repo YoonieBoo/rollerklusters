@@ -11,6 +11,29 @@ import type { User } from '@supabase/supabase-js';
 type AuthMode = 'login' | 'signup';
 type SupabaseRow = Record<string, unknown>;
 
+const getSupabaseErrorDetails = (error: unknown) => {
+  if (!error || typeof error !== 'object') {
+    return {
+      message: 'Unknown Supabase error',
+      code: undefined,
+      status: undefined,
+    };
+  }
+
+  const supabaseError = error as {
+    message?: string;
+    code?: string;
+    status?: number;
+    name?: string;
+  };
+
+  return {
+    message: supabaseError.message ?? supabaseError.name ?? 'Unknown Supabase error',
+    code: supabaseError.code,
+    status: supabaseError.status,
+  };
+};
+
 const logProfileSyncWarning = (label: string, error: unknown) => {
   if (process.env.NODE_ENV !== 'development') {
     return;
@@ -203,8 +226,18 @@ export default function AuthPage() {
         });
 
         if (error) {
-          console.error('Supabase login error:', error);
-          setErrorMessage('Unable to log in. Check your email and password.');
+          const errorDetails = getSupabaseErrorDetails(error);
+
+          console.error('Supabase login error:', {
+            email: trimmedEmail,
+            ...errorDetails,
+          });
+
+          setErrorMessage(
+            errorDetails.message === 'Invalid login credentials'
+              ? 'Unable to log in. Check your email and password.'
+              : `Unable to log in: ${errorDetails.message}`
+          );
           setIsSubmitting(false);
           return;
         }
