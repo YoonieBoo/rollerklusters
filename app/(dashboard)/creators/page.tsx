@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import {
   Table,
@@ -24,6 +23,7 @@ type CreatorProfile = {
   verification_status?: string | null;
   onboarding_completed?: boolean | string | null;
   created_at?: string | null;
+  [key: string]: unknown;
 };
 
 const toText = (value: unknown) => {
@@ -70,6 +70,23 @@ const formatFollowers = (creator: CreatorProfile) => {
   return new Intl.NumberFormat().format(numericValue);
 };
 
+const formatNumberValue = (value: unknown) => {
+  const text = toText(value).trim();
+
+  if (!text) {
+    return 'N/A';
+  }
+
+  const numericValue =
+    typeof value === 'number' ? value : Number(text.replace(/,/g, ''));
+
+  if (Number.isNaN(numericValue)) {
+    return text;
+  }
+
+  return new Intl.NumberFormat().format(numericValue);
+};
+
 const formatDate = (date: string | null | undefined) => {
   if (!date) {
     return 'N/A';
@@ -89,6 +106,51 @@ const getCreatorName = (creator: CreatorProfile) =>
   toText(creator.social_handle).trim() ||
   'Unnamed creator';
 
+const getFirstValue = (creator: CreatorProfile, keys: string[]) => {
+  for (const key of keys) {
+    const value = creator[key];
+
+    if (toText(value).trim()) {
+      return value;
+    }
+  }
+
+  return null;
+};
+
+const getCreatorConsistency = (creator: CreatorProfile) =>
+  formatLabel(
+    getFirstValue(creator, [
+      'consistency',
+      'consistency_score',
+      'consistencyScore',
+      'posting_consistency',
+      'postingConsistency',
+      'content_consistency',
+      'contentConsistency',
+    ])
+  );
+
+const getCreatorVideoCount = (creator: CreatorProfile) =>
+  formatNumberValue(
+    getFirstValue(creator, [
+      'video_count',
+      'videoCount',
+      'video_counts',
+      'videoCounts',
+      'videos_count',
+      'videosCount',
+      'total_videos',
+      'totalVideos',
+      'content_count',
+      'contentCount',
+      'post_count',
+      'postCount',
+      'posts_count',
+      'postsCount',
+    ])
+  );
+
 const normalizeCreatorIdentifier = (value: unknown) =>
   toText(value).trim().toLowerCase().replace(/^@/, '');
 
@@ -107,47 +169,6 @@ const withoutFirstAustinProtocolCreator = (creators: CreatorProfile[]) => {
 
     return true;
   });
-};
-
-const StatusBadge = ({ status }: { status: string | null | undefined }) => {
-  const normalizedStatus = toText(status).trim().toLowerCase() || 'unknown';
-  const styles: Record<string, string> = {
-    approved: 'bg-green-500/10 text-green-600',
-    verified: 'bg-green-500/10 text-green-600',
-    active: 'bg-green-500/10 text-green-600',
-    pending: 'bg-yellow-500/10 text-yellow-600',
-    unverified: 'bg-yellow-500/10 text-yellow-600',
-    rejected: 'bg-red-500/10 text-red-600',
-    suspended: 'bg-red-500/10 text-red-600',
-    unknown: 'bg-slate-500/10 text-slate-600',
-  };
-
-  return (
-    <Badge className={`${styles[normalizedStatus] ?? styles.unknown} border-0`}>
-      {formatLabel(normalizedStatus, 'Unknown')}
-    </Badge>
-  );
-};
-
-const OnboardingBadge = ({
-  completed,
-}: {
-  completed: boolean | string | null | undefined;
-}) => {
-  const isCompleted =
-    completed === true || toText(completed).trim().toLowerCase() === 'true';
-
-  return (
-    <Badge
-      className={`border-0 ${
-        isCompleted
-          ? 'bg-green-500/10 text-green-600'
-          : 'bg-yellow-500/10 text-yellow-600'
-      }`}
-    >
-      {isCompleted ? 'Completed' : 'Incomplete'}
-    </Badge>
-  );
 };
 
 export default function CreatorsPage() {
@@ -207,8 +228,8 @@ export default function CreatorsPage() {
                 <TableHead className="py-2">Social handle</TableHead>
                 <TableHead className="py-2">Followers</TableHead>
                 <TableHead className="py-2">Rank</TableHead>
-                <TableHead className="py-2">Status</TableHead>
-                <TableHead className="py-2">Onboarding</TableHead>
+                <TableHead className="py-2">Consistency</TableHead>
+                <TableHead className="py-2">Video Count</TableHead>
                 <TableHead className="py-2">Signed up date</TableHead>
               </TableRow>
             </TableHeader>
@@ -233,11 +254,11 @@ export default function CreatorsPage() {
                   <TableCell className="py-2 text-muted-foreground">
                     {formatLabel(creator.creator_rank)}
                   </TableCell>
-                  <TableCell className="py-2">
-                    <StatusBadge status={creator.verification_status} />
+                  <TableCell className="py-2 text-muted-foreground">
+                    {getCreatorConsistency(creator)}
                   </TableCell>
-                  <TableCell className="py-2">
-                    <OnboardingBadge completed={creator.onboarding_completed} />
+                  <TableCell className="py-2 text-muted-foreground">
+                    {getCreatorVideoCount(creator)}
                   </TableCell>
                   <TableCell className="py-2 text-sm text-muted-foreground">
                     {formatDate(creator.created_at)}
