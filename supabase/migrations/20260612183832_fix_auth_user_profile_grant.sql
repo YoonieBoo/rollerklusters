@@ -4,6 +4,17 @@
 -- profile/cache table and should never be required to exist before a user can
 -- receive a Supabase Auth session.
 
+-- Supabase Auth uses auth.users.role as the database/JWT role when granting a
+-- session. App roles such as "admin" belong in public.users.role, not here.
+-- If auth.users.role is blank or set to "admin", Auth can fail with:
+-- "Database error granting user".
+update auth.users
+set role = 'authenticated'
+where role is distinct from 'authenticated';
+
+alter table auth.users
+alter column role set default 'authenticated';
+
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,
   email text,
