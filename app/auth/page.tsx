@@ -95,7 +95,7 @@ export default function AuthPage() {
     resetMessages();
 
     const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
+    const submittedPassword = password;
     const trimmedName = fullName.trim();
 
     if (!trimmedEmail) {
@@ -103,12 +103,12 @@ export default function AuthPage() {
       return;
     }
 
-    if (!trimmedPassword) {
+    if (!submittedPassword) {
       setErrorMessage('Password is required');
       return;
     }
 
-    if (trimmedPassword.length < 6) {
+    if (submittedPassword.length < 6) {
       setErrorMessage('Password must be at least 6 characters');
       return;
     }
@@ -124,7 +124,7 @@ export default function AuthPage() {
       if (mode === 'login') {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: trimmedEmail,
-          password: trimmedPassword,
+          password: submittedPassword,
         });
 
         if (error) {
@@ -151,7 +151,7 @@ export default function AuthPage() {
 
       const { data, error } = await supabase.auth.signUp({
         email: trimmedEmail,
-        password: trimmedPassword,
+        password: submittedPassword,
         options: {
           data: {
             full_name: trimmedName,
