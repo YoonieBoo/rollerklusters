@@ -40,6 +40,8 @@ type CreatorSignup = {
 };
 
 const SIGNUPS_PAGE_SIZE = 1000;
+const HIDDEN_SIGNUP_IDS = new Set(['f6f0a00b-094e-4921-b50d-14d6ff6a5fbe']);
+const HIDDEN_SIGNUP_EMAILS = new Set(['nangnommaung@gmail.com']);
 
 const toText = (value: unknown): string => {
   if (typeof value === 'string') {
@@ -111,6 +113,10 @@ const formatDate = (date: string | null | undefined) => {
   return parsedDate.toLocaleDateString();
 };
 
+const shouldShowSignup = (signup: CreatorSignup) =>
+  !HIDDEN_SIGNUP_IDS.has(toText(signup.id)) &&
+  !HIDDEN_SIGNUP_EMAILS.has(toText(signup.email).trim().toLowerCase());
+
 const fetchAllCreatorSignups = async () => {
   const signups: CreatorSignup[] = [];
 
@@ -128,7 +134,7 @@ const fetchAllCreatorSignups = async () => {
     }
 
     const pageRows = (data ?? []) as CreatorSignup[];
-    signups.push(...pageRows);
+    signups.push(...pageRows.filter(shouldShowSignup));
 
     if (pageRows.length < SIGNUPS_PAGE_SIZE) {
       return { data: signups, error: null };
@@ -203,7 +209,6 @@ export default function CreatorSignupsPage() {
                   <TableHead className="py-2">Followers</TableHead>
                   <TableHead className="py-2">Experience</TableHead>
                   <TableHead className="py-2">Hours</TableHead>
-                  <TableHead className="py-2">Portfolio</TableHead>
                   <TableHead className="py-2">Contribution</TableHead>
                   <TableHead className="py-2">Content Types</TableHead>
                   <TableHead className="py-2">Notes</TableHead>
@@ -267,9 +272,6 @@ export default function CreatorSignupsPage() {
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
                     {formatValue(signup.hours_available)}
-                  </TableCell>
-                  <TableCell className="max-w-72 whitespace-normal break-all py-2 text-muted-foreground">
-                    {formatValue(signup.portfolio_links)}
                   </TableCell>
                   <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
                     {formatValue(signup.contribution)}
