@@ -6,8 +6,10 @@ import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase/client';
+import type { User } from '@supabase/supabase-js';
 
 type AuthMode = 'login' | 'signup';
+type SupabaseRow = Record<string, unknown>;
 
 const logProfileSyncWarning = (label: string, error: unknown) => {
   if (process.env.NODE_ENV !== 'development') {
@@ -34,32 +36,105 @@ const logProfileSyncWarning = (label: string, error: unknown) => {
   console.warn(label, error);
 };
 
-const syncUserProfile = async ({
-  userId,
-  email,
-  fullName,
-}: {
-  userId: string;
-  email: string;
-  fullName: string;
-}) => {
-  try {
-    const { error } = await supabase.from('users').upsert(
-      {
-        id: userId,
-        full_name: fullName,
-        email,
-        created_at: new Date().toISOString(),
-      },
-      { onConflict: 'id' }
-    );
+const getAuthUserDisplayName = (user: User, fallbackEmail: string) => {
+  const metadataDisplayName = user.user_metadata?.display_name;
+  const metadataFullName = user.user_metadata?.full_name;
 
-    if (error) {
-      logProfileSyncWarning('Supabase profile sync skipped:', error);
-    }
-  } catch (error) {
-    logProfileSyncWarning('Unexpected profile sync issue:', error);
+  if (typeof metadataDisplayName === 'string' && metadataDisplayName.trim()) {
+    return metadataDisplayName.trim();
   }
+
+  if (typeof metadataFullName === 'string' && metadataFullName.trim()) {
+    return metadataFullName.trim();
+  }
+
+  return user.email ?? fallbackEmail;
+};
+
+const isMissingColumnError = (error: unknown) => {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const supabaseError = error as { code?: string; message?: string };
+
+  return (
+    supabaseError.code === 'PGRST204' ||
+    supabaseError.message?.toLowerCase().includes('column') === true
+  );
+};
+
+const createUserProfile = async (profile: {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+}) => {
+  const { data, error } = await supabase
+    .from('users')
+    .insert(profile)
+    .select('*')
+    .maybeSingle();
+
+  if (!error) {
+    return data as SupabaseRow | null;
+  }
+
+  if (!isMissingColumnError(error)) {
+    throw error;
+  }
+
+  logProfileSyncWarning('User profile insert fallback used:', error);
+
+  const fallbackProfile = {
+    id: profile.id,
+    email: profile.email,
+    full_name: profile.name,
+    created_at: new Date().toISOString(),
+  };
+
+  const fallbackResult = await supabase
+    .from('users')
+    .insert(fallbackProfile)
+    .select('*')
+    .maybeSingle();
+
+  if (fallbackResult.error) {
+    throw fallbackResult.error;
+  }
+
+  return fallbackResult.data as SupabaseRow | null;
+};
+
+const ensureUserProfile = async (user: User, fallbackEmail: string) => {
+  const email = user.email ?? fallbackEmail;
+  const name = getAuthUserDisplayName(user, fallbackEmail);
+
+  const { data: existingProfile, error: profileFetchError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (profileFetchError) {
+    throw profileFetchError;
+  }
+
+  if (existingProfile) {
+    console.log('User row found:', { userId: user.id, email });
+    return existingProfile as SupabaseRow;
+  }
+
+  const createdProfile = await createUserProfile({
+    id: user.id,
+    email,
+    name,
+    role: 'admin',
+  });
+
+  console.log('User row created:', { userId: user.id, email, role: 'admin' });
+
+  return createdProfile;
 };
 
 export default function AuthPage() {
@@ -135,17 +210,16 @@ export default function AuthPage() {
         }
 
         if (data.user) {
-          void syncUserProfile({
+          console.log('Supabase auth success:', {
             userId: data.user.id,
             email: data.user.email ?? trimmedEmail,
-            fullName:
-              typeof data.user.user_metadata?.full_name === 'string'
-                ? data.user.user_metadata.full_name
-                : trimmedEmail,
           });
+
+          await ensureUserProfile(data.user, trimmedEmail);
         }
 
         router.replace('/');
+        console.log('Redirect success:', { path: '/' });
         return;
       }
 
@@ -154,6 +228,7 @@ export default function AuthPage() {
         password: submittedPassword,
         options: {
           data: {
+            display_name: trimmedName,
             full_name: trimmedName,
           },
           emailRedirectTo:
@@ -169,15 +244,17 @@ export default function AuthPage() {
       }
 
       if (data.user) {
-        void syncUserProfile({
+        console.log('Supabase auth success:', {
           userId: data.user.id,
           email: data.user.email ?? trimmedEmail,
-          fullName: trimmedName,
         });
+
+        await ensureUserProfile(data.user, trimmedEmail);
       }
 
       if (data.session) {
         router.replace('/');
+        console.log('Redirect success:', { path: '/' });
         return;
       }
 
