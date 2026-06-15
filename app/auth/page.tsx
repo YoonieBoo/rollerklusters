@@ -160,6 +160,14 @@ const ensureUserProfile = async (user: User, fallbackEmail: string) => {
   return createdProfile;
 };
 
+const syncUserProfile = async (user: User, fallbackEmail: string) => {
+  try {
+    await ensureUserProfile(user, fallbackEmail);
+  } catch (error) {
+    logProfileSyncWarning('Optional user profile sync skipped:', error);
+  }
+};
+
 export default function AuthPage() {
   const router = useRouter();
   const [mode, setMode] = useState<AuthMode>('login');
@@ -168,19 +176,35 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    router.prefetch('/');
+
+    let isMounted = true;
+
     const checkExistingSession = async () => {
       const { data } = await supabase.auth.getSession();
 
+      if (!isMounted) {
+        return;
+      }
+
       if (data.session) {
         router.replace('/');
+        return;
       }
+
+      setIsCheckingSession(false);
     };
 
     checkExistingSession();
+
+    return () => {
+      isMounted = false;
+    };
   }, [router]);
 
   const resetMessages = () => {
@@ -248,7 +272,7 @@ export default function AuthPage() {
             email: data.user.email ?? trimmedEmail,
           });
 
-          await ensureUserProfile(data.user, trimmedEmail);
+          void syncUserProfile(data.user, trimmedEmail);
         }
 
         router.replace('/');
@@ -270,8 +294,14 @@ export default function AuthPage() {
       });
 
       if (error) {
-        console.error('Supabase sign up error:', error);
-        setErrorMessage('Unable to create account. Please try again.');
+        const errorDetails = getSupabaseErrorDetails(error);
+
+        console.error('Supabase sign up error:', {
+          email: trimmedEmail,
+          ...errorDetails,
+        });
+
+        setErrorMessage(`Unable to create account: ${errorDetails.message}`);
         setIsSubmitting(false);
         return;
       }
@@ -282,7 +312,7 @@ export default function AuthPage() {
           email: data.user.email ?? trimmedEmail,
         });
 
-        await ensureUserProfile(data.user, trimmedEmail);
+        void syncUserProfile(data.user, trimmedEmail);
       }
 
       if (data.session) {
@@ -300,6 +330,16 @@ export default function AuthPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (isCheckingSession) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-white">
+        <div className="rounded-xl border border-slate-200 bg-white px-6 py-5 text-center shadow-sm">
+          <p className="text-sm font-medium text-slate-900">Checking session...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-white">
