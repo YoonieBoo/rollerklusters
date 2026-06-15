@@ -36,6 +36,7 @@ const navItems = [
 const SIGNUP_COUNT_REFRESH_INTERVAL_MS = 15000;
 const SIGNUP_COUNT_PAGE_SIZE = 1000;
 const HIDDEN_SIGNUP_DISPLAY_NAMES = new Set(['testing yoonie']);
+const SIGNUP_COUNT_SOURCES = ['creator_signups', 'creator_signup_profile_sources'];
 
 type SupabaseRow = Record<string, unknown>;
 
@@ -190,28 +191,31 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     try {
       const signups: SupabaseRow[] = [];
 
-      for (let page = 0; ; page += 1) {
-        const from = page * SIGNUP_COUNT_PAGE_SIZE;
-        const to = from + SIGNUP_COUNT_PAGE_SIZE - 1;
-        const { data, error } = await supabase
-          .from('creator_signups')
-          .select('id, display_name')
-          .range(from, to);
+      for (const source of SIGNUP_COUNT_SOURCES) {
+        for (let page = 0; ; page += 1) {
+          const from = page * SIGNUP_COUNT_PAGE_SIZE;
+          const to = from + SIGNUP_COUNT_PAGE_SIZE - 1;
+          const { data, error } = await supabase
+            .from(source)
+            .select('id, display_name')
+            .range(from, to);
 
-        if (error) {
-          console.error('Creator signup count fetch error:', error);
-          setSignupCount(0);
-          return;
-        }
+          if (error) {
+            console.error('Creator signup count fetch error:', error);
+            setSignupCount(0);
+            return;
+          }
 
-        const pageRows = (data ?? []) as SupabaseRow[];
-        signups.push(...pageRows);
+          const pageRows = (data ?? []) as SupabaseRow[];
+          signups.push(...pageRows);
 
-        if (pageRows.length < SIGNUP_COUNT_PAGE_SIZE) {
-          setSignupCount(signups.filter(isVisibleSignup).length);
-          return;
+          if (pageRows.length < SIGNUP_COUNT_PAGE_SIZE) {
+            break;
+          }
         }
       }
+
+      setSignupCount(signups.filter(isVisibleSignup).length);
     } catch (error) {
       console.error('Creator signup count fetch issue:', error);
       setSignupCount(0);
@@ -245,6 +249,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'creator_signups' },
+        () => {
+          fetchSignupCount();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'creator_profiles' },
         () => {
           fetchSignupCount();
         }
