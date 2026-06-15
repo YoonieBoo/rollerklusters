@@ -33,7 +33,14 @@ const navItems = [
   { href: '/reviews', label: 'Reviews', icon: CheckSquare },
 ];
 
+const SIGNUP_COUNT_REFRESH_INTERVAL_MS = 15000;
+const SIGNUP_COUNT_PAGE_SIZE = 1000;
+const HIDDEN_SIGNUP_DISPLAY_NAMES = new Set(['testing yoonie']);
+
 type SupabaseRow = Record<string, unknown>;
+
+const isVisibleSignup = (signup: SupabaseRow) =>
+  !HIDDEN_SIGNUP_DISPLAY_NAMES.has(toText(signup.display_name).trim().toLowerCase());
 
 const logOptionalProfileWarning = (label: string, error: unknown) => {
   if (process.env.NODE_ENV !== 'development') {
@@ -181,17 +188,30 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
 
     try {
-      const { count, error } = await supabase
-        .from('creator_signups')
-        .select('id', { count: 'exact', head: true });
+      const signups: SupabaseRow[] = [];
 
-      if (error) {
-        console.error('Creator signup count fetch error:', error);
-        setSignupCount(0);
-        return;
+      for (let page = 0; ; page += 1) {
+        const from = page * SIGNUP_COUNT_PAGE_SIZE;
+        const to = from + SIGNUP_COUNT_PAGE_SIZE - 1;
+        const { data, error } = await supabase
+          .from('creator_signups')
+          .select('id, display_name')
+          .range(from, to);
+
+        if (error) {
+          console.error('Creator signup count fetch error:', error);
+          setSignupCount(0);
+          return;
+        }
+
+        const pageRows = (data ?? []) as SupabaseRow[];
+        signups.push(...pageRows);
+
+        if (pageRows.length < SIGNUP_COUNT_PAGE_SIZE) {
+          setSignupCount(signups.filter(isVisibleSignup).length);
+          return;
+        }
       }
-
-      setSignupCount(count ?? 0);
     } catch (error) {
       console.error('Creator signup count fetch issue:', error);
       setSignupCount(0);
@@ -207,6 +227,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       return;
     }
 
+    const refreshVisibleSignupCount = () => {
+      if (document.visibilityState === 'visible') {
+        fetchSignupCount();
+      }
+    };
+
+    const intervalId = window.setInterval(
+      refreshVisibleSignupCount,
+      SIGNUP_COUNT_REFRESH_INTERVAL_MS
+    );
+    window.addEventListener('focus', refreshVisibleSignupCount);
+    document.addEventListener('visibilitychange', refreshVisibleSignupCount);
+
     const channel = supabase
       .channel('creator-signups-count')
       .on(
@@ -219,6 +252,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       .subscribe();
 
     return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshVisibleSignupCount);
+      document.removeEventListener('visibilitychange', refreshVisibleSignupCount);
       supabase.removeChannel(channel);
     };
   }, [user]);
@@ -329,8 +365,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <Icon size={20} />
                   <span className="flex-1 text-left text-sm font-medium">{item.label}</span>
                   {item.href === '/creator-signups' && signupCount > 0 && (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-700 px-1.5 text-[10px] font-semibold leading-none text-white">
-                      {signupCount > 9 ? '9+' : signupCount}
+                    <span className="flex h-5 min-w-5 max-w-16 items-center justify-center rounded-full bg-blue-700 px-1.5 text-[10px] font-semibold leading-none text-white tabular-nums">
+                      {signupCount.toLocaleString()}
                     </span>
                   )}
                 </button>

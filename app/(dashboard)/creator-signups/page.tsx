@@ -41,8 +41,8 @@ type CreatorSignup = {
 };
 
 const SIGNUPS_PAGE_SIZE = 1000;
-const PRIORITY_SIGNUP_IDS = new Set(['3af1db2d-6489-4a49-9ef7-0581cc61614a']);
-const PRIORITY_SIGNUP_EMAILS = new Set(['jirathip2548@gmail.com']);
+const SIGNUPS_REFRESH_INTERVAL_MS = 15000;
+const HIDDEN_SIGNUP_DISPLAY_NAMES = new Set(['testing yoonie']);
 
 const toText = (value: unknown): string => {
   if (typeof value === 'string') {
@@ -138,19 +138,18 @@ const SignupDetail = ({ label, value }: { label: string; value: unknown }) => (
   </div>
 );
 
-const isPrioritySignup = (signup: CreatorSignup) =>
-  PRIORITY_SIGNUP_IDS.has(toText(signup.id)) ||
-  PRIORITY_SIGNUP_EMAILS.has(toText(signup.email).trim().toLowerCase());
+const isVisibleSignup = (signup: CreatorSignup) =>
+  !HIDDEN_SIGNUP_DISPLAY_NAMES.has(toText(signup.display_name).trim().toLowerCase());
 
 const sortSignups = (firstSignup: CreatorSignup, secondSignup: CreatorSignup) => {
-  const firstIsPriority = isPrioritySignup(firstSignup);
-  const secondIsPriority = isPrioritySignup(secondSignup);
+  const firstCreatedAt = Date.parse(toText(firstSignup.created_at));
+  const secondCreatedAt = Date.parse(toText(secondSignup.created_at));
 
-  if (firstIsPriority !== secondIsPriority) {
-    return firstIsPriority ? -1 : 1;
+  if (!Number.isNaN(firstCreatedAt) && !Number.isNaN(secondCreatedAt)) {
+    return secondCreatedAt - firstCreatedAt;
   }
 
-  return 0;
+  return toText(secondSignup.created_at).localeCompare(toText(firstSignup.created_at));
 };
 
 const fetchAllCreatorSignups = async () => {
@@ -173,7 +172,7 @@ const fetchAllCreatorSignups = async () => {
     signups.push(...pageRows);
 
     if (pageRows.length < SIGNUPS_PAGE_SIZE) {
-      return { data: signups.sort(sortSignups), error: null };
+      return { data: signups.filter(isVisibleSignup).sort(sortSignups), error: null };
     }
   }
 };
@@ -215,6 +214,16 @@ export default function CreatorSignupsPage() {
 
     fetchSignups();
 
+    const refreshVisibleSignups = () => {
+      if (document.visibilityState === 'visible') {
+        fetchSignups(false);
+      }
+    };
+
+    const intervalId = window.setInterval(refreshVisibleSignups, SIGNUPS_REFRESH_INTERVAL_MS);
+    window.addEventListener('focus', refreshVisibleSignups);
+    document.addEventListener('visibilitychange', refreshVisibleSignups);
+
     const channel = supabase
       .channel('creator-signups-page')
       .on(
@@ -228,6 +237,9 @@ export default function CreatorSignupsPage() {
 
     return () => {
       isMounted = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshVisibleSignups);
+      document.removeEventListener('visibilitychange', refreshVisibleSignups);
       supabase.removeChannel(channel);
     };
   }, []);
@@ -236,6 +248,11 @@ export default function CreatorSignupsPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Creator Signups</h1>
+        {!isLoading && !errorMessage && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Showing {signups.length} signup{signups.length === 1 ? '' : 's'}
+          </p>
+        )}
       </div>
 
       <Card className="gap-0 overflow-hidden border-border bg-card py-0">
@@ -289,6 +306,7 @@ export default function CreatorSignupsPage() {
                     />
                     <SignupDetail label="Experience" value={signup.experience_level} />
                     <SignupDetail label="Hours" value={signup.hours_available} />
+                    <SignupDetail label="Portfolio" value={signup.portfolio_links} />
                     <SignupDetail label="Contribution" value={signup.contribution} />
                     <SignupDetail
                       label="Content Types"
@@ -302,7 +320,7 @@ export default function CreatorSignupsPage() {
               ))}
             </div>
             <div className="hidden overflow-x-auto lg:block">
-              <Table className="min-w-[2200px]">
+              <Table className="min-w-[2400px]">
               <TableHeader className="bg-muted/60">
                 <TableRow className="h-10 hover:bg-muted/60">
                   <TableHead className="py-2">Name</TableHead>
@@ -323,6 +341,7 @@ export default function CreatorSignupsPage() {
                   <TableHead className="py-2">Followers</TableHead>
                   <TableHead className="py-2">Experience</TableHead>
                   <TableHead className="py-2">Hours</TableHead>
+                  <TableHead className="py-2">Portfolio</TableHead>
                   <TableHead className="py-2">Contribution</TableHead>
                   <TableHead className="py-2">Content Types</TableHead>
                   <TableHead className="py-2">Notes</TableHead>
@@ -389,6 +408,9 @@ export default function CreatorSignupsPage() {
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
                     {formatValue(signup.hours_available)}
+                  </TableCell>
+                  <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
+                    {formatValue(signup.portfolio_links)}
                   </TableCell>
                   <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
                     {formatValue(signup.contribution)}
