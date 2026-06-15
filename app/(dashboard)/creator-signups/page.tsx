@@ -184,16 +184,28 @@ export default function CreatorSignupsPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchSignups = async () => {
-      setIsLoading(true);
+    let isMounted = true;
+
+    const fetchSignups = async (showLoading = true) => {
+      if (showLoading) {
+        setIsLoading(true);
+      }
+
       setErrorMessage(null);
 
       const { data, error } = await fetchAllCreatorSignups();
 
+      if (!isMounted) {
+        return;
+      }
+
       if (error) {
         console.error('Supabase creator signups fetch error:', error);
         setErrorMessage(error.message);
-        setSignups([]);
+
+        if (showLoading) {
+          setSignups([]);
+        }
       } else {
         setSignups((data ?? []) as CreatorSignup[]);
       }
@@ -202,6 +214,22 @@ export default function CreatorSignupsPage() {
     };
 
     fetchSignups();
+
+    const channel = supabase
+      .channel('creator-signups-page')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'creator_signups' },
+        () => {
+          fetchSignups(false);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return (
