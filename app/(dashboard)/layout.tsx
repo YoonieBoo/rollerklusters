@@ -33,9 +33,6 @@ const navItems = [
   { href: '/reviews', label: 'Reviews', icon: CheckSquare },
 ];
 
-const hiddenSignupId = 'f6f0a00b-094e-4921-b50d-14d6ff6a5fbe';
-const hiddenSignupEmail = 'nangnommaung@gmail.com';
-
 type SupabaseRow = Record<string, unknown>;
 
 const logOptionalProfileWarning = (label: string, error: unknown) => {
@@ -186,9 +183,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     try {
       const { count, error } = await supabase
         .from('creator_signups')
-        .select('id', { count: 'exact', head: true })
-        .neq('id', hiddenSignupId)
-        .neq('email', hiddenSignupEmail);
+        .select('id', { count: 'exact', head: true });
 
       if (error) {
         console.error('Creator signup count fetch error:', error);

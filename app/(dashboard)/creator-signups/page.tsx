@@ -22,6 +22,7 @@ type CreatorSignup = {
   nickname?: string | null;
   university_program?: string | null;
   year?: string | number | null;
+  scholarship_student?: boolean | null;
   phone_number?: string | null;
   line_id?: string | null;
   instagram_handle?: string | null;
@@ -42,8 +43,6 @@ type CreatorSignup = {
 const SIGNUPS_PAGE_SIZE = 1000;
 const PRIORITY_SIGNUP_IDS = new Set(['3af1db2d-6489-4a49-9ef7-0581cc61614a']);
 const PRIORITY_SIGNUP_EMAILS = new Set(['jirathip2548@gmail.com']);
-const HIDDEN_SIGNUP_IDS = new Set(['f6f0a00b-094e-4921-b50d-14d6ff6a5fbe']);
-const HIDDEN_SIGNUP_EMAILS = new Set(['nangnommaung@gmail.com']);
 
 const toText = (value: unknown): string => {
   if (typeof value === 'string') {
@@ -115,6 +114,21 @@ const formatDate = (date: string | null | undefined) => {
   return parsedDate.toLocaleDateString();
 };
 
+const formatScholarshipStudent = (signup: CreatorSignup) => {
+  if (typeof signup.scholarship_student === 'boolean') {
+    return signup.scholarship_student ? 'Yes' : 'No';
+  }
+
+  const notes = toText(signup.additional_notes);
+  const notesMatch = notes.match(/scholarship\s+student\s*:\s*(yes|no)\b/i);
+
+  if (notesMatch) {
+    return formatLabel(notesMatch[1]);
+  }
+
+  return 'N/A';
+};
+
 const SignupDetail = ({ label, value }: { label: string; value: unknown }) => (
   <div className="min-w-0">
     <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">
@@ -123,10 +137,6 @@ const SignupDetail = ({ label, value }: { label: string; value: unknown }) => (
     <p className="mt-1 break-words text-sm text-foreground">{formatValue(value)}</p>
   </div>
 );
-
-const shouldShowSignup = (signup: CreatorSignup) =>
-  !HIDDEN_SIGNUP_IDS.has(toText(signup.id)) &&
-  !HIDDEN_SIGNUP_EMAILS.has(toText(signup.email).trim().toLowerCase());
 
 const isPrioritySignup = (signup: CreatorSignup) =>
   PRIORITY_SIGNUP_IDS.has(toText(signup.id)) ||
@@ -160,7 +170,7 @@ const fetchAllCreatorSignups = async () => {
     }
 
     const pageRows = (data ?? []) as CreatorSignup[];
-    signups.push(...pageRows.filter(shouldShowSignup));
+    signups.push(...pageRows);
 
     if (pageRows.length < SIGNUPS_PAGE_SIZE) {
       return { data: signups.sort(sortSignups), error: null };
@@ -232,6 +242,10 @@ export default function CreatorSignupsPage() {
                     <SignupDetail label="Nickname" value={signup.nickname} />
                     <SignupDetail label="Program" value={signup.university_program} />
                     <SignupDetail label="Year" value={signup.year} />
+                    <SignupDetail
+                      label="Scholarship Student"
+                      value={formatScholarshipStudent(signup)}
+                    />
                     <SignupDetail label="Phone" value={signup.phone_number} />
                     <SignupDetail label="Line ID" value={signup.line_id} />
                     <SignupDetail label="Instagram" value={signup.instagram_handle} />
@@ -271,6 +285,7 @@ export default function CreatorSignupsPage() {
                   <TableHead className="py-2">Nickname</TableHead>
                   <TableHead className="py-2">Program</TableHead>
                   <TableHead className="py-2">Year</TableHead>
+                  <TableHead className="py-2">Scholarship Student</TableHead>
                   <TableHead className="py-2">Phone</TableHead>
                   <TableHead className="py-2">Line ID</TableHead>
                   <TableHead className="py-2">Instagram</TableHead>
@@ -316,6 +331,9 @@ export default function CreatorSignupsPage() {
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
                     {formatValue(signup.year)}
+                  </TableCell>
+                  <TableCell className="py-2 text-muted-foreground">
+                    {formatScholarshipStudent(signup)}
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
                     {formatValue(signup.phone_number)}
