@@ -37,62 +37,8 @@ const SIGNUP_COUNT_REFRESH_INTERVAL_MS = 15000;
 const SIGNUP_COUNT_PAGE_SIZE = 1000;
 const CREATOR_COUNT_REFRESH_INTERVAL_MS = 15000;
 const CREATOR_COUNT_PAGE_SIZE = 1000;
-const HIDDEN_SIGNUP_DISPLAY_NAMES = new Set([
-  'testing yoonie',
-  'emris',
-  'yoon testing',
-  'yoonie',
-  'yoon',
-  'yoon yamone',
-]);
-const HIDDEN_CREATOR_HANDLES = new Set([
-  'yoonie',
-  '_yoonieeee',
-  'yoonieeee',
-  'nanisherewithme',
-  'aeiou',
-]);
 
 type SupabaseRow = Record<string, unknown>;
-
-const isVisibleSignup = (signup: SupabaseRow) =>
-  !HIDDEN_SIGNUP_DISPLAY_NAMES.has(toText(signup.display_name).trim().toLowerCase());
-
-const isStudentCreatorSignup = (signup: SupabaseRow) => {
-  const signupType = toText(signup.signup_type).trim().toLowerCase();
-  const roleLabel = toText(signup.role_label).trim().toLowerCase();
-
-  return (
-    signupType === 'student-creator' ||
-    roleLabel === 'student creator sign up' ||
-    (!signupType && !roleLabel)
-  );
-};
-
-const normalizeCreatorIdentifier = (value: unknown) =>
-  toText(value).trim().toLowerCase().replace(/^@/, '');
-
-const isVisibleCreator = (creator: SupabaseRow) =>
-  !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.display_name)) &&
-  !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.creator_name)) &&
-  !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.social_handle));
-
-const withoutFirstAustinProtocolCreator = (creators: SupabaseRow[]) => {
-  let hasRemovedCreator = false;
-
-  return creators.filter((creator) => {
-    const isAustinProtocol =
-      normalizeCreatorIdentifier(creator.display_name) === 'austin_protocol' ||
-      normalizeCreatorIdentifier(creator.social_handle) === 'austin_protocol';
-
-    if (isAustinProtocol && !hasRemovedCreator) {
-      hasRemovedCreator = true;
-      return false;
-    }
-
-    return true;
-  });
-};
 
 const logOptionalProfileWarning = (label: string, error: unknown) => {
   if (process.env.NODE_ENV !== 'development') {
@@ -244,7 +190,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         const to = from + CREATOR_COUNT_PAGE_SIZE - 1;
         const { data, error } = await supabase
           .from('creator_profiles')
-          .select('id, display_name, social_handle')
+          .select('id')
           .range(from, to);
 
         if (error) {
@@ -261,9 +207,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         }
       }
 
-      setCreatorCount(
-        withoutFirstAustinProtocolCreator(creators.filter(isVisibleCreator)).length
-      );
+      setCreatorCount(creators.length);
     } catch (error) {
       console.error('Creator count fetch issue:', error);
       setCreatorCount(0);
@@ -284,8 +228,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         const to = from + SIGNUP_COUNT_PAGE_SIZE - 1;
         const { data, error } = await supabase
           .from('creator_signups')
-          .select('id, display_name, signup_type, role_label')
-          .eq('signup_type', 'student-creator')
+          .select('id')
           .range(from, to);
 
         if (error) {
@@ -302,7 +245,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         }
       }
 
-      setSignupCount(signups.filter(isStudentCreatorSignup).filter(isVisibleSignup).length);
+      setSignupCount(signups.length);
     } catch (error) {
       console.error('Creator signup count fetch issue:', error);
       setSignupCount(0);

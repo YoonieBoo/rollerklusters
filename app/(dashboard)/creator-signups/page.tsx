@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import {
   Table,
@@ -42,14 +42,6 @@ type CreatorSignup = {
 
 const SIGNUPS_PAGE_SIZE = 1000;
 const SIGNUPS_REFRESH_INTERVAL_MS = 15000;
-const HIDDEN_SIGNUP_DISPLAY_NAMES = new Set([
-  'testing yoonie',
-  'emris',
-  'yoon testing',
-  'yoonie',
-  'yoon',
-  'yoon yamone',
-]);
 
 const toText = (value: unknown): string => {
   if (typeof value === 'string') {
@@ -169,20 +161,6 @@ const SignupDetail = ({ label, value }: { label: string; value: unknown }) => (
   </div>
 );
 
-const isVisibleSignup = (signup: CreatorSignup) =>
-  !HIDDEN_SIGNUP_DISPLAY_NAMES.has(toText(signup.display_name).trim().toLowerCase());
-
-const isStudentCreatorSignup = (signup: CreatorSignup) => {
-  const signupType = toText(signup.signup_type).trim().toLowerCase();
-  const roleLabel = toText(signup.role_label).trim().toLowerCase();
-
-  return (
-    signupType === 'student-creator' ||
-    roleLabel === 'student creator sign up' ||
-    (!signupType && !roleLabel)
-  );
-};
-
 const sortSignups = (firstSignup: CreatorSignup, secondSignup: CreatorSignup) => {
   const firstCreatedAt = Date.parse(toText(firstSignup.created_at));
   const secondCreatedAt = Date.parse(toText(secondSignup.created_at));
@@ -203,7 +181,6 @@ const fetchAllCreatorSignups = async () => {
     const { data, error } = await supabase
       .from('creator_signups')
       .select('*')
-      .eq('signup_type', 'student-creator')
       .order('created_at', { ascending: false })
       .range(from, to);
 
@@ -216,7 +193,7 @@ const fetchAllCreatorSignups = async () => {
 
     if (pageRows.length < SIGNUPS_PAGE_SIZE) {
       return {
-        data: signups.filter(isStudentCreatorSignup).filter(isVisibleSignup).sort(sortSignups),
+        data: signups.sort(sortSignups),
         error: null,
       };
     }
@@ -295,34 +272,31 @@ export default function CreatorSignupsPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Creator Signups</h1>
-        {!isLoading && !errorMessage && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            Showing {signups.length} signup{signups.length === 1 ? '' : 's'}
-          </p>
-        )}
       </div>
 
-      <Card className="gap-0 overflow-hidden border-border bg-card py-0">
-        {isLoading ? (
+      {isLoading ? (
+        <Card className="gap-0 overflow-hidden border-border bg-card py-0">
           <div className="p-6 text-center">
             <p className="text-muted-foreground">Loading signups...</p>
           </div>
-        ) : errorMessage ? (
+        </Card>
+      ) : errorMessage ? (
+        <Card className="gap-0 overflow-hidden border-border bg-card py-0">
           <div className="p-6 text-center">
             <p className="text-red-500">Could not load signups.</p>
             <p className="mt-1 text-sm text-muted-foreground">{errorMessage}</p>
           </div>
-        ) : signups.length > 0 ? (
-          <>
-            <div className="lg:hidden">
-              {signupGroups.map((group) => (
-                <section key={group.label} className="border-b border-border last:border-b-0">
-                  <div className="bg-muted/60 px-4 py-2">
-                    <p className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
-                      {group.label} · {group.rows.length} signup
-                      {group.rows.length === 1 ? '' : 's'}
-                    </p>
-                  </div>
+        </Card>
+      ) : signups.length > 0 ? (
+        <div className="space-y-6">
+          {signupGroups.map((group) => (
+            <section key={group.label} className="space-y-2">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="text-sm font-semibold text-foreground">{group.label}</h2>
+              </div>
+
+              <Card className="gap-0 overflow-hidden border-border bg-card py-0">
+                <div className="lg:hidden">
                   <div className="divide-y divide-border">
                     {group.rows.map((signup, index) => (
                       <div
@@ -373,53 +347,39 @@ export default function CreatorSignupsPage() {
                             value={signup.interested_content_types}
                           />
                           <SignupDetail label="Notes" value={signup.additional_notes} />
-                          <SignupDetail label="Created" value={formatDate(signup.created_at)} />
                         </div>
                       </div>
                     ))}
                   </div>
-                </section>
-              ))}
-            </div>
-            <div className="hidden overflow-x-auto lg:block">
-              <Table className="min-w-[2400px]">
-              <TableHeader className="bg-muted/60">
-                <TableRow className="h-10 hover:bg-muted/60">
-                  <TableHead className="py-2">Name</TableHead>
-                  <TableHead className="py-2">Email</TableHead>
-                  <TableHead className="py-2">Signup Type</TableHead>
-                  <TableHead className="py-2">Role</TableHead>
-                  <TableHead className="py-2">Nickname</TableHead>
-                  <TableHead className="py-2">Program</TableHead>
-                  <TableHead className="py-2">Year</TableHead>
-                  <TableHead className="py-2">Scholarship Student</TableHead>
-                  <TableHead className="py-2">Phone</TableHead>
-                  <TableHead className="py-2">Line ID</TableHead>
-                  <TableHead className="py-2">Instagram</TableHead>
-                  <TableHead className="py-2">Other Platforms</TableHead>
-                  <TableHead className="py-2">Creative Focus</TableHead>
-                  <TableHead className="py-2">Followers</TableHead>
-                  <TableHead className="py-2">Experience</TableHead>
-                  <TableHead className="py-2">Hours</TableHead>
-                  <TableHead className="py-2">Portfolio</TableHead>
-                  <TableHead className="py-2">Contribution</TableHead>
-                  <TableHead className="py-2">Content Types</TableHead>
-                  <TableHead className="py-2">Notes</TableHead>
-                  <TableHead className="py-2">Created</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {signupGroups.map((group) => (
-                  <Fragment key={group.label}>
-                    <TableRow className="h-9 border-border bg-muted/60 hover:bg-muted/60">
-                      <TableCell
-                        colSpan={21}
-                        className="py-2 text-xs font-semibold uppercase tracking-normal text-muted-foreground"
-                      >
-                        {group.label} · {group.rows.length} signup
-                        {group.rows.length === 1 ? '' : 's'}
-                      </TableCell>
-                    </TableRow>
+                </div>
+
+                <div className="hidden overflow-x-auto lg:block">
+                  <Table className="min-w-[2280px]">
+                    <TableHeader className="bg-muted/60">
+                      <TableRow className="h-10 hover:bg-muted/60">
+                        <TableHead className="py-2">Name</TableHead>
+                        <TableHead className="py-2">Email</TableHead>
+                        <TableHead className="py-2">Signup Type</TableHead>
+                        <TableHead className="py-2">Role</TableHead>
+                        <TableHead className="py-2">Nickname</TableHead>
+                        <TableHead className="py-2">Program</TableHead>
+                        <TableHead className="py-2">Year</TableHead>
+                        <TableHead className="py-2">Scholarship Student</TableHead>
+                        <TableHead className="py-2">Phone</TableHead>
+                        <TableHead className="py-2">Line ID</TableHead>
+                        <TableHead className="py-2">Instagram</TableHead>
+                        <TableHead className="py-2">Other Platforms</TableHead>
+                        <TableHead className="py-2">Creative Focus</TableHead>
+                        <TableHead className="py-2">Followers</TableHead>
+                        <TableHead className="py-2">Experience</TableHead>
+                        <TableHead className="py-2">Hours</TableHead>
+                        <TableHead className="py-2">Portfolio</TableHead>
+                        <TableHead className="py-2">Contribution</TableHead>
+                        <TableHead className="py-2">Content Types</TableHead>
+                        <TableHead className="py-2">Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                     {group.rows.map((signup, index) => (
                       <TableRow
                         key={
@@ -488,23 +448,22 @@ export default function CreatorSignupsPage() {
                       <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
                         {formatValue(signup.additional_notes)}
                       </TableCell>
-                      <TableCell className="py-2 text-sm text-muted-foreground">
-                        {formatDate(signup.created_at)}
-                      </TableCell>
                       </TableRow>
                     ))}
-                  </Fragment>
-                ))}
-              </TableBody>
-              </Table>
-            </div>
-          </>
-        ) : (
+                    </TableBody>
+                  </Table>
+                </div>
+              </Card>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <Card className="gap-0 overflow-hidden border-border bg-card py-0">
           <div className="p-6 text-center">
             <p className="text-muted-foreground">No creator signups yet.</p>
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }

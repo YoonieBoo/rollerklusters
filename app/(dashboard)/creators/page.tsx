@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import {
   Table,
@@ -51,13 +51,6 @@ type CreatorSignup = {
 };
 
 const CREATORS_REFRESH_INTERVAL_MS = 15000;
-const HIDDEN_CREATOR_HANDLES = new Set([
-  'yoonie',
-  '_yoonieeee',
-  'yoonieeee',
-  'nanisherewithme',
-  'aeiou',
-]);
 
 const toText = (value: unknown) => {
   if (typeof value === 'string') {
@@ -268,28 +261,6 @@ const normalizeCreatorIdentifier = (value: unknown) =>
 
 const normalizeEmail = (value: unknown) => toText(value).trim().toLowerCase();
 
-const isVisibleCreator = (creator: CreatorProfile) =>
-  !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.display_name)) &&
-  !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.creator_name)) &&
-  !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.social_handle));
-
-const withoutFirstAustinProtocolCreator = (creators: CreatorProfile[]) => {
-  let hasRemovedCreator = false;
-
-  return creators.filter((creator) => {
-    const isAustinProtocol =
-      normalizeCreatorIdentifier(creator.display_name) === 'austin_protocol' ||
-      normalizeCreatorIdentifier(creator.social_handle) === 'austin_protocol';
-
-    if (isAustinProtocol && !hasRemovedCreator) {
-      hasRemovedCreator = true;
-      return false;
-    }
-
-    return true;
-  });
-};
-
 const fetchOptionalRows = async <T extends Record<string, unknown>>(
   tableName: string,
   orderColumn?: string
@@ -437,12 +408,10 @@ export default function CreatorsPage() {
         }
       } else {
         setCreators(
-          withoutFirstAustinProtocolCreator(
-            enrichCreatorsWithSubmittedFields(
-              ((data ?? []) as CreatorProfile[]).filter(isVisibleCreator),
-              users,
-              signups
-            )
+          enrichCreatorsWithSubmittedFields(
+            (data ?? []) as CreatorProfile[],
+            users,
+            signups
           )
         );
       }
@@ -505,27 +474,29 @@ export default function CreatorsPage() {
         <h1 className="text-2xl font-semibold text-foreground">Onboarded Creators</h1>
       </div>
 
-      <Card className="gap-0 overflow-hidden border-border bg-card py-0">
-        {isLoading ? (
+      {isLoading ? (
+        <Card className="gap-0 overflow-hidden border-border bg-card py-0">
           <div className="p-6 text-center">
             <p className="text-muted-foreground">Loading creators...</p>
           </div>
-        ) : errorMessage ? (
+        </Card>
+      ) : errorMessage ? (
+        <Card className="gap-0 overflow-hidden border-border bg-card py-0">
           <div className="p-6 text-center">
             <p className="text-red-500">Could not load creators.</p>
             <p className="mt-1 text-sm text-muted-foreground">{errorMessage}</p>
           </div>
-        ) : creators.length > 0 ? (
-          <>
-            <div className="md:hidden">
-              {creatorGroups.map((group) => (
-                <section key={group.label} className="border-b border-border last:border-b-0">
-                  <div className="bg-muted/60 px-4 py-2">
-                    <p className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
-                      {group.label} · {group.rows.length} creator
-                      {group.rows.length === 1 ? '' : 's'}
-                    </p>
-                  </div>
+        </Card>
+      ) : creators.length > 0 ? (
+        <div className="space-y-6">
+          {creatorGroups.map((group) => (
+            <section key={group.label} className="space-y-2">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="text-sm font-semibold text-foreground">{group.label}</h2>
+              </div>
+
+              <Card className="gap-0 overflow-hidden border-border bg-card py-0">
+                <div className="md:hidden">
                   <div className="divide-y divide-border">
                     {group.rows.map((creator, index) => (
                       <div
@@ -570,96 +541,78 @@ export default function CreatorsPage() {
                             value={toText(creator.line_id).trim() || 'N/A'}
                           />
                         </div>
-                        <CreatorMetric
-                          label="Signed up"
-                          value={formatDate(creator.created_at)}
-                        />
                       </div>
                     ))}
                   </div>
-                </section>
-              ))}
-            </div>
-            <div className="hidden overflow-x-auto md:block">
-              <Table className="min-w-[1280px]">
-                <TableHeader className="bg-muted/60">
-                  <TableRow className="h-10 hover:bg-muted/60">
-                    <TableHead className="py-2">Creator</TableHead>
-                    <TableHead className="py-2">Platform</TableHead>
-                    <TableHead className="py-2">Social handle</TableHead>
-                    <TableHead className="py-2">Followers</TableHead>
-                    <TableHead className="py-2">Rank</TableHead>
-                    <TableHead className="py-2">Consistency</TableHead>
-                    <TableHead className="py-2">Video Count</TableHead>
-                    <TableHead className="py-2">Scholarship Student</TableHead>
-                    <TableHead className="py-2">Line ID</TableHead>
-                    <TableHead className="py-2">Signed up date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {creatorGroups.map((group) => (
-                    <Fragment key={group.label}>
-                      <TableRow className="h-9 border-border bg-muted/60 hover:bg-muted/60">
-                        <TableCell
-                          colSpan={10}
-                          className="py-2 text-xs font-semibold uppercase tracking-normal text-muted-foreground"
-                        >
-                          {group.label} · {group.rows.length} creator
-                          {group.rows.length === 1 ? '' : 's'}
-                        </TableCell>
+                </div>
+
+                <div className="hidden overflow-x-auto md:block">
+                  <Table className="min-w-[1160px]">
+                    <TableHeader className="bg-muted/60">
+                      <TableRow className="h-10 hover:bg-muted/60">
+                        <TableHead className="py-2">Creator</TableHead>
+                        <TableHead className="py-2">Platform</TableHead>
+                        <TableHead className="py-2">Social handle</TableHead>
+                        <TableHead className="py-2">Followers</TableHead>
+                        <TableHead className="py-2">Rank</TableHead>
+                        <TableHead className="py-2">Consistency</TableHead>
+                        <TableHead className="py-2">Video Count</TableHead>
+                        <TableHead className="py-2">Scholarship Student</TableHead>
+                        <TableHead className="py-2">Line ID</TableHead>
                       </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {group.rows.map((creator, index) => (
-                        <TableRow
-                          key={
-                            toText(creator.id) ||
-                            `${creator.social_handle ?? 'creator'}-${group.label}-${index}`
-                          }
-                          className="h-11 border-border hover:bg-muted/40"
-                        >
-                          <TableCell className="py-2 font-medium text-foreground">
-                            {getCreatorName(creator)}
-                          </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
-                            {formatLabel(creator.platform)}
-                          </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
-                            {toText(creator.social_handle).trim() || 'N/A'}
-                          </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
-                            {formatFollowers(creator)}
-                          </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
-                            {formatLabel(creator.creator_rank)}
-                          </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
-                            {getCreatorConsistency(creator)}
-                          </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
-                            {getCreatorVideoCount(creator)}
-                          </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
-                            {formatScholarshipStudent(creator)}
-                          </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
-                            {toText(creator.line_id).trim() || 'N/A'}
-                          </TableCell>
-                          <TableCell className="py-2 text-sm text-muted-foreground">
-                            {formatDate(creator.created_at)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </Fragment>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </>
-        ) : (
+                          <TableRow
+                            key={
+                              toText(creator.id) ||
+                              `${creator.social_handle ?? 'creator'}-${group.label}-${index}`
+                            }
+                            className="h-11 border-border hover:bg-muted/40"
+                          >
+                            <TableCell className="py-2 font-medium text-foreground">
+                              {getCreatorName(creator)}
+                            </TableCell>
+                            <TableCell className="py-2 text-muted-foreground">
+                              {formatLabel(creator.platform)}
+                            </TableCell>
+                            <TableCell className="py-2 text-muted-foreground">
+                              {toText(creator.social_handle).trim() || 'N/A'}
+                            </TableCell>
+                            <TableCell className="py-2 text-muted-foreground">
+                              {formatFollowers(creator)}
+                            </TableCell>
+                            <TableCell className="py-2 text-muted-foreground">
+                              {formatLabel(creator.creator_rank)}
+                            </TableCell>
+                            <TableCell className="py-2 text-muted-foreground">
+                              {getCreatorConsistency(creator)}
+                            </TableCell>
+                            <TableCell className="py-2 text-muted-foreground">
+                              {getCreatorVideoCount(creator)}
+                            </TableCell>
+                            <TableCell className="py-2 text-muted-foreground">
+                              {formatScholarshipStudent(creator)}
+                            </TableCell>
+                            <TableCell className="py-2 text-muted-foreground">
+                              {toText(creator.line_id).trim() || 'N/A'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </Card>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <Card className="gap-0 overflow-hidden border-border bg-card py-0">
           <div className="p-6 text-center">
             <p className="text-muted-foreground">No signed-up creators yet.</p>
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }
