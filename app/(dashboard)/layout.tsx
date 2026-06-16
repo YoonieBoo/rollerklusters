@@ -27,7 +27,7 @@ import {
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/campaigns', label: 'Campaigns', icon: FolderOpen },
-  { href: '/creators', label: 'Creators', icon: Users },
+  { href: '/creators', label: 'Onboarded Creators', icon: Users },
   { href: '/creator-signups', label: 'Signups', icon: UserPlus },
   { href: '/briefs', label: 'Briefs', icon: FileText },
   { href: '/reviews', label: 'Reviews', icon: CheckSquare },
@@ -124,7 +124,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [profileName, setProfileName] = useState<string | null>(null);
-  const [profileRole, setProfileRole] = useState<string | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifications, setNotifications] = useState<WorkflowUpdate[]>([]);
@@ -188,7 +187,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     const fetchUserProfile = async () => {
       if (!user) {
         setProfileName(null);
-        setProfileRole(null);
         return;
       }
 
@@ -206,11 +204,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         const profile = data as SupabaseRow | null;
 
         setProfileName(toText(profile?.name) || toText(profile?.full_name) || null);
-        setProfileRole(toText(profile?.role) || null);
       } catch (error) {
         logOptionalProfileWarning('Optional user profile fetch issue:', error);
         setProfileName(null);
-        setProfileRole(null);
       }
     };
 
@@ -543,9 +539,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-sidebar-foreground truncate">
                 {getUserName()}
-              </p>
-              <p className="text-xs text-sidebar-accent-foreground truncate">
-                {profileRole || 'Admin'}
               </p>
             </div>
           </div>

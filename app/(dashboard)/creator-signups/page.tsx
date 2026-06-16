@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import {
   Table,
@@ -121,6 +121,30 @@ const formatDate = (date: string | null | undefined) => {
   return parsedDate.toLocaleDateString();
 };
 
+const getDateClusterLabel = (date: string | null | undefined) => {
+  const formattedDate = formatDate(date);
+
+  return formattedDate === 'N/A' ? 'Unknown signup date' : formattedDate;
+};
+
+const groupSignupsByDate = (signups: CreatorSignup[]) => {
+  const groups: { label: string; rows: CreatorSignup[] }[] = [];
+
+  signups.forEach((signup) => {
+    const label = getDateClusterLabel(signup.created_at);
+    const existingGroup = groups.find((group) => group.label === label);
+
+    if (existingGroup) {
+      existingGroup.rows.push(signup);
+      return;
+    }
+
+    groups.push({ label, rows: [signup] });
+  });
+
+  return groups;
+};
+
 const formatScholarshipStudent = (signup: CreatorSignup) => {
   if (typeof signup.scholarship_student === 'boolean') {
     return signup.scholarship_student ? 'Yes' : 'No';
@@ -203,6 +227,7 @@ export default function CreatorSignupsPage() {
   const [signups, setSignups] = useState<CreatorSignup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const signupGroups = groupSignupsByDate(signups);
 
   useEffect(() => {
     let isMounted = true;
@@ -289,53 +314,71 @@ export default function CreatorSignupsPage() {
           </div>
         ) : signups.length > 0 ? (
           <>
-            <div className="divide-y divide-border lg:hidden">
-              {signups.map((signup, index) => (
-                <div
-                  key={toText(signup.id) || `${signup.email ?? 'signup'}-${index}`}
-                  className="space-y-4 px-4 py-4"
-                >
-                  <div className="min-w-0">
-                    <p className="break-words font-medium text-foreground">
-                      {formatValue(signup.display_name)}
-                    </p>
-                    <p className="mt-1 break-all text-sm text-muted-foreground">
-                      {formatValue(signup.email)}
+            <div className="lg:hidden">
+              {signupGroups.map((group) => (
+                <section key={group.label} className="border-b border-border last:border-b-0">
+                  <div className="bg-muted/60 px-4 py-2">
+                    <p className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                      {group.label} · {group.rows.length} signup
+                      {group.rows.length === 1 ? '' : 's'}
                     </p>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <SignupDetail label="Role" value={signup.role_label} />
-                    <SignupDetail label="Nickname" value={signup.nickname} />
-                    <SignupDetail label="Program" value={signup.university_program} />
-                    <SignupDetail label="Year" value={signup.year} />
-                    <SignupDetail
-                      label="Scholarship Student"
-                      value={formatScholarshipStudent(signup)}
-                    />
-                    <SignupDetail label="Phone" value={signup.phone_number} />
-                    <SignupDetail label="Line ID" value={signup.line_id} />
-                    <SignupDetail label="Instagram" value={signup.instagram_handle} />
-                    <SignupDetail label="Other Platforms" value={signup.other_platforms} />
-                    <SignupDetail
-                      label="Creative Focus"
-                      value={signup.primary_creative_focus}
-                    />
-                    <SignupDetail
-                      label="Followers"
-                      value={formatFollowers(signup.follower_count)}
-                    />
-                    <SignupDetail label="Experience" value={signup.experience_level} />
-                    <SignupDetail label="Hours" value={signup.hours_available} />
-                    <SignupDetail label="Portfolio" value={signup.portfolio_links} />
-                    <SignupDetail label="Contribution" value={signup.contribution} />
-                    <SignupDetail
-                      label="Content Types"
-                      value={signup.interested_content_types}
-                    />
-                    <SignupDetail label="Notes" value={signup.additional_notes} />
-                    <SignupDetail label="Created" value={formatDate(signup.created_at)} />
+                  <div className="divide-y divide-border">
+                    {group.rows.map((signup, index) => (
+                      <div
+                        key={
+                          toText(signup.id) ||
+                          `${signup.email ?? 'signup'}-${group.label}-${index}`
+                        }
+                        className="space-y-4 px-4 py-4"
+                      >
+                        <div className="min-w-0">
+                          <p className="break-words font-medium text-foreground">
+                            {formatValue(signup.display_name)}
+                          </p>
+                          <p className="mt-1 break-all text-sm text-muted-foreground">
+                            {formatValue(signup.email)}
+                          </p>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <SignupDetail label="Role" value={signup.role_label} />
+                          <SignupDetail label="Nickname" value={signup.nickname} />
+                          <SignupDetail label="Program" value={signup.university_program} />
+                          <SignupDetail label="Year" value={signup.year} />
+                          <SignupDetail
+                            label="Scholarship Student"
+                            value={formatScholarshipStudent(signup)}
+                          />
+                          <SignupDetail label="Phone" value={signup.phone_number} />
+                          <SignupDetail label="Line ID" value={signup.line_id} />
+                          <SignupDetail label="Instagram" value={signup.instagram_handle} />
+                          <SignupDetail
+                            label="Other Platforms"
+                            value={signup.other_platforms}
+                          />
+                          <SignupDetail
+                            label="Creative Focus"
+                            value={signup.primary_creative_focus}
+                          />
+                          <SignupDetail
+                            label="Followers"
+                            value={formatFollowers(signup.follower_count)}
+                          />
+                          <SignupDetail label="Experience" value={signup.experience_level} />
+                          <SignupDetail label="Hours" value={signup.hours_available} />
+                          <SignupDetail label="Portfolio" value={signup.portfolio_links} />
+                          <SignupDetail label="Contribution" value={signup.contribution} />
+                          <SignupDetail
+                            label="Content Types"
+                            value={signup.interested_content_types}
+                          />
+                          <SignupDetail label="Notes" value={signup.additional_notes} />
+                          <SignupDetail label="Created" value={formatDate(signup.created_at)} />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                </section>
               ))}
             </div>
             <div className="hidden overflow-x-auto lg:block">
@@ -366,75 +409,91 @@ export default function CreatorSignupsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {signups.map((signup, index) => (
-                  <TableRow
-                    key={toText(signup.id) || `${signup.email ?? 'signup'}-${index}`}
-                    className="border-border align-top hover:bg-muted/40"
-                  >
-                  <TableCell className="py-2 font-medium text-foreground">
-                    {formatValue(signup.display_name)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.email)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatLabel(signup.signup_type)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.role_label)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.nickname)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.university_program)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.year)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatScholarshipStudent(signup)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.phone_number)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.line_id)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.instagram_handle)}
-                  </TableCell>
-                  <TableCell className="max-w-56 whitespace-normal break-words py-2 text-muted-foreground">
-                    {formatValue(signup.other_platforms)}
-                  </TableCell>
-                  <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
-                    {formatValue(signup.primary_creative_focus)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatFollowers(signup.follower_count)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatLabel(signup.experience_level)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.hours_available)}
-                  </TableCell>
-                  <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
-                    {formatValue(signup.portfolio_links)}
-                  </TableCell>
-                  <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
-                    {formatValue(signup.contribution)}
-                  </TableCell>
-                  <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
-                    {formatValue(signup.interested_content_types)}
-                  </TableCell>
-                  <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
-                    {formatValue(signup.additional_notes)}
-                  </TableCell>
-                  <TableCell className="py-2 text-sm text-muted-foreground">
-                    {formatDate(signup.created_at)}
-                  </TableCell>
-                  </TableRow>
+                {signupGroups.map((group) => (
+                  <Fragment key={group.label}>
+                    <TableRow className="h-9 border-border bg-muted/60 hover:bg-muted/60">
+                      <TableCell
+                        colSpan={21}
+                        className="py-2 text-xs font-semibold uppercase tracking-normal text-muted-foreground"
+                      >
+                        {group.label} · {group.rows.length} signup
+                        {group.rows.length === 1 ? '' : 's'}
+                      </TableCell>
+                    </TableRow>
+                    {group.rows.map((signup, index) => (
+                      <TableRow
+                        key={
+                          toText(signup.id) ||
+                          `${signup.email ?? 'signup'}-${group.label}-${index}`
+                        }
+                        className="border-border align-top hover:bg-muted/40"
+                      >
+                      <TableCell className="py-2 font-medium text-foreground">
+                        {formatValue(signup.display_name)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatValue(signup.email)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatLabel(signup.signup_type)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatValue(signup.role_label)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatValue(signup.nickname)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatValue(signup.university_program)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatValue(signup.year)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatScholarshipStudent(signup)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatValue(signup.phone_number)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatValue(signup.line_id)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatValue(signup.instagram_handle)}
+                      </TableCell>
+                      <TableCell className="max-w-56 whitespace-normal break-words py-2 text-muted-foreground">
+                        {formatValue(signup.other_platforms)}
+                      </TableCell>
+                      <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
+                        {formatValue(signup.primary_creative_focus)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatFollowers(signup.follower_count)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatLabel(signup.experience_level)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatValue(signup.hours_available)}
+                      </TableCell>
+                      <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
+                        {formatValue(signup.portfolio_links)}
+                      </TableCell>
+                      <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
+                        {formatValue(signup.contribution)}
+                      </TableCell>
+                      <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
+                        {formatValue(signup.interested_content_types)}
+                      </TableCell>
+                      <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
+                        {formatValue(signup.additional_notes)}
+                      </TableCell>
+                      <TableCell className="py-2 text-sm text-muted-foreground">
+                        {formatDate(signup.created_at)}
+                      </TableCell>
+                      </TableRow>
+                    ))}
+                  </Fragment>
                 ))}
               </TableBody>
               </Table>
