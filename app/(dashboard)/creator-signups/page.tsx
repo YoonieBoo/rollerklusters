@@ -47,6 +47,7 @@ const HIDDEN_SIGNUP_DISPLAY_NAMES = new Set([
   'emris',
   'yoon testing',
   'yoon',
+  'yoon yamone',
 ]);
 
 const toText = (value: unknown): string => {
