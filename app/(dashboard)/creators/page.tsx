@@ -27,7 +27,12 @@ type CreatorProfile = {
 };
 
 const CREATORS_REFRESH_INTERVAL_MS = 15000;
-const HIDDEN_CREATOR_HANDLES = new Set(['yoonie', '_yoonieeee', 'nanisherewithme']);
+const HIDDEN_CREATOR_HANDLES = new Set([
+  'yoonie',
+  '_yoonieeee',
+  'nanisherewithme',
+  'aeiou',
+]);
 
 const toText = (value: unknown) => {
   if (typeof value === 'string') {

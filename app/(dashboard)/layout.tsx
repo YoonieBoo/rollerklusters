@@ -45,7 +45,12 @@ const HIDDEN_SIGNUP_DISPLAY_NAMES = new Set([
   'yoon yamone',
 ]);
 const SIGNUP_COUNT_SOURCES = ['creator_signups', 'creator_signup_profile_sources'];
-const HIDDEN_CREATOR_HANDLES = new Set(['yoonie', '_yoonieeee', 'nanisherewithme']);
+const HIDDEN_CREATOR_HANDLES = new Set([
+  'yoonie',
+  '_yoonieeee',
+  'nanisherewithme',
+  'aeiou',
+]);
 
 type SupabaseRow = Record<string, unknown>;
 
