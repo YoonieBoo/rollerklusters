@@ -14,6 +14,8 @@ import { supabase } from '@/lib/supabase/client';
 
 type CreatorProfile = {
   id?: string | number | null;
+  user_id?: string | null;
+  email?: string | null;
   display_name?: string | null;
   creator_name?: string | null;
   social_handle?: string | null;
@@ -23,8 +25,29 @@ type CreatorProfile = {
   creator_rank?: string | number | null;
   verification_status?: string | null;
   onboarding_completed?: boolean | string | null;
+  scholarship_student?: boolean | string | null;
+  is_scholarship_student?: boolean | string | null;
+  line_id?: string | null;
+  additional_notes?: unknown;
   created_at?: string | null;
   [key: string]: unknown;
+};
+
+type UserProfile = {
+  id?: string | null;
+  email?: string | null;
+  name?: string | null;
+  full_name?: string | null;
+};
+
+type CreatorSignup = {
+  email?: string | null;
+  display_name?: string | null;
+  instagram_handle?: string | null;
+  tiktok_handle?: string | null;
+  scholarship_student?: boolean | string | null;
+  line_id?: string | null;
+  additional_notes?: unknown;
 };
 
 const CREATORS_REFRESH_INTERVAL_MS = 15000;
@@ -94,6 +117,51 @@ const formatNumberValue = (value: unknown) => {
   }
 
   return new Intl.NumberFormat().format(numericValue);
+};
+
+const formatScholarshipStudent = (creator: CreatorProfile) => {
+  const value = creator.scholarship_student ?? creator.is_scholarship_student;
+
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+
+  const text = toText(value).trim().toLowerCase();
+
+  if (['true', 'yes', 'y'].includes(text)) {
+    return 'Yes';
+  }
+
+  if (['false', 'no', 'n'].includes(text)) {
+    return 'No';
+  }
+
+  return 'N/A';
+};
+
+const getScholarshipStudentValue = (signup: CreatorSignup) => {
+  if (typeof signup.scholarship_student === 'boolean') {
+    return signup.scholarship_student;
+  }
+
+  const text = toText(signup.scholarship_student).trim().toLowerCase();
+
+  if (['true', 'yes', 'y'].includes(text)) {
+    return true;
+  }
+
+  if (['false', 'no', 'n'].includes(text)) {
+    return false;
+  }
+
+  const notes = toText(signup.additional_notes);
+  const notesMatch = notes.match(/scholarship\s+student\s*:\s*(yes|no)\b/i);
+
+  if (notesMatch) {
+    return notesMatch[1].toLowerCase() === 'yes';
+  }
+
+  return null;
 };
 
 const formatDate = (date: string | null | undefined) => {
@@ -173,6 +241,8 @@ const CreatorMetric = ({ label, value }: { label: string; value: string }) => (
 const normalizeCreatorIdentifier = (value: unknown) =>
   toText(value).trim().toLowerCase().replace(/^@/, '');
 
+const normalizeEmail = (value: unknown) => toText(value).trim().toLowerCase();
+
 const isVisibleCreator = (creator: CreatorProfile) =>
   !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.display_name)) &&
   !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.social_handle));
@@ -191,6 +261,114 @@ const withoutFirstAustinProtocolCreator = (creators: CreatorProfile[]) => {
     }
 
     return true;
+  });
+};
+
+const fetchOptionalRows = async <T extends Record<string, unknown>>(
+  tableName: string,
+  orderColumn?: string
+) => {
+  let query = supabase.from(tableName).select('*');
+
+  if (orderColumn) {
+    query = query.order(orderColumn, { ascending: false });
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.warn(`Optional ${tableName} fetch skipped:`, error.message);
+    return [] as T[];
+  }
+
+  return (data ?? []) as T[];
+};
+
+const getSignupMatch = (
+  creator: CreatorProfile,
+  usersById: Map<string, UserProfile>,
+  signupsByEmail: Map<string, CreatorSignup>,
+  signupsByIdentifier: Map<string, CreatorSignup>
+) => {
+  const profileUser = usersById.get(toText(creator.user_id));
+  const email = normalizeEmail(creator.email) || normalizeEmail(profileUser?.email);
+
+  if (email) {
+    const emailMatch = signupsByEmail.get(email);
+
+    if (emailMatch) {
+      return emailMatch;
+    }
+  }
+
+  const identifiers = [
+    creator.display_name,
+    creator.creator_name,
+    creator.social_handle,
+    profileUser?.name,
+    profileUser?.full_name,
+  ];
+
+  for (const identifier of identifiers) {
+    const match = signupsByIdentifier.get(normalizeCreatorIdentifier(identifier));
+
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+};
+
+const enrichCreatorsWithSubmittedFields = (
+  creators: CreatorProfile[],
+  users: UserProfile[],
+  signups: CreatorSignup[]
+) => {
+  const usersById = new Map(
+    users
+      .map((user) => [toText(user.id), user] as const)
+      .filter(([id]) => id)
+  );
+  const signupsByEmail = new Map(
+    signups
+      .map((signup) => [normalizeEmail(signup.email), signup] as const)
+      .filter(([email]) => email)
+  );
+  const signupsByIdentifier = new Map<string, CreatorSignup>();
+
+  signups.forEach((signup) => {
+    [
+      signup.display_name,
+      signup.instagram_handle,
+      signup.tiktok_handle,
+    ].forEach((identifier) => {
+      const normalizedIdentifier = normalizeCreatorIdentifier(identifier);
+
+      if (normalizedIdentifier && !signupsByIdentifier.has(normalizedIdentifier)) {
+        signupsByIdentifier.set(normalizedIdentifier, signup);
+      }
+    });
+  });
+
+  return creators.map((creator) => {
+    const signup = getSignupMatch(
+      creator,
+      usersById,
+      signupsByEmail,
+      signupsByIdentifier
+    );
+    const scholarshipStudent =
+      creator.scholarship_student ??
+      creator.is_scholarship_student ??
+      (signup ? getScholarshipStudentValue(signup) : null);
+    const lineId = toText(creator.line_id).trim() || toText(signup?.line_id).trim();
+
+    return {
+      ...creator,
+      scholarship_student: scholarshipStudent,
+      line_id: lineId || null,
+    };
   });
 };
 
@@ -214,6 +392,11 @@ export default function CreatorsPage() {
         .select('*')
         .order('created_at', { ascending: false });
 
+      const [users, signups] = await Promise.all([
+        fetchOptionalRows<UserProfile>('users'),
+        fetchOptionalRows<CreatorSignup>('creator_signups', 'created_at'),
+      ]);
+
       if (!isMounted) {
         return;
       }
@@ -228,7 +411,11 @@ export default function CreatorsPage() {
       } else {
         setCreators(
           withoutFirstAustinProtocolCreator(
-            ((data ?? []) as CreatorProfile[]).filter(isVisibleCreator)
+            enrichCreatorsWithSubmittedFields(
+              ((data ?? []) as CreatorProfile[]).filter(isVisibleCreator),
+              users,
+              signups
+            )
           )
         );
       }
@@ -256,6 +443,20 @@ export default function CreatorsPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'creator_profiles' },
+        () => {
+          fetchCreators(false);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'creator_signups' },
+        () => {
+          fetchCreators(false);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'users' },
         () => {
           fetchCreators(false);
         }
@@ -315,13 +516,21 @@ export default function CreatorsPage() {
                       label="Videos"
                       value={getCreatorVideoCount(creator)}
                     />
+                    <CreatorMetric
+                      label="Scholarship"
+                      value={formatScholarshipStudent(creator)}
+                    />
+                    <CreatorMetric
+                      label="Line ID"
+                      value={toText(creator.line_id).trim() || 'N/A'}
+                    />
                   </div>
                   <CreatorMetric label="Signed up" value={formatDate(creator.created_at)} />
                 </div>
               ))}
             </div>
-            <div className="hidden md:block">
-              <Table>
+            <div className="hidden overflow-x-auto md:block">
+              <Table className="min-w-[1280px]">
                 <TableHeader className="bg-muted/60">
                   <TableRow className="h-10 hover:bg-muted/60">
                     <TableHead className="py-2">Creator</TableHead>
@@ -331,6 +540,8 @@ export default function CreatorsPage() {
                     <TableHead className="py-2">Rank</TableHead>
                     <TableHead className="py-2">Consistency</TableHead>
                     <TableHead className="py-2">Video Count</TableHead>
+                    <TableHead className="py-2">Scholarship Student</TableHead>
+                    <TableHead className="py-2">Line ID</TableHead>
                     <TableHead className="py-2">Signed up date</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -360,6 +571,12 @@ export default function CreatorsPage() {
                       </TableCell>
                       <TableCell className="py-2 text-muted-foreground">
                         {getCreatorVideoCount(creator)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatScholarshipStudent(creator)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {toText(creator.line_id).trim() || 'N/A'}
                       </TableCell>
                       <TableCell className="py-2 text-sm text-muted-foreground">
                         {formatDate(creator.created_at)}
