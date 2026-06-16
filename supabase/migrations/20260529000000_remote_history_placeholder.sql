@@ -1,0 +1,3 @@
+-- Placeholder for a migration that exists in the linked remote Supabase
+-- migration history but was not present in this local checkout.
+-- Do not add schema changes here; the remote database already has this version.

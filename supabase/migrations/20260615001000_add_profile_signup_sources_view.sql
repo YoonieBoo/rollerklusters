@@ -45,6 +45,11 @@ where not exists (
   from public.creator_signups signup
   where lower(signup.email) = lower(auth_user.email)
 )
+and lower(auth_user.email) not in (
+  'aungkhantbhonemyat09@gmail.com',
+  'u6511158@au.edu',
+  'u6732015@au.edu'
+)
 union all
 select
   'email-campaign-manager-phyuhninkhaing107'::text as id,

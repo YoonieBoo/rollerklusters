@@ -35,7 +35,12 @@ const navItems = [
 
 const SIGNUP_COUNT_REFRESH_INTERVAL_MS = 15000;
 const SIGNUP_COUNT_PAGE_SIZE = 1000;
-const HIDDEN_SIGNUP_DISPLAY_NAMES = new Set(['testing yoonie']);
+const HIDDEN_SIGNUP_DISPLAY_NAMES = new Set([
+  'testing yoonie',
+  'emris',
+  'yoon testing',
+  'yoon',
+]);
 const SIGNUP_COUNT_SOURCES = ['creator_signups', 'creator_signup_profile_sources'];
 
 type SupabaseRow = Record<string, unknown>;

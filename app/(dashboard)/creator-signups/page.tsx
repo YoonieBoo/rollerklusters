@@ -42,7 +42,12 @@ type CreatorSignup = {
 
 const SIGNUPS_PAGE_SIZE = 1000;
 const SIGNUPS_REFRESH_INTERVAL_MS = 15000;
-const HIDDEN_SIGNUP_DISPLAY_NAMES = new Set(['testing yoonie']);
+const HIDDEN_SIGNUP_DISPLAY_NAMES = new Set([
+  'testing yoonie',
+  'emris',
+  'yoon testing',
+  'yoon',
+]);
 
 const toText = (value: unknown): string => {
   if (typeof value === 'string') {
