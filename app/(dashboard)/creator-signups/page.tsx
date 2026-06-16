@@ -182,26 +182,7 @@ const fetchAllCreatorSignups = async () => {
     }
   }
 
-  for (let page = 0; ; page += 1) {
-    const from = page * SIGNUPS_PAGE_SIZE;
-    const to = from + SIGNUPS_PAGE_SIZE - 1;
-    const { data, error } = await supabase
-      .from('creator_signup_profile_sources')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .range(from, to);
-
-    if (error) {
-      return { data: null, error };
-    }
-
-    const pageRows = (data ?? []) as CreatorSignup[];
-    signups.push(...pageRows);
-
-    if (pageRows.length < SIGNUPS_PAGE_SIZE) {
-      return { data: signups.filter(isVisibleSignup).sort(sortSignups), error: null };
-    }
-  }
+  return { data: signups.filter(isVisibleSignup).sort(sortSignups), error: null };
 };
 
 export default function CreatorSignupsPage() {
@@ -256,13 +237,6 @@ export default function CreatorSignupsPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'creator_signups' },
-        () => {
-          fetchSignups(false);
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'creator_profiles' },
         () => {
           fetchSignups(false);
         }
