@@ -35,6 +35,8 @@ const navItems = [
 
 const SIGNUP_COUNT_REFRESH_INTERVAL_MS = 15000;
 const SIGNUP_COUNT_PAGE_SIZE = 1000;
+const CREATOR_COUNT_REFRESH_INTERVAL_MS = 15000;
+const CREATOR_COUNT_PAGE_SIZE = 1000;
 const HIDDEN_SIGNUP_DISPLAY_NAMES = new Set([
   'testing yoonie',
   'emris',
@@ -43,11 +45,36 @@ const HIDDEN_SIGNUP_DISPLAY_NAMES = new Set([
   'yoon yamone',
 ]);
 const SIGNUP_COUNT_SOURCES = ['creator_signups', 'creator_signup_profile_sources'];
+const HIDDEN_CREATOR_HANDLES = new Set(['yoonie', '_yoonieeee', 'nanisherewithme']);
 
 type SupabaseRow = Record<string, unknown>;
 
 const isVisibleSignup = (signup: SupabaseRow) =>
   !HIDDEN_SIGNUP_DISPLAY_NAMES.has(toText(signup.display_name).trim().toLowerCase());
+
+const normalizeCreatorIdentifier = (value: unknown) =>
+  toText(value).trim().toLowerCase().replace(/^@/, '');
+
+const isVisibleCreator = (creator: SupabaseRow) =>
+  !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.display_name)) &&
+  !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.social_handle));
+
+const withoutFirstAustinProtocolCreator = (creators: SupabaseRow[]) => {
+  let hasRemovedCreator = false;
+
+  return creators.filter((creator) => {
+    const isAustinProtocol =
+      normalizeCreatorIdentifier(creator.display_name) === 'austin_protocol' ||
+      normalizeCreatorIdentifier(creator.social_handle) === 'austin_protocol';
+
+    if (isAustinProtocol && !hasRemovedCreator) {
+      hasRemovedCreator = true;
+      return false;
+    }
+
+    return true;
+  });
+};
 
 const logOptionalProfileWarning = (label: string, error: unknown) => {
   if (process.env.NODE_ENV !== 'development') {
@@ -84,6 +111,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifications, setNotifications] = useState<WorkflowUpdate[]>([]);
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
+  const [creatorCount, setCreatorCount] = useState(0);
   const [signupCount, setSignupCount] = useState(0);
 
   useEffect(() => {
@@ -188,6 +216,46 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     fetchNotifications();
   }, [pathname, user]);
 
+  const fetchCreatorCount = async () => {
+    if (!user) {
+      setCreatorCount(0);
+      return;
+    }
+
+    try {
+      const creators: SupabaseRow[] = [];
+
+      for (let page = 0; ; page += 1) {
+        const from = page * CREATOR_COUNT_PAGE_SIZE;
+        const to = from + CREATOR_COUNT_PAGE_SIZE - 1;
+        const { data, error } = await supabase
+          .from('creator_profiles')
+          .select('id, display_name, social_handle')
+          .range(from, to);
+
+        if (error) {
+          console.error('Creator count fetch error:', error);
+          setCreatorCount(0);
+          return;
+        }
+
+        const pageRows = (data ?? []) as SupabaseRow[];
+        creators.push(...pageRows);
+
+        if (pageRows.length < CREATOR_COUNT_PAGE_SIZE) {
+          break;
+        }
+      }
+
+      setCreatorCount(
+        withoutFirstAustinProtocolCreator(creators.filter(isVisibleCreator)).length
+      );
+    } catch (error) {
+      console.error('Creator count fetch issue:', error);
+      setCreatorCount(0);
+    }
+  };
+
   const fetchSignupCount = async () => {
     if (!user) {
       setSignupCount(0);
@@ -229,8 +297,46 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    fetchCreatorCount();
     fetchSignupCount();
   }, [pathname, user]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const refreshVisibleCreatorCount = () => {
+      if (document.visibilityState === 'visible') {
+        fetchCreatorCount();
+      }
+    };
+
+    const intervalId = window.setInterval(
+      refreshVisibleCreatorCount,
+      CREATOR_COUNT_REFRESH_INTERVAL_MS
+    );
+    window.addEventListener('focus', refreshVisibleCreatorCount);
+    document.addEventListener('visibilitychange', refreshVisibleCreatorCount);
+
+    const channel = supabase
+      .channel('creator-profiles-count')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'creator_profiles' },
+        () => {
+          fetchCreatorCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshVisibleCreatorCount);
+      document.removeEventListener('visibilitychange', refreshVisibleCreatorCount);
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -381,6 +487,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 >
                   <Icon size={20} />
                   <span className="flex-1 text-left text-sm font-medium">{item.label}</span>
+                  {item.href === '/creators' && creatorCount > 0 && (
+                    <span className="flex h-5 min-w-5 max-w-16 items-center justify-center rounded-full bg-blue-700 px-1.5 text-[10px] font-semibold leading-none text-white tabular-nums">
+                      {creatorCount.toLocaleString()}
+                    </span>
+                  )}
                   {item.href === '/creator-signups' && signupCount > 0 && (
                     <span className="flex h-5 min-w-5 max-w-16 items-center justify-center rounded-full bg-blue-700 px-1.5 text-[10px] font-semibold leading-none text-white tabular-nums">
                       {signupCount.toLocaleString()}

@@ -27,6 +27,7 @@ type CreatorProfile = {
 };
 
 const CREATORS_REFRESH_INTERVAL_MS = 15000;
+const HIDDEN_CREATOR_HANDLES = new Set(['yoonie', '_yoonieeee', 'nanisherewithme']);
 
 const toText = (value: unknown) => {
   if (typeof value === 'string') {
@@ -165,6 +166,10 @@ const CreatorMetric = ({ label, value }: { label: string; value: string }) => (
 const normalizeCreatorIdentifier = (value: unknown) =>
   toText(value).trim().toLowerCase().replace(/^@/, '');
 
+const isVisibleCreator = (creator: CreatorProfile) =>
+  !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.display_name)) &&
+  !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.social_handle));
+
 const withoutFirstAustinProtocolCreator = (creators: CreatorProfile[]) => {
   let hasRemovedCreator = false;
 
@@ -214,7 +219,11 @@ export default function CreatorsPage() {
           setCreators([]);
         }
       } else {
-        setCreators(withoutFirstAustinProtocolCreator((data ?? []) as CreatorProfile[]));
+        setCreators(
+          withoutFirstAustinProtocolCreator(
+            ((data ?? []) as CreatorProfile[]).filter(isVisibleCreator)
+          )
+        );
       }
 
       setIsLoading(false);
