@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase/client';
 type CreatorProfile = {
   id?: string | number | null;
   display_name?: string | null;
+  creator_name?: string | null;
   social_handle?: string | null;
   platform?: string | null;
   manual_follower_count?: number | string | null;
@@ -111,6 +112,7 @@ const formatDate = (date: string | null | undefined) => {
 
 const getCreatorName = (creator: CreatorProfile) =>
   toText(creator.display_name).trim() ||
+  toText(creator.creator_name).trim() ||
   toText(creator.social_handle).trim() ||
   'Unnamed creator';
 

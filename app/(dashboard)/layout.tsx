@@ -41,6 +41,7 @@ const HIDDEN_SIGNUP_DISPLAY_NAMES = new Set([
   'testing yoonie',
   'emris',
   'yoon testing',
+  'yoonie',
   'yoon',
   'yoon yamone',
 ]);
