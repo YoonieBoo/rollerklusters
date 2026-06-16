@@ -45,7 +45,6 @@ const HIDDEN_SIGNUP_DISPLAY_NAMES = new Set([
   'yoon',
   'yoon yamone',
 ]);
-const SIGNUP_COUNT_SOURCES = ['creator_signups', 'creator_signup_profile_sources'];
 const HIDDEN_CREATOR_HANDLES = new Set([
   'yoonie',
   '_yoonieeee',
@@ -58,6 +57,17 @@ type SupabaseRow = Record<string, unknown>;
 
 const isVisibleSignup = (signup: SupabaseRow) =>
   !HIDDEN_SIGNUP_DISPLAY_NAMES.has(toText(signup.display_name).trim().toLowerCase());
+
+const isStudentCreatorSignup = (signup: SupabaseRow) => {
+  const signupType = toText(signup.signup_type).trim().toLowerCase();
+  const roleLabel = toText(signup.role_label).trim().toLowerCase();
+
+  return (
+    signupType === 'student-creator' ||
+    roleLabel === 'student creator sign up' ||
+    (!signupType && !roleLabel)
+  );
+};
 
 const normalizeCreatorIdentifier = (value: unknown) =>
   toText(value).trim().toLowerCase().replace(/^@/, '');
@@ -273,31 +283,30 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     try {
       const signups: SupabaseRow[] = [];
 
-      for (const source of SIGNUP_COUNT_SOURCES) {
-        for (let page = 0; ; page += 1) {
-          const from = page * SIGNUP_COUNT_PAGE_SIZE;
-          const to = from + SIGNUP_COUNT_PAGE_SIZE - 1;
-          const { data, error } = await supabase
-            .from(source)
-            .select('id, display_name')
-            .range(from, to);
+      for (let page = 0; ; page += 1) {
+        const from = page * SIGNUP_COUNT_PAGE_SIZE;
+        const to = from + SIGNUP_COUNT_PAGE_SIZE - 1;
+        const { data, error } = await supabase
+          .from('creator_signups')
+          .select('id, display_name, signup_type, role_label')
+          .eq('signup_type', 'student-creator')
+          .range(from, to);
 
-          if (error) {
-            console.error('Creator signup count fetch error:', error);
-            setSignupCount(0);
-            return;
-          }
+        if (error) {
+          console.error('Creator signup count fetch error:', error);
+          setSignupCount(0);
+          return;
+        }
 
-          const pageRows = (data ?? []) as SupabaseRow[];
-          signups.push(...pageRows);
+        const pageRows = (data ?? []) as SupabaseRow[];
+        signups.push(...pageRows);
 
-          if (pageRows.length < SIGNUP_COUNT_PAGE_SIZE) {
-            break;
-          }
+        if (pageRows.length < SIGNUP_COUNT_PAGE_SIZE) {
+          break;
         }
       }
 
-      setSignupCount(signups.filter(isVisibleSignup).length);
+      setSignupCount(signups.filter(isStudentCreatorSignup).filter(isVisibleSignup).length);
     } catch (error) {
       console.error('Creator signup count fetch issue:', error);
       setSignupCount(0);
@@ -369,13 +378,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'creator_signups' },
-        () => {
-          fetchSignupCount();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'creator_profiles' },
         () => {
           fetchSignupCount();
         }
