@@ -26,6 +26,8 @@ type CreatorProfile = {
   [key: string]: unknown;
 };
 
+const CREATORS_REFRESH_INTERVAL_MS = 15000;
+
 const toText = (value: unknown) => {
   if (typeof value === 'string') {
     return value;
@@ -186,8 +188,13 @@ export default function CreatorsPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchCreators = async () => {
-      setIsLoading(true);
+    let isMounted = true;
+
+    const fetchCreators = async (showLoading = true) => {
+      if (showLoading) {
+        setIsLoading(true);
+      }
+
       setErrorMessage(null);
 
       const { data, error } = await supabase
@@ -195,10 +202,17 @@ export default function CreatorsPage() {
         .select('*')
         .order('created_at', { ascending: false });
 
+      if (!isMounted) {
+        return;
+      }
+
       if (error) {
         console.error('Supabase creator profiles fetch error:', error);
         setErrorMessage(error.message);
-        setCreators([]);
+
+        if (showLoading) {
+          setCreators([]);
+        }
       } else {
         setCreators(withoutFirstAustinProtocolCreator((data ?? []) as CreatorProfile[]));
       }
@@ -207,6 +221,38 @@ export default function CreatorsPage() {
     };
 
     fetchCreators();
+
+    const refreshVisibleCreators = () => {
+      if (document.visibilityState === 'visible') {
+        fetchCreators(false);
+      }
+    };
+
+    const intervalId = window.setInterval(
+      refreshVisibleCreators,
+      CREATORS_REFRESH_INTERVAL_MS
+    );
+    window.addEventListener('focus', refreshVisibleCreators);
+    document.addEventListener('visibilitychange', refreshVisibleCreators);
+
+    const channel = supabase
+      .channel('creator-profiles-page')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'creator_profiles' },
+        () => {
+          fetchCreators(false);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshVisibleCreators);
+      document.removeEventListener('visibilitychange', refreshVisibleCreators);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return (
