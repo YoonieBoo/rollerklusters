@@ -54,6 +54,7 @@ const CREATORS_REFRESH_INTERVAL_MS = 15000;
 const HIDDEN_CREATOR_HANDLES = new Set([
   'yoonie',
   '_yoonieeee',
+  'yoonieeee',
   'nanisherewithme',
   'aeiou',
 ]);
@@ -245,6 +246,7 @@ const normalizeEmail = (value: unknown) => toText(value).trim().toLowerCase();
 
 const isVisibleCreator = (creator: CreatorProfile) =>
   !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.display_name)) &&
+  !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.creator_name)) &&
   !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.social_handle));
 
 const withoutFirstAustinProtocolCreator = (creators: CreatorProfile[]) => {

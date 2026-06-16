@@ -49,6 +49,7 @@ const SIGNUP_COUNT_SOURCES = ['creator_signups', 'creator_signup_profile_sources
 const HIDDEN_CREATOR_HANDLES = new Set([
   'yoonie',
   '_yoonieeee',
+  'yoonieeee',
   'nanisherewithme',
   'aeiou',
 ]);
@@ -63,6 +64,7 @@ const normalizeCreatorIdentifier = (value: unknown) =>
 
 const isVisibleCreator = (creator: SupabaseRow) =>
   !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.display_name)) &&
+  !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.creator_name)) &&
   !HIDDEN_CREATOR_HANDLES.has(normalizeCreatorIdentifier(creator.social_handle));
 
 const withoutFirstAustinProtocolCreator = (creators: SupabaseRow[]) => {
