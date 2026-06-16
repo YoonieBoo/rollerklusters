@@ -57,58 +57,6 @@ type SupabaseRow = Record<string, unknown>;
 const isVisibleSignup = (signup: SupabaseRow) =>
   !HIDDEN_SIGNUP_DISPLAY_NAMES.has(toText(signup.display_name).trim().toLowerCase());
 
-const normalizeEmail = (value: unknown) => toText(value).trim().toLowerCase();
-
-const getSignupSourcePriority = (signup: SupabaseRow) => {
-  const signupType = toText(signup.signup_type).trim().toLowerCase();
-  const roleLabel = toText(signup.role_label).trim().toLowerCase();
-
-  if (signupType === 'profile' || roleLabel === 'creator profile sign up') {
-    return 2;
-  }
-
-  return 1;
-};
-
-const getSignupTimestamp = (signup: SupabaseRow) => {
-  const timestamp = Date.parse(toText(signup.created_at));
-
-  return Number.isNaN(timestamp) ? 0 : timestamp;
-};
-
-const isPreferredSignup = (nextSignup: SupabaseRow, currentSignup: SupabaseRow) => {
-  const priorityDifference =
-    getSignupSourcePriority(nextSignup) - getSignupSourcePriority(currentSignup);
-
-  if (priorityDifference !== 0) {
-    return priorityDifference > 0;
-  }
-
-  return getSignupTimestamp(nextSignup) > getSignupTimestamp(currentSignup);
-};
-
-const dedupeSignupsByEmail = (signups: SupabaseRow[]) => {
-  const signupByEmail = new Map<string, SupabaseRow>();
-  const signupsWithoutEmail: SupabaseRow[] = [];
-
-  for (const signup of signups) {
-    const email = normalizeEmail(signup.email);
-
-    if (!email) {
-      signupsWithoutEmail.push(signup);
-      continue;
-    }
-
-    const currentSignup = signupByEmail.get(email);
-
-    if (!currentSignup || isPreferredSignup(signup, currentSignup)) {
-      signupByEmail.set(email, signup);
-    }
-  }
-
-  return [...signupByEmail.values(), ...signupsWithoutEmail];
-};
-
 const normalizeCreatorIdentifier = (value: unknown) =>
   toText(value).trim().toLowerCase().replace(/^@/, '');
 
@@ -328,7 +276,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           const to = from + SIGNUP_COUNT_PAGE_SIZE - 1;
           const { data, error } = await supabase
             .from(source)
-            .select('id, display_name, email, signup_type, role_label, created_at')
+            .select('id, display_name')
             .range(from, to);
 
           if (error) {
@@ -346,7 +294,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         }
       }
 
-      setSignupCount(dedupeSignupsByEmail(signups.filter(isVisibleSignup)).length);
+      setSignupCount(signups.filter(isVisibleSignup).length);
     } catch (error) {
       console.error('Creator signup count fetch issue:', error);
       setSignupCount(0);

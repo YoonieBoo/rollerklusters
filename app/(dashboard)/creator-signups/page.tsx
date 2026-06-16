@@ -147,61 +147,6 @@ const SignupDetail = ({ label, value }: { label: string; value: unknown }) => (
 const isVisibleSignup = (signup: CreatorSignup) =>
   !HIDDEN_SIGNUP_DISPLAY_NAMES.has(toText(signup.display_name).trim().toLowerCase());
 
-const normalizeEmail = (value: unknown) => toText(value).trim().toLowerCase();
-
-const getSignupSourcePriority = (signup: CreatorSignup) => {
-  const signupType = toText(signup.signup_type).trim().toLowerCase();
-  const roleLabel = toText(signup.role_label).trim().toLowerCase();
-
-  if (signupType === 'profile' || roleLabel === 'creator profile sign up') {
-    return 2;
-  }
-
-  return 1;
-};
-
-const getSignupTimestamp = (signup: CreatorSignup) => {
-  const timestamp = Date.parse(toText(signup.created_at));
-
-  return Number.isNaN(timestamp) ? 0 : timestamp;
-};
-
-const isPreferredSignup = (
-  nextSignup: CreatorSignup,
-  currentSignup: CreatorSignup
-) => {
-  const priorityDifference =
-    getSignupSourcePriority(nextSignup) - getSignupSourcePriority(currentSignup);
-
-  if (priorityDifference !== 0) {
-    return priorityDifference > 0;
-  }
-
-  return getSignupTimestamp(nextSignup) > getSignupTimestamp(currentSignup);
-};
-
-const dedupeSignupsByEmail = (signups: CreatorSignup[]) => {
-  const signupByEmail = new Map<string, CreatorSignup>();
-  const signupsWithoutEmail: CreatorSignup[] = [];
-
-  for (const signup of signups) {
-    const email = normalizeEmail(signup.email);
-
-    if (!email) {
-      signupsWithoutEmail.push(signup);
-      continue;
-    }
-
-    const currentSignup = signupByEmail.get(email);
-
-    if (!currentSignup || isPreferredSignup(signup, currentSignup)) {
-      signupByEmail.set(email, signup);
-    }
-  }
-
-  return [...signupByEmail.values(), ...signupsWithoutEmail];
-};
-
 const sortSignups = (firstSignup: CreatorSignup, secondSignup: CreatorSignup) => {
   const firstCreatedAt = Date.parse(toText(firstSignup.created_at));
   const secondCreatedAt = Date.parse(toText(secondSignup.created_at));
@@ -254,10 +199,7 @@ const fetchAllCreatorSignups = async () => {
     signups.push(...pageRows);
 
     if (pageRows.length < SIGNUPS_PAGE_SIZE) {
-      return {
-        data: dedupeSignupsByEmail(signups.filter(isVisibleSignup)).sort(sortSignups),
-        error: null,
-      };
+      return { data: signups.filter(isVisibleSignup).sort(sortSignups), error: null };
     }
   }
 };
