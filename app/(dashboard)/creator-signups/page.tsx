@@ -317,7 +317,6 @@ export default function CreatorSignupsPage() {
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <SignupDetail label="Role" value={signup.role_label} />
-                    <SignupDetail label="Location" value={signup.location} />
                     <SignupDetail label="Nickname" value={signup.nickname} />
                     <SignupDetail label="Program" value={signup.university_program} />
                     <SignupDetail label="Year" value={signup.year} />
@@ -328,7 +327,6 @@ export default function CreatorSignupsPage() {
                     <SignupDetail label="Phone" value={signup.phone_number} />
                     <SignupDetail label="Line ID" value={signup.line_id} />
                     <SignupDetail label="Instagram" value={signup.instagram_handle} />
-                    <SignupDetail label="TikTok" value={signup.tiktok_handle} />
                     <SignupDetail label="Other Platforms" value={signup.other_platforms} />
                     <SignupDetail
                       label="Creative Focus"
@@ -347,7 +345,6 @@ export default function CreatorSignupsPage() {
                       value={signup.interested_content_types}
                     />
                     <SignupDetail label="Notes" value={signup.additional_notes} />
-                    <SignupDetail label="Status" value={formatLabel(signup.status)} />
                     <SignupDetail label="Created" value={formatDate(signup.created_at)} />
                   </div>
                 </div>
@@ -361,7 +358,6 @@ export default function CreatorSignupsPage() {
                   <TableHead className="py-2">Email</TableHead>
                   <TableHead className="py-2">Signup Type</TableHead>
                   <TableHead className="py-2">Role</TableHead>
-                  <TableHead className="py-2">Location</TableHead>
                   <TableHead className="py-2">Nickname</TableHead>
                   <TableHead className="py-2">Program</TableHead>
                   <TableHead className="py-2">Year</TableHead>
@@ -369,7 +365,6 @@ export default function CreatorSignupsPage() {
                   <TableHead className="py-2">Phone</TableHead>
                   <TableHead className="py-2">Line ID</TableHead>
                   <TableHead className="py-2">Instagram</TableHead>
-                  <TableHead className="py-2">TikTok</TableHead>
                   <TableHead className="py-2">Other Platforms</TableHead>
                   <TableHead className="py-2">Creative Focus</TableHead>
                   <TableHead className="py-2">Followers</TableHead>
@@ -379,7 +374,6 @@ export default function CreatorSignupsPage() {
                   <TableHead className="py-2">Contribution</TableHead>
                   <TableHead className="py-2">Content Types</TableHead>
                   <TableHead className="py-2">Notes</TableHead>
-                  <TableHead className="py-2">Status</TableHead>
                   <TableHead className="py-2">Created</TableHead>
                 </TableRow>
               </TableHeader>
@@ -402,9 +396,6 @@ export default function CreatorSignupsPage() {
                     {formatValue(signup.role_label)}
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.location)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
                     {formatValue(signup.nickname)}
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
@@ -424,9 +415,6 @@ export default function CreatorSignupsPage() {
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
                     {formatValue(signup.instagram_handle)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatValue(signup.tiktok_handle)}
                   </TableCell>
                   <TableCell className="max-w-56 whitespace-normal break-words py-2 text-muted-foreground">
                     {formatValue(signup.other_platforms)}
@@ -454,9 +442,6 @@ export default function CreatorSignupsPage() {
                   </TableCell>
                   <TableCell className="max-w-64 whitespace-normal break-words py-2 text-muted-foreground">
                     {formatValue(signup.additional_notes)}
-                  </TableCell>
-                  <TableCell className="py-2 text-muted-foreground">
-                    {formatLabel(signup.status)}
                   </TableCell>
                   <TableCell className="py-2 text-sm text-muted-foreground">
                     {formatDate(signup.created_at)}
