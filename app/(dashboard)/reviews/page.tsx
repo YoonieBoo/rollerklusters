@@ -800,8 +800,8 @@ export default function ReviewsPage() {
                       : 'pointer-events-none opacity-70'
                   }`}
                 >
-                  <div className="grid gap-0 sm:grid-cols-[15rem_1fr]">
-                    <div className="relative aspect-video overflow-hidden bg-muted">
+                  <div className="grid gap-0 sm:grid-cols-[15rem_1fr] sm:items-stretch">
+                    <div className="relative aspect-video overflow-hidden bg-muted sm:aspect-auto sm:h-full sm:min-h-40">
                       {selectedPreviewKind === 'image' ? (
                         <img
                           src={selectedSubmission.submissionLink}
