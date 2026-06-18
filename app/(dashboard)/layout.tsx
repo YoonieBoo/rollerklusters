@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -9,7 +9,6 @@ import {
   LogOut,
   Menu,
   X,
-  Bell,
   FileText,
   CheckSquare,
   Users,
@@ -19,10 +18,7 @@ import {
 import { supabase } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
 import {
-  fetchWorkflowUpdates,
   toText,
-  workflowUpdateStorageKey,
-  type WorkflowUpdate,
 } from '@/lib/workflow-updates';
 
 const navItems = [
@@ -30,7 +26,7 @@ const navItems = [
   { href: '/campaigns', label: 'Campaigns', icon: FolderOpen },
   { href: '/creators', label: 'Onboarded Creators', icon: Users },
   { href: '/campaign-managers', label: 'Campaign Managers', icon: UserCog },
-  { href: '/creator-signups', label: 'About Creators', icon: UserPlus },
+  { href: '/creator-signups', label: 'Creator Details', icon: UserPlus },
   { href: '/briefs', label: 'Briefs', icon: FileText },
   { href: '/reviews', label: 'Reviews', icon: CheckSquare },
 ];
@@ -76,8 +72,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [profileName, setProfileName] = useState<string | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [notifications, setNotifications] = useState<WorkflowUpdate[]>([]);
-  const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
   const [creatorCount, setCreatorCount] = useState(0);
   const [signupCount, setSignupCount] = useState(0);
   const [campaignManagerCount, setCampaignManagerCount] = useState(0);
@@ -123,18 +117,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }, [router]);
 
   useEffect(() => {
-    const savedReadIds = window.localStorage.getItem(workflowUpdateStorageKey);
-
-    if (savedReadIds) {
-      try {
-        setReadNotificationIds(JSON.parse(savedReadIds));
-      } catch {
-        setReadNotificationIds([]);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
     const fetchUserProfile = async () => {
       if (!user) {
         setProfileName(null);
@@ -163,23 +145,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
     fetchUserProfile();
   }, [user]);
-
-  const fetchNotifications = async () => {
-    if (!user) {
-      return;
-    }
-
-    try {
-      setNotifications(await fetchWorkflowUpdates(supabase));
-    } catch (error) {
-      console.error('Notifications fetch error:', error);
-      setNotifications([]);
-    }
-  };
-
-  useEffect(() => {
-    fetchNotifications();
-  }, [pathname, user]);
 
   const fetchCreatorCount = async () => {
     if (!user) {
@@ -428,14 +393,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
-  const unreadCount = useMemo(
-    () =>
-      notifications.filter(
-        (notification) => !readNotificationIds.includes(notification.id)
-      ).length,
-    [notifications, readNotificationIds]
-  );
-
   const getUserInitials = () => {
     const fullName = profileName || toText(user?.user_metadata?.full_name);
     const label = fullName || user?.email || 'User';
@@ -548,24 +505,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             );
           })}
 
-          <Link href="/updates">
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                pathname === '/updates'
-                  ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-xs'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-              }`}
-            >
-              <Bell size={20} />
-              <span className="flex-1 text-left">Updates</span>
-              {unreadCount > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-700 px-1.5 text-[10px] font-semibold leading-none text-white">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </button>
-          </Link>
         </nav>
 
         {/* User profile */}
