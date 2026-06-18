@@ -7,7 +7,7 @@ import {
   CheckCircle2,
   FileText,
   FolderOpen,
-  Zap,
+  Users,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -52,6 +52,7 @@ type DashboardData = {
   submissions: SupabaseRow[];
   reviews: SupabaseRow[];
   reports: SupabaseRow[];
+  creatorProfiles: SupabaseRow[];
 };
 
 const StatusBadge = ({ status }: { status: string }) => {
@@ -232,15 +233,6 @@ const isReviewed = (row: SupabaseRow) => {
 
 const isApproved = (row: SupabaseRow) => getReviewStatus(row) === 'approved';
 
-const isIssue = (row: SupabaseRow) => {
-  const status = getReviewStatus(row);
-
-  return (
-    status === 'rejected' ||
-    toText(row.feedback_notes).trim() !== ''
-  );
-};
-
 export default function DashboardPage() {
   const router = useRouter();
   const [dashboardData, setDashboardData] = useState<DashboardData>({
@@ -250,6 +242,7 @@ export default function DashboardPage() {
     submissions: [],
     reviews: [],
     reports: [],
+    creatorProfiles: [],
   });
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -266,6 +259,7 @@ export default function DashboardPage() {
         submissionsResult,
         reviewsResult,
         reportsResult,
+        creatorProfilesResult,
       ] = await Promise.all([
         supabase.from('campaigns').select('*'),
         supabase.from('briefs').select('*'),
@@ -273,19 +267,22 @@ export default function DashboardPage() {
         supabase.from('submissions').select('*'),
         supabase.from('reviews').select('*'),
         supabase.from('reports').select('*'),
+        supabase.from('creator_profiles').select('*'),
       ]);
 
       const acceptanceCriteriaMissing = isMissingRelationError(acceptanceCriteriaResult.error);
       const submissionsMissing = isMissingRelationError(submissionsResult.error);
       const reviewsMissing = isMissingRelationError(reviewsResult.error);
       const reportsMissing = isMissingRelationError(reportsResult.error);
+      const creatorProfilesMissing = isMissingRelationError(creatorProfilesResult.error);
       const fetchError =
         campaignsResult.error ||
         briefsResult.error ||
         (acceptanceCriteriaMissing ? null : acceptanceCriteriaResult.error) ||
         (submissionsMissing ? null : submissionsResult.error) ||
         (reviewsMissing ? null : reviewsResult.error) ||
-        (reportsMissing ? null : reportsResult.error);
+        (reportsMissing ? null : reportsResult.error) ||
+        (creatorProfilesMissing ? null : creatorProfilesResult.error);
 
       if (fetchError) {
         setErrorMessage(fetchError.message);
@@ -296,6 +293,7 @@ export default function DashboardPage() {
           submissions: [],
           reviews: [],
           reports: [],
+          creatorProfiles: [],
         });
         setIsLoading(false);
         return;
@@ -310,6 +308,9 @@ export default function DashboardPage() {
         submissions: submissionsMissing ? [] : ((submissionsResult.data ?? []) as SupabaseRow[]),
         reviews: reviewsMissing ? [] : ((reviewsResult.data ?? []) as SupabaseRow[]),
         reports: reportsMissing ? [] : ((reportsResult.data ?? []) as SupabaseRow[]),
+        creatorProfiles: creatorProfilesMissing
+          ? []
+          : ((creatorProfilesResult.data ?? []) as SupabaseRow[]),
       });
       setIsLoading(false);
     };
@@ -324,7 +325,7 @@ export default function DashboardPage() {
     completedBriefsCount,
     reviewedSubmissionsCount,
     approvedItemsCount,
-    issuesFlaggedCount,
+    onboardedCreatorsCount,
   } = useMemo(() => {
     const campaignNames = new Map(
       dashboardData.campaigns.map((campaign) => [
@@ -499,15 +500,6 @@ export default function DashboardPage() {
 
       return latestReview ? isApproved(latestReview) : isApproved(submission);
     }).length;
-    const issueSubmissionIds = new Set<string>();
-    dashboardData.submissions.forEach((submission) => {
-      const latestReview = latestReviewBySubmissionId.get(toText(submission.id));
-
-      if (latestReview ? isIssue(latestReview) : isIssue(submission)) {
-        issueSubmissionIds.add(toText(submission.id));
-      }
-    });
-
     const activities: DashboardActivity[] = [
       ...dashboardData.campaigns.map((campaign) => ({
         id: `campaign-${toText(campaign.id)}`,
@@ -556,7 +548,7 @@ export default function DashboardPage() {
       completedBriefsCount: completedBriefs,
       reviewedSubmissionsCount: reviewedSubmissions,
       approvedItemsCount: approvedSubmissions,
-      issuesFlaggedCount: issueSubmissionIds.size,
+      onboardedCreatorsCount: dashboardData.creatorProfiles.length,
     };
   }, [dashboardData]);
 
@@ -593,9 +585,9 @@ export default function DashboardPage() {
           value={approvedItemsCount}
         />
         <MetricCard
-          icon={<Zap size={24} />}
-          label={['Needs', 'Changes']}
-          value={issuesFlaggedCount}
+          icon={<Users size={24} />}
+          label={['Onboarded', 'Creators']}
+          value={onboardedCreatorsCount}
         />
       </div>
 
