@@ -20,6 +20,7 @@ type CreatorProfile = {
   creator_name?: string | null;
   social_handle?: string | null;
   platform?: string | null;
+  faculty?: string | null;
   university_program?: string | null;
   manual_follower_count?: number | string | null;
   follower_count?: number | string | null;
@@ -244,6 +245,8 @@ const getCreatorInterest = (creator: CreatorProfile) =>
 const getCreatorProgram = (creator: CreatorProfile) =>
   toText(
     getFirstValue(creator, [
+      'faculty',
+      'facultyName',
       'university_program',
       'universityProgram',
       'program',
@@ -369,6 +372,10 @@ const enrichCreatorsWithSubmittedFields = (
       toText(creator.universityProgram).trim() ||
       toText(creator.program).trim() ||
       null;
+    const faculty =
+      toText(creator.faculty).trim() ||
+      toText(creator.facultyName).trim() ||
+      null;
     const interestedContentTypes =
       creator.interested_content_types ??
       creator.interestedContentTypes ??
@@ -379,6 +386,7 @@ const enrichCreatorsWithSubmittedFields = (
     return {
       ...creator,
       scholarship_student: scholarshipStudent,
+      faculty,
       university_program: universityProgram,
       interested_content_types: interestedContentTypes,
     };
