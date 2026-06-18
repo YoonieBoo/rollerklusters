@@ -154,7 +154,7 @@ const formatDate = (date: string | null) => {
     return 'N/A';
   }
 
-  return parsedDate.toLocaleDateString();
+  return parsedDate.getDate() + '/' + (parsedDate.getMonth() + 1) + '/' + parsedDate.getFullYear();
 };
 
 const formatTimestamp = (date: string | null) => {
@@ -168,7 +168,7 @@ const formatTimestamp = (date: string | null) => {
     return 'N/A';
   }
 
-  return `${parsedDate.toLocaleDateString()} ${parsedDate.toLocaleTimeString([], {
+  return `${formatDate(date)} ${parsedDate.toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
   })}`;

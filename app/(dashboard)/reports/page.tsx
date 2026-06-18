@@ -106,7 +106,7 @@ const formatDate = (date: string | null) => {
     return 'N/A';
   }
 
-  return parsedDate.toLocaleDateString();
+  return parsedDate.getDate() + '/' + (parsedDate.getMonth() + 1) + '/' + parsedDate.getFullYear();
 };
 
 const getFirstText = (row: SupabaseRow | null, keys: string[]) => {
@@ -331,7 +331,7 @@ const createCampaignReportPdf = ({
     cursorY = 790;
     addRaw('1 1 1 rg 0 0 595 842 re f');
     addPdfText('RollerKluster Campaign Report', 48, 806, 12, true, [0.08, 0.08, 0.08]);
-    addPdfText(new Date().toLocaleDateString(), 470, 806, 9, false, [0.42, 0.42, 0.42]);
+    addPdfText(formatDate(new Date().toISOString()), 470, 806, 9, false, [0.42, 0.42, 0.42]);
     addRaw(`0.90 0.90 0.90 RG ${marginX} 784 m ${pageWidth - marginX} 784 l S`);
     cursorY = 748;
   };

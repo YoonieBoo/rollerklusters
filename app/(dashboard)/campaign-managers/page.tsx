@@ -85,7 +85,7 @@ const formatDate = (date: string | null | undefined) => {
     return 'N/A';
   }
 
-  return parsedDate.toLocaleDateString();
+  return parsedDate.getDate() + '/' + (parsedDate.getMonth() + 1) + '/' + parsedDate.getFullYear();
 };
 
 const getDateClusterLabel = (date: string | null | undefined) => {

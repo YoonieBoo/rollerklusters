@@ -20,6 +20,7 @@ type CreatorProfile = {
   creator_name?: string | null;
   social_handle?: string | null;
   platform?: string | null;
+  university_program?: string | null;
   manual_follower_count?: number | string | null;
   follower_count?: number | string | null;
   creator_rank?: string | number | null;
@@ -45,6 +46,7 @@ type UserProfile = {
 type CreatorSignup = {
   email?: string | null;
   display_name?: string | null;
+  university_program?: string | null;
   instagram_handle?: string | null;
   tiktok_handle?: string | null;
   scholarship_student?: boolean | string | null;
@@ -56,7 +58,7 @@ type CreatorSignup = {
 
 const CREATORS_REFRESH_INTERVAL_MS = 15000;
 
-const toText = (value: unknown) => {
+const toText = (value: unknown): string => {
   if (typeof value === 'string') {
     return value;
   }
@@ -167,7 +169,7 @@ const formatDate = (date: string | null | undefined) => {
     return 'N/A';
   }
 
-  return parsedDate.toLocaleDateString();
+  return parsedDate.getDate() + '/' + (parsedDate.getMonth() + 1) + '/' + parsedDate.getFullYear();
 };
 
 const getDateClusterLabel = (date: string | null | undefined) => {
@@ -238,6 +240,16 @@ const getCreatorInterest = (creator: CreatorProfile) =>
       'primaryCreativeFocus',
     ])
   );
+
+const getCreatorProgram = (creator: CreatorProfile) =>
+  toText(
+    getFirstValue(creator, [
+      'university_program',
+      'universityProgram',
+      'program',
+      'major',
+    ])
+  ).trim() || 'N/A';
 
 const CreatorMetric = ({ label, value }: { label: string; value: string }) => (
   <div className="min-w-0">
@@ -352,6 +364,12 @@ const enrichCreatorsWithSubmittedFields = (
       creator.is_scholarship_student ??
       (signup ? getScholarshipStudentValue(signup) : null);
     const lineId = toText(creator.line_id).trim() || toText(signup?.line_id).trim();
+    const universityProgram =
+      toText(creator.university_program).trim() ||
+      toText(creator.universityProgram).trim() ||
+      toText(creator.program).trim() ||
+      toText(signup?.university_program).trim() ||
+      null;
     const interestedContentTypes =
       creator.interested_content_types ??
       creator.interestedContentTypes ??
@@ -363,6 +381,7 @@ const enrichCreatorsWithSubmittedFields = (
       ...creator,
       scholarship_student: scholarshipStudent,
       line_id: lineId || null,
+      university_program: universityProgram,
       interested_content_types: interestedContentTypes,
     };
   });
@@ -524,6 +543,10 @@ export default function CreatorsPage() {
                             value={formatLabel(creator.creator_rank)}
                           />
                           <CreatorMetric
+                            label="Program"
+                            value={getCreatorProgram(creator)}
+                          />
+                          <CreatorMetric
                             label="Consistency"
                             value={getCreatorConsistency(creator)}
                           />
@@ -552,6 +575,7 @@ export default function CreatorsPage() {
                         <TableHead className="py-2">Creator</TableHead>
                         <TableHead className="py-2">Platform</TableHead>
                         <TableHead className="py-2">Social handle</TableHead>
+                        <TableHead className="py-2">Program</TableHead>
                         <TableHead className="py-2">Followers</TableHead>
                         <TableHead className="py-2">Rank</TableHead>
                         <TableHead className="py-2">Consistency</TableHead>
@@ -577,6 +601,9 @@ export default function CreatorsPage() {
                             </TableCell>
                             <TableCell className="py-2 text-muted-foreground">
                               {toText(creator.social_handle).trim() || 'N/A'}
+                            </TableCell>
+                            <TableCell className="max-w-56 whitespace-normal break-words py-2 text-muted-foreground">
+                              {getCreatorProgram(creator)}
                             </TableCell>
                             <TableCell className="py-2 text-muted-foreground">
                               {formatFollowers(creator)}

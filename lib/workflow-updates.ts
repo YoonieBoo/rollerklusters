@@ -36,7 +36,7 @@ export const formatWorkflowUpdateDate = (date: string | null) => {
     return '';
   }
 
-  return parsedDate.toLocaleDateString();
+  return parsedDate.getDate() + '/' + (parsedDate.getMonth() + 1) + '/' + parsedDate.getFullYear();
 };
 
 export const getWorkflowUpdateDestination = (update: WorkflowUpdate) => {

@@ -215,7 +215,7 @@ const formatDate = (date: string | null) => {
     return 'N/A';
   }
 
-  return parsedDate.toLocaleDateString();
+  return parsedDate.getDate() + '/' + (parsedDate.getMonth() + 1) + '/' + parsedDate.getFullYear();
 };
 
 const formatCampaignDate = (date: string | null) => {
@@ -236,11 +236,7 @@ const formatCampaignDate = (date: string | null) => {
     return '';
   }
 
-  return new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(parsedDate);
+  return parsedDate.getDate() + '/' + (parsedDate.getMonth() + 1) + '/' + parsedDate.getFullYear();
 };
 
 const buildCampaignTimeline = (campaign: CampaignRow | undefined) => {

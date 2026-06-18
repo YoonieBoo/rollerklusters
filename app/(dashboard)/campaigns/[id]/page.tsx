@@ -69,7 +69,7 @@ const formatDate = (date: string | null) => {
     return 'N/A';
   }
 
-  return parsedDate.toLocaleDateString();
+  return parsedDate.getDate() + '/' + (parsedDate.getMonth() + 1) + '/' + parsedDate.getFullYear();
 };
 
 const getBriefStatus = (brief: SupabaseRow | null) => {

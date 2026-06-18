@@ -76,7 +76,7 @@ export const formatDate = (date: string | null) => {
     return 'N/A';
   }
 
-  return parsedDate.toLocaleDateString();
+  return parsedDate.getDate() + '/' + (parsedDate.getMonth() + 1) + '/' + parsedDate.getFullYear();
 };
 
 export const getFirstText = (row: SupabaseRow | null, keys: string[]) => {
@@ -501,7 +501,7 @@ export const createCampaignReportPdf = ({
       gap: 12,
     });
 
-    const generatedDate = new Date().toLocaleDateString();
+    const generatedDate = formatDate(new Date().toISOString());
     const metadata = [
       ['Client', report.clientName],
       ['Status', campaignStatus.replace(/_/g, ' ') || report.status || 'draft'],
