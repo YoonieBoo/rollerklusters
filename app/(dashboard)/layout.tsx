@@ -29,8 +29,8 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/campaigns', label: 'Campaigns', icon: FolderOpen },
   { href: '/creators', label: 'Onboarded Creators', icon: Users },
-  { href: '/creator-signups', label: 'Total Signups', icon: UserPlus },
   { href: '/campaign-managers', label: 'Campaign Managers', icon: UserCog },
+  { href: '/creator-signups', label: 'Creator Signups', icon: UserPlus },
   { href: '/briefs', label: 'Briefs', icon: FileText },
   { href: '/reviews', label: 'Reviews', icon: CheckSquare },
 ];
@@ -536,11 +536,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   {item.href === '/creators' && creatorCount > 0 && (
                     <span className="flex h-5 min-w-5 max-w-16 items-center justify-center rounded-full bg-blue-700 px-1.5 text-[10px] font-semibold leading-none text-white tabular-nums">
                       {creatorCount.toLocaleString()}
-                    </span>
-                  )}
-                  {item.href === '/creator-signups' && signupCount > 0 && (
-                    <span className="flex h-5 min-w-5 max-w-16 items-center justify-center rounded-full bg-blue-700 px-1.5 text-[10px] font-semibold leading-none text-white tabular-nums">
-                      {signupCount.toLocaleString()}
                     </span>
                   )}
                   {item.href === '/campaign-managers' && campaignManagerCount > 0 && (

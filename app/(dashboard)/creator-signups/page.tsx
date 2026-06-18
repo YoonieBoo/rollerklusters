@@ -270,8 +270,13 @@ export default function CreatorSignupsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
+      <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold text-foreground">Creator Signups</h1>
+        {!isLoading && !errorMessage && (
+          <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-blue-700 px-2.5 text-sm font-semibold leading-none text-white tabular-nums">
+            {signups.length.toLocaleString()}
+          </span>
+        )}
       </div>
 
       {isLoading ? (
