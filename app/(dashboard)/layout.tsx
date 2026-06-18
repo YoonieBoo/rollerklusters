@@ -14,6 +14,7 @@ import {
   CheckSquare,
   Users,
   UserPlus,
+  UserCog,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
@@ -29,6 +30,7 @@ const navItems = [
   { href: '/campaigns', label: 'Campaigns', icon: FolderOpen },
   { href: '/creators', label: 'Onboarded Creators', icon: Users },
   { href: '/creator-signups', label: 'Signups', icon: UserPlus },
+  { href: '/campaign-managers', label: 'Campaign Managers', icon: UserCog },
   { href: '/briefs', label: 'Briefs', icon: FileText },
   { href: '/reviews', label: 'Reviews', icon: CheckSquare },
 ];
@@ -37,6 +39,8 @@ const SIGNUP_COUNT_REFRESH_INTERVAL_MS = 15000;
 const SIGNUP_COUNT_PAGE_SIZE = 1000;
 const CREATOR_COUNT_REFRESH_INTERVAL_MS = 15000;
 const CREATOR_COUNT_PAGE_SIZE = 1000;
+const CAMPAIGN_MANAGER_COUNT_REFRESH_INTERVAL_MS = 15000;
+const CAMPAIGN_MANAGER_COUNT_PAGE_SIZE = 1000;
 
 type SupabaseRow = Record<string, unknown>;
 
@@ -76,6 +80,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
   const [creatorCount, setCreatorCount] = useState(0);
   const [signupCount, setSignupCount] = useState(0);
+  const [campaignManagerCount, setCampaignManagerCount] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -252,9 +257,64 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
   };
 
+  const isCampaignManagerSignup = (signup: SupabaseRow) => {
+    const roleText = [
+      signup.signup_type,
+      signup.role_label,
+      signup.primary_creative_focus,
+    ]
+      .map(toText)
+      .join(' ')
+      .toLowerCase();
+
+    return (
+      roleText.includes('campaign-manager') ||
+      roleText.includes('campaign manager')
+    );
+  };
+
+  const fetchCampaignManagerCount = async () => {
+    if (!user) {
+      setCampaignManagerCount(0);
+      return;
+    }
+
+    try {
+      const campaignManagers: SupabaseRow[] = [];
+
+      for (let page = 0; ; page += 1) {
+        const from = page * CAMPAIGN_MANAGER_COUNT_PAGE_SIZE;
+        const to = from + CAMPAIGN_MANAGER_COUNT_PAGE_SIZE - 1;
+        const { data, error } = await supabase
+          .from('creator_signups')
+          .select('id, signup_type, role_label, primary_creative_focus')
+          .range(from, to);
+
+        if (error) {
+          console.error('Campaign manager signup count fetch error:', error);
+          setCampaignManagerCount(0);
+          return;
+        }
+
+        const pageRows = (data ?? []) as SupabaseRow[];
+        campaignManagers.push(...pageRows.filter(isCampaignManagerSignup));
+
+        if (pageRows.length < CAMPAIGN_MANAGER_COUNT_PAGE_SIZE) {
+          break;
+        }
+      }
+
+      setCampaignManagerCount(campaignManagers.length);
+    } catch (error) {
+      console.error('Campaign manager signup count fetch issue:', error);
+      setCampaignManagerCount(0);
+    }
+  };
+
   useEffect(() => {
     fetchCreatorCount();
     fetchSignupCount();
+    fetchCampaignManagerCount();
   }, [pathname, user]);
 
   useEffect(() => {
@@ -290,6 +350,43 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       window.clearInterval(intervalId);
       window.removeEventListener('focus', refreshVisibleCreatorCount);
       document.removeEventListener('visibilitychange', refreshVisibleCreatorCount);
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const refreshVisibleCampaignManagerCount = () => {
+      if (document.visibilityState === 'visible') {
+        fetchCampaignManagerCount();
+      }
+    };
+
+    const intervalId = window.setInterval(
+      refreshVisibleCampaignManagerCount,
+      CAMPAIGN_MANAGER_COUNT_REFRESH_INTERVAL_MS
+    );
+    window.addEventListener('focus', refreshVisibleCampaignManagerCount);
+    document.addEventListener('visibilitychange', refreshVisibleCampaignManagerCount);
+
+    const channel = supabase
+      .channel('campaign-manager-signups-count')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'creator_signups' },
+        () => {
+          fetchCampaignManagerCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshVisibleCampaignManagerCount);
+      document.removeEventListener('visibilitychange', refreshVisibleCampaignManagerCount);
       supabase.removeChannel(channel);
     };
   }, [user]);
@@ -444,6 +541,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   {item.href === '/creator-signups' && signupCount > 0 && (
                     <span className="flex h-5 min-w-5 max-w-16 items-center justify-center rounded-full bg-blue-700 px-1.5 text-[10px] font-semibold leading-none text-white tabular-nums">
                       {signupCount.toLocaleString()}
+                    </span>
+                  )}
+                  {item.href === '/campaign-managers' && campaignManagerCount > 0 && (
+                    <span className="flex h-5 min-w-5 max-w-16 items-center justify-center rounded-full bg-blue-700 px-1.5 text-[10px] font-semibold leading-none text-white tabular-nums">
+                      {campaignManagerCount.toLocaleString()}
                     </span>
                   )}
                 </button>
