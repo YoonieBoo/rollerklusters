@@ -241,15 +241,36 @@ const getCreatorInterest = (creator: CreatorProfile) =>
     ])
   );
 
-const getCreatorProgram = (creator: CreatorProfile) =>
-  toText(
+const getCreatorFaculty = (creator: CreatorProfile) => {
+  const programText = toText(
     getFirstValue(creator, [
       'university_program',
       'universityProgram',
       'program',
       'major',
     ])
-  ).trim() || 'N/A';
+  ).trim();
+
+  if (!programText) {
+    return 'N/A';
+  }
+
+  const knownFacultyMatch = programText.match(
+    /\b(msme|communication arts|comm arts|bba|arts|business)\b/i
+  );
+
+  if (knownFacultyMatch) {
+    return formatLabel(knownFacultyMatch[1]);
+  }
+
+  const facultyParts = programText
+    .split(/[\/,|]+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => !/^(assumption university|abac|au)$/i.test(part));
+
+  return facultyParts[0] || programText;
+};
 
 const CreatorMetric = ({ label, value }: { label: string; value: string }) => (
   <div className="min-w-0">
@@ -541,8 +562,8 @@ export default function CreatorsPage() {
                             value={formatLabel(creator.creator_rank)}
                           />
                           <CreatorMetric
-                            label="Program"
-                            value={getCreatorProgram(creator)}
+                            label="Faculty"
+                            value={getCreatorFaculty(creator)}
                           />
                           <CreatorMetric
                             label="Consistency"
@@ -569,7 +590,7 @@ export default function CreatorsPage() {
                         <TableHead className="py-2">Creator</TableHead>
                         <TableHead className="py-2">Platform</TableHead>
                         <TableHead className="py-2">Social handle</TableHead>
-                        <TableHead className="py-2">Program</TableHead>
+                        <TableHead className="py-2">Faculty</TableHead>
                         <TableHead className="py-2">Followers</TableHead>
                         <TableHead className="py-2">Rank</TableHead>
                         <TableHead className="py-2">Consistency</TableHead>
@@ -596,7 +617,7 @@ export default function CreatorsPage() {
                               {toText(creator.social_handle).trim() || 'N/A'}
                             </TableCell>
                             <TableCell className="max-w-56 whitespace-normal break-words py-2 text-muted-foreground">
-                              {getCreatorProgram(creator)}
+                              {getCreatorFaculty(creator)}
                             </TableCell>
                             <TableCell className="py-2 text-muted-foreground">
                               {formatFollowers(creator)}
