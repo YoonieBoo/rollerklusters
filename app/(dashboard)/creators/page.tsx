@@ -28,6 +28,8 @@ type CreatorProfile = {
   scholarship_student?: boolean | string | null;
   is_scholarship_student?: boolean | string | null;
   line_id?: string | null;
+  interested_content_types?: unknown;
+  primary_creative_focus?: unknown;
   additional_notes?: unknown;
   created_at?: string | null;
   [key: string]: unknown;
@@ -47,6 +49,8 @@ type CreatorSignup = {
   tiktok_handle?: string | null;
   scholarship_student?: boolean | string | null;
   line_id?: string | null;
+  interested_content_types?: unknown;
+  primary_creative_focus?: unknown;
   additional_notes?: unknown;
 };
 
@@ -59,6 +63,17 @@ const toText = (value: unknown) => {
 
   if (typeof value === 'number' || typeof value === 'boolean') {
     return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(toText).filter(Boolean).join(', ');
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>)
+      .map(toText)
+      .filter(Boolean)
+      .join(', ');
   }
 
   return '';
@@ -80,23 +95,6 @@ const formatLabel = (value: unknown, fallback = 'N/A') => {
 
 const formatFollowers = (creator: CreatorProfile) => {
   const value = creator.manual_follower_count ?? creator.follower_count;
-  const text = toText(value).trim();
-
-  if (!text) {
-    return 'N/A';
-  }
-
-  const numericValue =
-    typeof value === 'number' ? value : Number(text.replace(/,/g, ''));
-
-  if (Number.isNaN(numericValue)) {
-    return text;
-  }
-
-  return new Intl.NumberFormat().format(numericValue);
-};
-
-const formatNumberValue = (value: unknown) => {
   const text = toText(value).trim();
 
   if (!text) {
@@ -227,23 +225,17 @@ const getCreatorConsistency = (creator: CreatorProfile) =>
     ])
   );
 
-const getCreatorVideoCount = (creator: CreatorProfile) =>
-  formatNumberValue(
+const getCreatorInterest = (creator: CreatorProfile) =>
+  formatLabel(
     getFirstValue(creator, [
-      'video_count',
-      'videoCount',
-      'video_counts',
-      'videoCounts',
-      'videos_count',
-      'videosCount',
-      'total_videos',
-      'totalVideos',
-      'content_count',
-      'contentCount',
-      'post_count',
-      'postCount',
-      'posts_count',
-      'postsCount',
+      'interested_content_types',
+      'interestedContentTypes',
+      'content_interests',
+      'contentInterests',
+      'interests',
+      'interest',
+      'primary_creative_focus',
+      'primaryCreativeFocus',
     ])
   );
 
@@ -360,11 +352,18 @@ const enrichCreatorsWithSubmittedFields = (
       creator.is_scholarship_student ??
       (signup ? getScholarshipStudentValue(signup) : null);
     const lineId = toText(creator.line_id).trim() || toText(signup?.line_id).trim();
+    const interestedContentTypes =
+      creator.interested_content_types ??
+      creator.interestedContentTypes ??
+      signup?.interested_content_types ??
+      signup?.primary_creative_focus ??
+      null;
 
     return {
       ...creator,
       scholarship_student: scholarshipStudent,
       line_id: lineId || null,
+      interested_content_types: interestedContentTypes,
     };
   });
 };
@@ -529,8 +528,8 @@ export default function CreatorsPage() {
                             value={getCreatorConsistency(creator)}
                           />
                           <CreatorMetric
-                            label="Videos"
-                            value={getCreatorVideoCount(creator)}
+                            label="Interest"
+                            value={getCreatorInterest(creator)}
                           />
                           <CreatorMetric
                             label="Scholarship"
@@ -556,7 +555,7 @@ export default function CreatorsPage() {
                         <TableHead className="py-2">Followers</TableHead>
                         <TableHead className="py-2">Rank</TableHead>
                         <TableHead className="py-2">Consistency</TableHead>
-                        <TableHead className="py-2">Video Count</TableHead>
+                        <TableHead className="py-2">Interest</TableHead>
                         <TableHead className="py-2">Scholarship Student</TableHead>
                         <TableHead className="py-2">Line ID</TableHead>
                       </TableRow>
@@ -588,8 +587,8 @@ export default function CreatorsPage() {
                             <TableCell className="py-2 text-muted-foreground">
                               {getCreatorConsistency(creator)}
                             </TableCell>
-                            <TableCell className="py-2 text-muted-foreground">
-                              {getCreatorVideoCount(creator)}
+                            <TableCell className="max-w-56 whitespace-normal break-words py-2 text-muted-foreground">
+                              {getCreatorInterest(creator)}
                             </TableCell>
                             <TableCell className="py-2 text-muted-foreground">
                               {formatScholarshipStudent(creator)}
