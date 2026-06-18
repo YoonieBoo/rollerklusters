@@ -29,7 +29,7 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/campaigns', label: 'Campaigns', icon: FolderOpen },
   { href: '/creators', label: 'Onboarded Creators', icon: Users },
-  { href: '/creator-signups', label: 'Signups', icon: UserPlus },
+  { href: '/creator-signups', label: 'Total Signups', icon: UserPlus },
   { href: '/campaign-managers', label: 'Campaign Managers', icon: UserCog },
   { href: '/briefs', label: 'Briefs', icon: FileText },
   { href: '/reviews', label: 'Reviews', icon: CheckSquare },
