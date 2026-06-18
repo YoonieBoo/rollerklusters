@@ -363,12 +363,11 @@ const enrichCreatorsWithSubmittedFields = (
       creator.scholarship_student ??
       creator.is_scholarship_student ??
       (signup ? getScholarshipStudentValue(signup) : null);
-    const lineId = toText(creator.line_id).trim() || toText(signup?.line_id).trim();
     const universityProgram =
+      toText(signup?.university_program).trim() ||
       toText(creator.university_program).trim() ||
       toText(creator.universityProgram).trim() ||
       toText(creator.program).trim() ||
-      toText(signup?.university_program).trim() ||
       null;
     const interestedContentTypes =
       creator.interested_content_types ??
@@ -380,7 +379,6 @@ const enrichCreatorsWithSubmittedFields = (
     return {
       ...creator,
       scholarship_student: scholarshipStudent,
-      line_id: lineId || null,
       university_program: universityProgram,
       interested_content_types: interestedContentTypes,
     };
@@ -558,10 +556,6 @@ export default function CreatorsPage() {
                             label="Scholarship"
                             value={formatScholarshipStudent(creator)}
                           />
-                          <CreatorMetric
-                            label="Line ID"
-                            value={toText(creator.line_id).trim() || 'N/A'}
-                          />
                         </div>
                       </div>
                     ))}
@@ -581,7 +575,6 @@ export default function CreatorsPage() {
                         <TableHead className="py-2">Consistency</TableHead>
                         <TableHead className="py-2">Interest</TableHead>
                         <TableHead className="py-2">Scholarship Student</TableHead>
-                        <TableHead className="py-2">Line ID</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -619,9 +612,6 @@ export default function CreatorsPage() {
                             </TableCell>
                             <TableCell className="py-2 text-muted-foreground">
                               {formatScholarshipStudent(creator)}
-                            </TableCell>
-                            <TableCell className="py-2 text-muted-foreground">
-                              {toText(creator.line_id).trim() || 'N/A'}
                             </TableCell>
                           </TableRow>
                         ))}
