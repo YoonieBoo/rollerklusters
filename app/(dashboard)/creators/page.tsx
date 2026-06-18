@@ -30,6 +30,8 @@ type CreatorProfile = {
   scholarship_student?: boolean | string | null;
   is_scholarship_student?: boolean | string | null;
   line_id?: string | null;
+  content_categories?: unknown;
+  content_types?: unknown;
   interested_content_types?: unknown;
   primary_creative_focus?: unknown;
   additional_notes?: unknown;
@@ -233,6 +235,10 @@ const getCreatorInterest = (creator: CreatorProfile) =>
     getFirstValue(creator, [
       'interested_content_types',
       'interestedContentTypes',
+      'content_categories',
+      'contentCategories',
+      'content_types',
+      'contentTypes',
       'content_interests',
       'contentInterests',
       'interests',
@@ -377,6 +383,10 @@ const enrichCreatorsWithSubmittedFields = (
       toText(creator.facultyName).trim() ||
       null;
     const interestedContentTypes =
+      creator.content_categories ??
+      creator.contentCategories ??
+      creator.content_types ??
+      creator.contentTypes ??
       creator.interested_content_types ??
       creator.interestedContentTypes ??
       signup?.interested_content_types ??
