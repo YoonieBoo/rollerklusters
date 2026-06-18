@@ -54,6 +54,7 @@ type ReviewSubmission = {
   submittedAt: string | null;
   reviewedAt: string | null;
   feedback: string;
+  note: string;
 };
 
 const StatusBadge = ({ status }: { status: string }) => {
@@ -196,6 +197,25 @@ const getYouTubeEmbedUrl = (link: string) => {
   return '';
 };
 
+const getYouTubeThumbnailUrl = (link: string) => {
+  try {
+    const url = new URL(link);
+    let videoId = '';
+
+    if (url.hostname.includes('youtu.be')) {
+      videoId = url.pathname.replace('/', '');
+    }
+
+    if (url.hostname.includes('youtube.com')) {
+      videoId = url.searchParams.get('v') ?? '';
+    }
+
+    return videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : '';
+  } catch {
+    return '';
+  }
+};
+
 const getPreviewKind = (link: string) => {
   const normalizedLink = link.toLowerCase();
 
@@ -212,6 +232,14 @@ const getPreviewKind = (link: string) => {
   }
 
   return 'link';
+};
+
+const getLinkHost = (link: string) => {
+  try {
+    return new URL(link).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
 };
 
 export default function ReviewsPage() {
@@ -391,6 +419,7 @@ export default function ReviewsPage() {
         submittedAt: toDateValue(submission.submitted_at),
         reviewedAt,
         feedback: latestFeedback || toText(latestReview?.feedback_notes),
+        note: toText(submission.note),
       };
     });
   }, [campaigns, submissions, reviews, creatorProfiles]);
@@ -454,8 +483,11 @@ export default function ReviewsPage() {
   const selectedPreviewKind = selectedSubmission
     ? getPreviewKind(selectedSubmission.submissionLink)
     : 'link';
-  const selectedYouTubeEmbedUrl = selectedSubmission
-    ? getYouTubeEmbedUrl(selectedSubmission.submissionLink)
+  const selectedYouTubeThumbnailUrl = selectedSubmission
+    ? getYouTubeThumbnailUrl(selectedSubmission.submissionLink)
+    : '';
+  const selectedLinkHost = selectedSubmission
+    ? getLinkHost(selectedSubmission.submissionLink)
     : '';
   const selectedSubmissionStatus = selectedSubmission?.status ?? 'pending';
   const isSelectedApproved = selectedSubmissionStatus === 'approved';
@@ -758,73 +790,74 @@ export default function ReviewsPage() {
               </SheetHeader>
 
               <div className="space-y-4 px-5 py-4">
-                <div className="overflow-hidden rounded-2xl border border-border bg-card/50">
-                  {selectedPreviewKind === 'youtube' && selectedYouTubeEmbedUrl ? (
-                    <iframe
-                      title="Creator submission preview"
-                      src={selectedYouTubeEmbedUrl}
-                      className="aspect-video w-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  ) : selectedPreviewKind === 'image' ? (
-                    <img
-                      src={selectedSubmission.submissionLink}
-                      alt="Creator submission preview"
-                      className="max-h-[520px] w-full object-cover"
-                    />
-                  ) : selectedPreviewKind === 'video' ? (
-                    <video
-                      src={selectedSubmission.submissionLink}
-                      controls
-                      className="max-h-[520px] w-full bg-black"
-                    />
-                  ) : (
-                    <a
-                      href={selectedSubmission.submissionLink || undefined}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`block p-5 transition ${
-                        selectedSubmission.submissionLink
-                          ? 'hover:bg-muted/30'
-                          : 'pointer-events-none opacity-70'
-                      }`}
-                    >
-                      <div className="flex min-h-56 flex-col items-center justify-center text-center">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                          <Play size={26} fill="currentColor" />
+                <a
+                  href={selectedSubmission.submissionLink || undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`group block overflow-hidden rounded-2xl border border-border bg-card/50 transition ${
+                    selectedSubmission.submissionLink
+                      ? 'hover:border-primary/40 hover:bg-muted/30'
+                      : 'pointer-events-none opacity-70'
+                  }`}
+                >
+                  <div className="grid gap-0 sm:grid-cols-[15rem_1fr]">
+                    <div className="relative aspect-video overflow-hidden bg-muted">
+                      {selectedPreviewKind === 'image' ? (
+                        <img
+                          src={selectedSubmission.submissionLink}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : selectedPreviewKind === 'youtube' && selectedYouTubeThumbnailUrl ? (
+                        <img
+                          src={selectedYouTubeThumbnailUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : selectedPreviewKind === 'video' ? (
+                        <video
+                          src={selectedSubmission.submissionLink}
+                          className="h-full w-full bg-black object-cover"
+                          muted
+                          playsInline
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-blue-50 text-primary">
+                          <Play size={30} fill="currentColor" />
                         </div>
-                        <p className="mt-5 text-xl font-semibold">
-                          {selectedSubmission.submissionLink
-                            ? `Open ${selectedPlatform} preview`
-                            : 'No content link provided'}
-                        </p>
-                        <p className="mt-3 max-w-lg break-all text-sm text-muted-foreground">
-                          {selectedSubmission.submissionLink || 'Waiting for a creator link'}
-                        </p>
-                        {selectedSubmission.submissionLink && (
-                          <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-sm">
-                            Open content <ExternalLink size={15} />
-                          </div>
-                        )}
+                      )}
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-100 transition group-hover:bg-black/20">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-primary shadow-sm">
+                          <Play size={20} fill="currentColor" />
+                        </span>
                       </div>
-                    </a>
-                  )}
-                </div>
+                    </div>
+                    <div className="min-w-0 p-4">
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {selectedLinkHost || selectedPlatform}
+                      </p>
+                      <p className="mt-1 text-lg font-semibold">
+                        {selectedSubmission.submissionLink
+                          ? `${selectedPlatform} preview`
+                          : 'No content link provided'}
+                      </p>
+                      <p className="mt-2 break-all text-sm text-muted-foreground">
+                        {selectedSubmission.submissionLink || 'Waiting for a creator link'}
+                      </p>
+                      {selectedSubmission.submissionLink && (
+                        <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1.5 text-sm">
+                          Open content <ExternalLink size={14} />
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </a>
 
-                <div className="grid gap-4 border-t border-border pt-4 sm:grid-cols-3">
-                  <div>
-                    <p className="text-sm font-medium">Caption</p>
-                    <p className="mt-2 text-sm text-muted-foreground">Check in preview.</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Hashtags</p>
-                    <p className="mt-2 text-sm text-muted-foreground">Check in preview.</p>
-                  </div>
+                <div className="border-t border-border pt-4">
                   <div>
                     <p className="text-sm font-medium">Notes</p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {selectedSubmission.feedback || 'None'}
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
+                      {selectedSubmission.note || 'None'}
                     </p>
                   </div>
                 </div>
