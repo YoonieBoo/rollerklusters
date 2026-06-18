@@ -80,10 +80,12 @@ interface MetricCardProps {
   icon: ReactNode;
   label: [string, string];
   value: number;
+  href: string;
 }
 
-const MetricCard = ({ icon, label, value }: MetricCardProps) => (
-  <Card className="p-5 bg-card hover:bg-blue-50/60 transition-colors border-border">
+const MetricCard = ({ icon, label, value, href }: MetricCardProps) => (
+  <Link href={href} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+    <Card className="h-full cursor-pointer p-5 bg-card hover:bg-blue-50/60 transition-colors border-border">
     <div className="flex min-h-28 flex-col justify-between gap-4">
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-medium uppercase leading-5 tracking-wide text-muted-foreground">
@@ -96,7 +98,8 @@ const MetricCard = ({ icon, label, value }: MetricCardProps) => (
       </div>
       <p className="text-3xl font-semibold leading-none text-foreground">{value}</p>
     </div>
-  </Card>
+    </Card>
+  </Link>
 );
 
 const toText = (value: unknown) => {
@@ -235,6 +238,7 @@ const isApproved = (row: SupabaseRow) => getReviewStatus(row) === 'approved';
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [userName, setUserName] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     campaigns: [],
     briefs: [],
@@ -246,6 +250,51 @@ export default function DashboardPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchUserName = async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData.session?.user;
+
+      if (!user) {
+        if (isMounted) {
+          setUserName(null);
+        }
+        return;
+      }
+
+      const metadataName =
+        toText(user.user_metadata?.display_name) ||
+        toText(user.user_metadata?.full_name);
+
+      const { data } = await supabase
+        .from('users')
+        .select('name, full_name')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!isMounted) {
+        return;
+      }
+
+      const profile = data as SupabaseRow | null;
+      setUserName(
+        toText(profile?.name) ||
+          toText(profile?.full_name) ||
+          metadataName ||
+          user.email?.split('@')[0] ||
+          null
+      );
+    };
+
+    fetchUserName();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -558,7 +607,7 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
         <p className="text-muted-foreground">
-          Welcome back! Here&apos;s an overview of your campaigns and activities.
+          Welcome{userName ? ` ${userName}` : ''}! Here&apos;s an overview of the campaigns and activities.
         </p>
       </div>
 
@@ -568,26 +617,31 @@ export default function DashboardPage() {
           icon={<FolderOpen size={24} />}
           label={['Active', 'Campaigns']}
           value={activeCampaignsCount}
+          href="/campaigns"
         />
         <MetricCard
           icon={<CheckCircle2 size={24} />}
           label={['Briefs', 'Completed']}
           value={completedBriefsCount}
+          href="/briefs"
         />
         <MetricCard
           icon={<BarChart3 size={24} />}
           label={['Submissions', 'Reviewed']}
           value={reviewedSubmissionsCount}
+          href="/reviews"
         />
         <MetricCard
           icon={<FileText size={24} />}
           label={['Approved', 'Content']}
           value={approvedItemsCount}
+          href="/reports"
         />
         <MetricCard
           icon={<Users size={24} />}
           label={['Onboarded', 'Creators']}
           value={onboardedCreatorsCount}
+          href="/creators"
         />
       </div>
 

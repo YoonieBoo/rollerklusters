@@ -23,9 +23,9 @@ import {
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/campaigns', label: 'Campaigns', icon: FolderOpen },
   { href: '/creators', label: 'Onboarded Creators', icon: Users },
   { href: '/campaign-managers', label: 'Campaign Managers', icon: UserCog },
+  { href: '/campaigns', label: 'Campaigns', icon: FolderOpen },
   { href: '/creator-signups', label: 'Creator Details', icon: UserPlus },
   { href: '/briefs', label: 'Briefs', icon: FileText },
   { href: '/reviews', label: 'Reviews', icon: CheckSquare },
