@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FileDown, MoreHorizontal, Plus, Search } from 'lucide-react';
+import { Bell, FileDown, Mail, MoreHorizontal, Plus, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -110,6 +110,20 @@ export default function CampaignsPage() {
   const [newClientName, setNewClientName] = useState('');
   const [newCampaignStartDate, setNewCampaignStartDate] = useState('');
   const [newCampaignEndDate, setNewCampaignEndDate] = useState('');
+
+  // Email invite state
+  const [inviteCampaign, setInviteCampaign] = useState<CampaignRow | null>(null);
+  const [inviteEmails, setInviteEmails] = useState('');
+  const [isSendingInvite, setIsSendingInvite] = useState(false);
+  const [inviteResult, setInviteResult] = useState<{ error?: string; success?: string } | null>(null);
+
+  // Push notification state
+  const [pushCampaign, setPushCampaign] = useState<CampaignRow | null>(null);
+  const [pushTitle, setPushTitle] = useState('');
+  const [pushMessage, setPushMessage] = useState('');
+  const [isSendingPush, setIsSendingPush] = useState(false);
+  const [pushSubscriberCount, setPushSubscriberCount] = useState<number | null>(null);
+  const [pushResult, setPushResult] = useState<{ error?: string; success?: string } | null>(null);
 
   const fetchCampaigns = async () => {
     setIsLoading(true);
@@ -364,6 +378,118 @@ export default function CampaignsPage() {
     setActionSuccess('Campaign deleted successfully');
   };
 
+  const openInviteDialog = (campaign: CampaignRow) => {
+    setActionError(null);
+    setActionSuccess(null);
+    setInviteCampaign(campaign);
+    setInviteEmails('');
+    setInviteResult(null);
+  };
+
+  const handleSendInvite = async () => {
+    if (!inviteCampaign) return;
+
+    const emailList = inviteEmails
+      .split(/[\n,]+/)
+      .map((e) => e.trim())
+      .filter(Boolean);
+
+    if (emailList.length === 0) {
+      setInviteResult({ error: 'Enter at least one email address.' });
+      return;
+    }
+
+    setIsSendingInvite(true);
+    setInviteResult(null);
+
+    try {
+      const res = await fetch('/api/send-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignId: inviteCampaign.id,
+          campaignName: inviteCampaign.name ?? 'Campaign',
+          clientName: inviteCampaign.client_name ?? '',
+          emails: emailList,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setInviteResult({ error: data.error ?? 'Failed to send invites.' });
+      } else {
+        setInviteResult({
+          success: `Sent ${data.sent} invite${data.sent === 1 ? '' : 's'}${data.failed > 0 ? ` (${data.failed} failed)` : ''}.`,
+        });
+      }
+    } catch {
+      setInviteResult({ error: 'Network error. Please try again.' });
+    } finally {
+      setIsSendingInvite(false);
+    }
+  };
+
+  const openPushDialog = async (campaign: CampaignRow) => {
+    setActionError(null);
+    setActionSuccess(null);
+    setPushCampaign(campaign);
+    setPushTitle(campaign.name ?? 'New update');
+    setPushMessage('');
+    setPushResult(null);
+    setPushSubscriberCount(null);
+
+    try {
+      const { count } = await supabase
+        .from('push_subscriptions')
+        .select('id', { count: 'exact', head: true })
+        .eq('campaign_id', campaign.id);
+      setPushSubscriberCount(count ?? 0);
+    } catch {
+      setPushSubscriberCount(0);
+    }
+  };
+
+  const handleSendPush = async () => {
+    if (!pushCampaign) return;
+
+    if (!pushTitle.trim()) {
+      setPushResult({ error: 'Title is required.' });
+      return;
+    }
+
+    setIsSendingPush(true);
+    setPushResult(null);
+
+    try {
+      const res = await fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignId: pushCampaign.id,
+          title: pushTitle.trim(),
+          message: pushMessage.trim(),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setPushResult({ error: data.error ?? 'Failed to send notification.' });
+      } else if (data.sent === 0) {
+        setPushResult({ error: 'No subscribers on this campaign yet.' });
+      } else {
+        setPushResult({
+          success: `Delivered to ${data.sent} device${data.sent === 1 ? '' : 's'}.`,
+        });
+      }
+    } catch {
+      setPushResult({ error: 'Network error. Please try again.' });
+    } finally {
+      setIsSendingPush(false);
+    }
+  };
+
   const handleExportCampaignReport = async (campaign: CampaignRow) => {
     setActionError(null);
     setActionSuccess(null);
@@ -566,6 +692,18 @@ export default function CampaignsPage() {
                           <FileDown size={14} />
                           {exportingCampaignId === campaign.id ? 'Exporting PDF...' : 'Export PDF'}
                         </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => { e.stopPropagation(); openInviteDialog(campaign); }}
+                        >
+                          <Mail size={14} />
+                          Send Brief Invite
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => { e.stopPropagation(); openPushDialog(campaign); }}
+                        >
+                          <Bell size={14} />
+                          Send Notification
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           variant="destructive"
@@ -757,6 +895,151 @@ export default function CampaignsPage() {
                 disabled={isDeleting}
               >
                 {isDeleting ? 'Deleting...' : 'Delete campaign'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send brief invite dialog */}
+      <Dialog
+        open={Boolean(inviteCampaign)}
+        onOpenChange={(open) => {
+          if (!isSendingInvite && !open) {
+            setInviteCampaign(null);
+            setInviteResult(null);
+          }
+        }}
+      >
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Send Brief Invite</DialogTitle>
+            <DialogDescription>
+              Send an email with a link to the creator brief for{' '}
+              <span className="font-medium text-foreground">
+                {inviteCampaign?.name ?? 'this campaign'}
+              </span>
+              .
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground block">
+                Recipient emails
+              </label>
+              <textarea
+                placeholder="creator@example.com&#10;another@example.com"
+                value={inviteEmails}
+                onChange={(e) => setInviteEmails(e.target.value)}
+                disabled={isSendingInvite}
+                rows={4}
+                className="w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none disabled:opacity-50"
+              />
+              <p className="text-xs text-muted-foreground">
+                One email per line, or comma-separated.
+              </p>
+            </div>
+            {inviteResult?.error && (
+              <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2">
+                <p className="text-sm text-red-500">{inviteResult.error}</p>
+              </div>
+            )}
+            {inviteResult?.success && (
+              <div className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2">
+                <p className="text-sm text-green-600">{inviteResult.success}</p>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => { setInviteCampaign(null); setInviteResult(null); }}
+                disabled={isSendingInvite}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSendInvite} disabled={isSendingInvite}>
+                {isSendingInvite ? 'Sending...' : 'Send Invite'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send push notification dialog */}
+      <Dialog
+        open={Boolean(pushCampaign)}
+        onOpenChange={(open) => {
+          if (!isSendingPush && !open) {
+            setPushCampaign(null);
+            setPushResult(null);
+          }
+        }}
+      >
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Send Push Notification</DialogTitle>
+            <DialogDescription>
+              Notify creators who enabled notifications for{' '}
+              <span className="font-medium text-foreground">
+                {pushCampaign?.name ?? 'this campaign'}
+              </span>
+              .{' '}
+              {pushSubscriberCount !== null && (
+                <span>
+                  {pushSubscriberCount === 0
+                    ? 'No subscribers yet.'
+                    : `${pushSubscriberCount} subscriber${pushSubscriberCount === 1 ? '' : 's'}.`}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground block">
+                Title
+              </label>
+              <input
+                type="text"
+                placeholder="New update on your brief"
+                value={pushTitle}
+                onChange={(e) => setPushTitle(e.target.value)}
+                disabled={isSendingPush}
+                className="w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground block">
+                Message
+              </label>
+              <textarea
+                placeholder="Your campaign brief has been updated."
+                value={pushMessage}
+                onChange={(e) => setPushMessage(e.target.value)}
+                disabled={isSendingPush}
+                rows={3}
+                className="w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none disabled:opacity-50"
+              />
+            </div>
+            {pushResult?.error && (
+              <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2">
+                <p className="text-sm text-red-500">{pushResult.error}</p>
+              </div>
+            )}
+            {pushResult?.success && (
+              <div className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2">
+                <p className="text-sm text-green-600">{pushResult.success}</p>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => { setPushCampaign(null); setPushResult(null); }}
+                disabled={isSendingPush}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSendPush} disabled={isSendingPush}>
+                {isSendingPush ? 'Sending...' : 'Send Notification'}
               </Button>
             </div>
           </div>

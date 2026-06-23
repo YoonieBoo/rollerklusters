@@ -2,12 +2,26 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { Bell, BellOff, BellRing } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   downloadCreatorBriefPdf,
   getCreatorBriefExportData,
   type CreatorBriefDocument,
 } from '@/lib/creator-brief-export';
+
+type PushState = 'idle' | 'loading' | 'subscribed' | 'unsupported';
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const output = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) {
+    output[i] = rawData.charCodeAt(i);
+  }
+  return output;
+}
 
 const Section = ({
   title,
@@ -52,6 +66,8 @@ export default function CreatorBriefPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pushState, setPushState] = useState<PushState>('idle');
+  const [pushError, setPushError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchBrief = async () => {
@@ -79,6 +95,88 @@ export default function CreatorBriefPage() {
 
     fetchBrief();
   }, [campaignId]);
+
+  useEffect(() => {
+    if (!campaignId || typeof window === 'undefined') return;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setPushState('unsupported');
+      return;
+    }
+    navigator.serviceWorker
+      .getRegistration('/sw.js')
+      .then((reg) => reg?.pushManager.getSubscription())
+      .then((sub) => { if (sub) setPushState('subscribed'); })
+      .catch(() => {});
+  }, [campaignId]);
+
+  const handleTogglePush = async () => {
+    if (!campaignId) return;
+
+    if (pushState === 'subscribed') {
+      setPushState('loading');
+      try {
+        const reg = await navigator.serviceWorker.getRegistration('/sw.js');
+        const sub = await reg?.pushManager.getSubscription();
+        if (sub) {
+          await fetch('/api/push/subscribe', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+          await sub.unsubscribe();
+        }
+        setPushState('idle');
+        setPushError(null);
+      } catch {
+        setPushState('subscribed');
+        setPushError('Could not disable notifications.');
+      }
+      return;
+    }
+
+    setPushState('loading');
+    setPushError(null);
+
+    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (!vapidKey) {
+      setPushState('unsupported');
+      setPushError('Push notifications are not configured.');
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        setPushState('idle');
+        setPushError('Permission denied. You can enable notifications in your browser settings.');
+        return;
+      }
+
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      });
+
+      const res = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId, subscription: sub }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? 'Failed to save subscription.');
+      }
+
+      setPushState('subscribed');
+    } catch (err) {
+      setPushState('idle');
+      setPushError(err instanceof Error ? err.message : 'Failed to enable notifications.');
+    }
+  };
 
   const handleExportPdf = async () => {
     if (!brief) {
@@ -147,14 +245,35 @@ export default function CreatorBriefPage() {
               </div>
             </div>
           </div>
-          <Button
-            variant="outline"
-            className="shrink-0"
-            onClick={handleExportPdf}
-            disabled={isExporting}
-          >
-            {isExporting ? 'Exporting...' : 'Export PDF'}
-          </Button>
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <Button
+              variant="outline"
+              onClick={handleExportPdf}
+              disabled={isExporting}
+            >
+              {isExporting ? 'Exporting...' : 'Export PDF'}
+            </Button>
+            {pushState !== 'unsupported' && (
+              <Button
+                variant={pushState === 'subscribed' ? 'outline' : 'default'}
+                size="sm"
+                onClick={handleTogglePush}
+                disabled={pushState === 'loading'}
+                className="gap-1.5"
+              >
+                {pushState === 'subscribed' ? (
+                  <><BellOff size={14} /> Notifications on</>
+                ) : pushState === 'loading' ? (
+                  <><Bell size={14} /> Please wait...</>
+                ) : (
+                  <><BellRing size={14} /> Enable Notifications</>
+                )}
+              </Button>
+            )}
+            {pushError && (
+              <p className="text-xs text-red-600 max-w-48 text-right">{pushError}</p>
+            )}
+          </div>
         </div>
 
         <Section title="Campaign Goal">
