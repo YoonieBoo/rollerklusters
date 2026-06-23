@@ -76,17 +76,20 @@ function InvitesPageInner() {
     if (!campaignId) { setCreators([]); return; }
     if (showLoading) setCreatorsLoading(true);
 
-    const [{ data: profileData }, { data: sourcesData }, { data: signupsData }] =
+    // creator_profiles has an email column + user_id; users table has email by id
+    const [{ data: profileData }, { data: usersData }, { data: signupsData }] =
       await Promise.all([
-        supabase.from('creator_profiles').select('id, display_name, creator_name, social_handle, user_id, content_categories, content_types, interested_content_types, primary_creative_focus'),
-        supabase.from('creator_signup_profile_sources').select('id, email'),
-        supabase.from('creator_signups').select('email, instagram_handle, tiktok_handle, other_platforms'),
+        supabase.from('creator_profiles').select('id, email, display_name, creator_name, social_handle, user_id, content_categories, content_types, interested_content_types, primary_creative_focus'),
+        supabase.from('users').select('id, email'),
+        supabase.from('creator_signups').select('email, instagram_handle, tiktok_handle, display_name'),
       ]);
 
-    const emailByProfileId = new Map<string, string>(
-      (sourcesData ?? []).map((s) => [String(s.id ?? ''), String(s.email ?? '').trim().toLowerCase()])
+    // users table: id → email (public.users mirrors some auth users)
+    const emailByUserId = new Map<string, string>(
+      (usersData ?? []).map((u) => [String((u as Record<string, unknown>).id ?? ''), String((u as Record<string, unknown>).email ?? '').trim().toLowerCase()])
     );
 
+    // creator_signups: handle/name → email fallback
     const emailByHandle = new Map<string, string>();
     for (const s of (signupsData ?? [])) {
       const email = String((s as Record<string, unknown>).email ?? '').trim().toLowerCase();
@@ -94,7 +97,7 @@ function InvitesPageInner() {
       for (const h of [
         norm((s as Record<string, unknown>).instagram_handle),
         norm((s as Record<string, unknown>).tiktok_handle),
-        norm((s as Record<string, unknown>).other_platforms),
+        norm((s as Record<string, unknown>).display_name),
       ]) {
         if (h) emailByHandle.set(h, email);
       }
@@ -105,10 +108,13 @@ function InvitesPageInner() {
 
     for (const row of (profileData ?? []) as Record<string, unknown>[]) {
       const profileId = String(row.id ?? '');
-      const handle = norm(row.social_handle);
+      // Priority: creator_profiles.email → users table by user_id → signup handle match
       const email =
-        emailByProfileId.get(profileId) ||
-        (handle ? emailByHandle.get(handle) : '') ||
+        String(row.email ?? '').trim().toLowerCase() ||
+        emailByUserId.get(String(row.user_id ?? '')) ||
+        emailByHandle.get(norm(row.social_handle)) ||
+        emailByHandle.get(norm(row.display_name)) ||
+        emailByHandle.get(norm(row.creator_name)) ||
         '';
       if (!email || seenEmails.has(email)) continue;
       seenEmails.add(email);
