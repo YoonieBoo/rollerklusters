@@ -106,7 +106,8 @@ const isCampaignManagerSignup = (signup: CampaignManagerSignup) => {
 
   return (
     roleText.includes('campaign-manager') ||
-    roleText.includes('campaign manager')
+    roleText.includes('campaign manager') ||
+    roleText.includes('campaign_manager')
   );
 };
 
@@ -153,6 +154,7 @@ const sortSignups = (
 
 const fetchAllCampaignManagerSignups = async () => {
   const signups: CampaignManagerSignup[] = [];
+  const seenEmails = new Set<string>();
 
   for (let page = 0; ; page += 1) {
     const from = page * CAMPAIGN_MANAGERS_PAGE_SIZE;
@@ -168,15 +170,37 @@ const fetchAllCampaignManagerSignups = async () => {
     }
 
     const pageRows = (data ?? []) as CampaignManagerSignup[];
-    signups.push(...pageRows.filter(isCampaignManagerSignup));
+    for (const row of pageRows.filter(isCampaignManagerSignup)) {
+      const email = (row.email ?? '').trim().toLowerCase();
+      if (email) seenEmails.add(email);
+      signups.push(row);
+    }
 
     if (pageRows.length < CAMPAIGN_MANAGERS_PAGE_SIZE) {
-      return {
-        data: signups.sort(sortSignups),
-        error: null,
-      };
+      break;
     }
   }
+
+  // Also check creator_signup_profile_sources for auth-based signups not in creator_signups
+  const { data: sourceRows, error: sourceError } = await supabase
+    .from('creator_signup_profile_sources')
+    .select('*');
+
+  if (sourceError) {
+    return { data: null, error: sourceError };
+  }
+
+  for (const row of ((sourceRows ?? []) as CampaignManagerSignup[]).filter(isCampaignManagerSignup)) {
+    const email = (row.email ?? '').trim().toLowerCase();
+    if (!email || seenEmails.has(email)) continue;
+    seenEmails.add(email);
+    signups.push(row);
+  }
+
+  return {
+    data: signups.sort(sortSignups),
+    error: null,
+  };
 };
 
 export default function CampaignManagersPage() {
@@ -235,6 +259,13 @@ export default function CampaignManagersPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'creator_signups' },
+        () => {
+          fetchSignups(false);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'creator_profiles' },
         () => {
           fetchSignups(false);
         }
