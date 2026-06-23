@@ -15,6 +15,7 @@ type Campaign = {
 
 type InviteCreator = {
   id: string;
+  userId: string;
   name: string;
   email: string;
   handle: string;
@@ -87,6 +88,7 @@ function InvitesPageInner() {
       seenEmails.add(email);
       list.push({
         id: String(row.id ?? ''),
+        userId: String(row.user_id ?? ''),
         name:
           String(row.display_name ?? '').trim() ||
           String(row.creator_name ?? '').trim() ||
@@ -196,10 +198,30 @@ function InvitesPageInner() {
     setResult(null);
 
     try {
+      // Build payload — creators mode includes userId so the API can write engagements to Supabase
+      const creatorMap = new Map(creators.map((c) => [c.email, c]));
+      const payload =
+        mode === 'creators'
+          ? {
+              campaignId: selectedCampaignId,
+              campaignName: selectedCampaign?.name ?? '',
+              clientName: selectedCampaign?.client_name ?? '',
+              creators: emailList.map((email) => ({
+                id: creatorMap.get(email)?.userId ?? '',
+                email,
+              })),
+            }
+          : {
+              campaignId: selectedCampaignId,
+              campaignName: selectedCampaign?.name ?? '',
+              clientName: selectedCampaign?.client_name ?? '',
+              emails: emailList,
+            };
+
       const res = await fetch('/api/send-invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaignId: selectedCampaignId, emails: emailList }),
+        body: JSON.stringify(payload),
       });
 
       const json = await res.json();

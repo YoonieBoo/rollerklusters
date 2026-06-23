@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { supabaseAdmin } from '@/lib/supabase/server';
 
 function getSiteUrl() {
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
@@ -63,29 +64,35 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const { campaignId, campaignName, clientName, emails } = body as Record<string, unknown>;
+  const { campaignId, campaignName, clientName, emails, creators } = body as Record<string, unknown>;
 
-  if (
-    !campaignId ||
-    !campaignName ||
-    !Array.isArray(emails) ||
-    emails.length === 0
-  ) {
+  // Accept either a `creators` array (with ids) or a plain `emails` array
+  const creatorList = Array.isArray(creators)
+    ? (creators as { id: string; email: string }[])
+    : null;
+  const emailList: string[] = creatorList
+    ? creatorList.map((c) => c.email)
+    : Array.isArray(emails)
+    ? (emails as string[])
+    : [];
+
+  if (!campaignId || emailList.length === 0) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
   const briefUrl = `${getSiteUrl()}/creator-brief/${campaignId}`;
   const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
   const resend = new Resend(apiKey);
+  const resolvedCampaignName = String(campaignName ?? '');
 
   const results = await Promise.allSettled(
-    (emails as string[]).map((email) =>
+    emailList.map((email) =>
       resend.emails.send({
         from: `RollerKluster <${fromEmail}>`,
         to: email.trim(),
-        subject: `Creator brief: ${campaignName}`,
+        subject: resolvedCampaignName ? `Creator brief: ${resolvedCampaignName}` : 'You have a creator brief',
         html: buildInviteEmail({
-          campaignName: String(campaignName),
+          campaignName: resolvedCampaignName,
           clientName: String(clientName ?? ''),
           briefUrl,
         }),
@@ -105,6 +112,29 @@ export async function POST(request: NextRequest) {
       firstRejected?.reason?.toString() ??
       'Failed to send emails';
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+
+  // Write engagement records to Supabase so the ecosystem's Invites tab shows them.
+  // Non-fatal: if the table doesn't exist yet, log and continue.
+  if (creatorList && creatorList.length > 0) {
+    const rows = creatorList
+      .filter((c) => c.id)
+      .map((c) => ({
+        campaign_id: String(campaignId),
+        creator_id: c.id,
+        status: 'matched',
+        match_score: 82,
+      }));
+
+    if (rows.length > 0) {
+      const { error: engagementError } = await supabaseAdmin
+        .from('engagements')
+        .upsert(rows, { onConflict: 'campaign_id,creator_id', ignoreDuplicates: true });
+
+      if (engagementError) {
+        console.warn('Could not write engagements to Supabase (table may not exist yet):', engagementError.message);
+      }
+    }
   }
 
   return NextResponse.json({ sent, failed });
