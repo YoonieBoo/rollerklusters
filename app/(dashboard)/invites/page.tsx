@@ -21,25 +21,28 @@ type InviteCreator = {
   tags: string[];
 };
 
+const addArrayTags = (value: unknown, tags: Set<string>) => {
+  if (!value) return;
+  if (Array.isArray(value)) {
+    value.forEach((v) => { if (v && typeof v === 'string' && v.trim()) tags.add(v.trim()); });
+    return;
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((v) => { if (v && typeof v === 'string' && v.trim()) tags.add(v.trim()); });
+        return;
+      }
+    } catch { /* not json */ }
+  }
+};
+
 const extractCreatorTags = (row: Record<string, unknown>): string[] => {
   const tags = new Set<string>();
-  const addTags = (value: unknown) => {
-    if (!value) return;
-    if (Array.isArray(value)) { value.forEach((v) => addTags(v)); return; }
-    if (typeof value === 'string') {
-      try {
-        const parsed = JSON.parse(value);
-        if (Array.isArray(parsed)) { parsed.forEach((v) => addTags(v)); return; }
-      } catch { /* not json */ }
-      value.split(',').map((s) => s.trim()).filter(Boolean).forEach((t) => tags.add(t));
-      return;
-    }
-    if (typeof value === 'object') {
-      Object.values(value as Record<string, unknown>).forEach(addTags);
-    }
-  };
-  addTags(row.interested_content_types);
-  addTags(row.primary_creative_focus);
+  // Use the clean structured fields from creator_profiles
+  addArrayTags(row.content_categories, tags);
+  addArrayTags(row.content_types, tags);
   return Array.from(tags);
 };
 
@@ -90,36 +93,38 @@ function InvitesPageInner() {
     setSearch('');
     setResult(null);
 
-    const cols = 'id, display_name, email, instagram_handle, tiktok_handle, interested_content_types, primary_creative_focus';
-
+    // Fetch from creator_profiles (same source as Onboarded Creators page)
+    // Join with users table to get email
     Promise.all([
-      supabase.from('creator_signups').select(cols).not('email', 'is', null).order('created_at', { ascending: false }),
-      supabase.from('creator_signup_profile_sources').select(cols),
-    ]).then(([{ data: signupData }, { data: profileData }]) => {
-      const toCreator = (row: Record<string, unknown>): InviteCreator => ({
-        id: String(row.id ?? ''),
-        name:
-          String(row.display_name ?? '').trim() ||
-          String(row.instagram_handle ?? '').trim() ||
-          String(row.tiktok_handle ?? '').trim() ||
-          'Unknown',
-        email: String(row.email ?? '').trim(),
-        handle:
-          String(row.instagram_handle ?? '').trim() ||
-          String(row.tiktok_handle ?? '').trim(),
-        tags: extractCreatorTags(row),
-      });
+      supabase.from('creator_profiles').select('id, display_name, creator_name, social_handle, user_id, content_categories, content_types, interested_content_types, primary_creative_focus'),
+      supabase.from('users').select('id, email'),
+    ]).then(([{ data: profileData }, { data: usersData }]) => {
+      const usersById = new Map(
+        (usersData ?? []).map((u) => [String(u.id ?? ''), u as Record<string, unknown>])
+      );
 
-      const allRows = (signupData ?? []) as Record<string, unknown>[];
-      const seenEmails = new Set(allRows.map((r) => String(r.email ?? '').toLowerCase()));
+      const seenEmails = new Set<string>();
+      const result: InviteCreator[] = [];
+
       for (const row of (profileData ?? []) as Record<string, unknown>[]) {
-        const email = String(row.email ?? '').toLowerCase();
+        const user = usersById.get(String(row.user_id ?? ''));
+        const email = String(row.email ?? user?.email ?? '').trim().toLowerCase();
         if (!email || seenEmails.has(email)) continue;
         seenEmails.add(email);
-        allRows.push(row);
+        result.push({
+          id: String(row.id ?? ''),
+          name:
+            String(row.display_name ?? '').trim() ||
+            String(row.creator_name ?? '').trim() ||
+            String(row.social_handle ?? '').trim() ||
+            'Unknown',
+          email,
+          handle: String(row.social_handle ?? '').trim(),
+          tags: extractCreatorTags(row),
+        });
       }
 
-      setCreators(allRows.map(toCreator).filter((c) => c.email));
+      setCreators(result);
       setCreatorsLoading(false);
     });
   }, [selectedCampaignId]);
