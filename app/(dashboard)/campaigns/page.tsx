@@ -438,30 +438,44 @@ export default function CampaignsPage() {
     setInviteCreatorsLoading(true);
 
     try {
-      const { data } = await supabase
-        .from('creator_signups')
-        .select('id, display_name, email, instagram_handle, tiktok_handle, interested_content_types, primary_creative_focus')
-        .not('email', 'is', null)
-        .order('created_at', { ascending: false });
+      const cols = 'id, display_name, email, instagram_handle, tiktok_handle, interested_content_types, primary_creative_focus';
 
-      const rows = (data ?? []) as Record<string, unknown>[];
-      setInviteCreators(
-        rows
-          .map((row) => ({
-            id: String(row.id ?? Math.random()),
-            name:
-              String(row.display_name ?? '').trim() ||
-              String(row.instagram_handle ?? '').trim() ||
-              String(row.tiktok_handle ?? '').trim() ||
-              'Unknown',
-            email: String(row.email ?? '').trim(),
-            handle:
-              String(row.instagram_handle ?? '').trim() ||
-              String(row.tiktok_handle ?? '').trim(),
-            tags: extractCreatorTags(row),
-          }))
-          .filter((c) => c.email)
-      );
+      const [{ data: signupData }, { data: profileData }] = await Promise.all([
+        supabase
+          .from('creator_signups')
+          .select(cols)
+          .not('email', 'is', null)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('creator_signup_profile_sources')
+          .select(cols),
+      ]);
+
+      const toCreator = (row: Record<string, unknown>) => ({
+        id: String(row.id ?? ''),
+        name:
+          String(row.display_name ?? '').trim() ||
+          String(row.instagram_handle ?? '').trim() ||
+          String(row.tiktok_handle ?? '').trim() ||
+          'Unknown',
+        email: String(row.email ?? '').trim(),
+        handle:
+          String(row.instagram_handle ?? '').trim() ||
+          String(row.tiktok_handle ?? '').trim(),
+        tags: extractCreatorTags(row),
+      });
+
+      const allRows = (signupData ?? []) as Record<string, unknown>[];
+      const seenEmails = new Set(allRows.map((r) => String(r.email ?? '').toLowerCase()));
+
+      for (const row of (profileData ?? []) as Record<string, unknown>[]) {
+        const email = String(row.email ?? '').toLowerCase();
+        if (!email || seenEmails.has(email)) continue;
+        seenEmails.add(email);
+        allRows.push(row);
+      }
+
+      setInviteCreators(allRows.map(toCreator).filter((c) => c.email));
     } catch {
       setInviteCreators([]);
     } finally {

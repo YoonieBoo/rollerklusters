@@ -175,6 +175,7 @@ const sortSignups = (firstSignup: CreatorSignup, secondSignup: CreatorSignup) =>
 const fetchAllCreatorSignups = async () => {
   const signups: CreatorSignup[] = [];
 
+  // Fetch direct form signups (paginated)
   for (let page = 0; ; page += 1) {
     const from = page * SIGNUPS_PAGE_SIZE;
     const to = from + SIGNUPS_PAGE_SIZE - 1;
@@ -192,12 +193,29 @@ const fetchAllCreatorSignups = async () => {
     signups.push(...pageRows);
 
     if (pageRows.length < SIGNUPS_PAGE_SIZE) {
-      return {
-        data: signups.sort(sortSignups),
-        error: null,
-      };
+      break;
     }
   }
+
+  // Also fetch auth-based creator profiles that aren't in creator_signups
+  const { data: profileData } = await supabase
+    .from('creator_signup_profile_sources')
+    .select('*');
+
+  if (profileData) {
+    const seenEmails = new Set(signups.map((s) => (s.email ?? '').toLowerCase()));
+    for (const row of profileData as CreatorSignup[]) {
+      const email = (row.email ?? '').toLowerCase();
+      if (!email || seenEmails.has(email)) continue;
+      seenEmails.add(email);
+      signups.push(row);
+    }
+  }
+
+  return {
+    data: signups.sort(sortSignups),
+    error: null,
+  };
 };
 
 export default function CreatorSignupsPage() {
