@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, Suspense } from 'react';
+import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Mail, Send, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -65,6 +65,70 @@ function InvitesPageInner() {
   const [isSending, setIsSending] = useState(false);
   const [result, setResult] = useState<{ success?: string; error?: string } | null>(null);
 
+  // Keep a ref so the refresh callback always sees the latest campaign id
+  const selectedCampaignIdRef = useRef(selectedCampaignId);
+  useEffect(() => { selectedCampaignIdRef.current = selectedCampaignId; }, [selectedCampaignId]);
+
+  const norm = (h: unknown) => String(h ?? '').replace(/^@/, '').toLowerCase().trim();
+
+  const fetchCreators = async (showLoading = true) => {
+    const campaignId = selectedCampaignIdRef.current;
+    if (!campaignId) { setCreators([]); return; }
+    if (showLoading) setCreatorsLoading(true);
+
+    const [{ data: profileData }, { data: sourcesData }, { data: signupsData }] =
+      await Promise.all([
+        supabase.from('creator_profiles').select('id, display_name, creator_name, social_handle, user_id, content_categories, content_types, interested_content_types, primary_creative_focus'),
+        supabase.from('creator_signup_profile_sources').select('id, email'),
+        supabase.from('creator_signups').select('email, instagram_handle, tiktok_handle, other_platforms'),
+      ]);
+
+    const emailByProfileId = new Map<string, string>(
+      (sourcesData ?? []).map((s) => [String(s.id ?? ''), String(s.email ?? '').trim().toLowerCase()])
+    );
+
+    const emailByHandle = new Map<string, string>();
+    for (const s of (signupsData ?? [])) {
+      const email = String((s as Record<string, unknown>).email ?? '').trim().toLowerCase();
+      if (!email) continue;
+      for (const h of [
+        norm((s as Record<string, unknown>).instagram_handle),
+        norm((s as Record<string, unknown>).tiktok_handle),
+        norm((s as Record<string, unknown>).other_platforms),
+      ]) {
+        if (h) emailByHandle.set(h, email);
+      }
+    }
+
+    const seenEmails = new Set<string>();
+    const list: InviteCreator[] = [];
+
+    for (const row of (profileData ?? []) as Record<string, unknown>[]) {
+      const profileId = String(row.id ?? '');
+      const handle = norm(row.social_handle);
+      const email =
+        emailByProfileId.get(profileId) ||
+        (handle ? emailByHandle.get(handle) : '') ||
+        '';
+      if (!email || seenEmails.has(email)) continue;
+      seenEmails.add(email);
+      list.push({
+        id: profileId,
+        name:
+          String(row.display_name ?? '').trim() ||
+          String(row.creator_name ?? '').trim() ||
+          String(row.social_handle ?? '').trim() ||
+          'Unknown',
+        email,
+        handle: String(row.social_handle ?? '').trim(),
+        tags: extractCreatorTags(row),
+      });
+    }
+
+    setCreators(list);
+    setCreatorsLoading(false);
+  };
+
   // Load campaigns
   useEffect(() => {
     supabase
@@ -83,45 +147,36 @@ function InvitesPageInner() {
     if (param) setSelectedCampaignId(param);
   }, [searchParams]);
 
-  // Load creators when campaign selected
+  // Initial fetch when campaign changes (with loading spinner + reset)
   useEffect(() => {
     if (!selectedCampaignId) { setCreators([]); return; }
-
-    setCreatorsLoading(true);
     setSelectedEmails(new Set());
     setTagFilter(null);
     setSearch('');
     setResult(null);
+    fetchCreators(true);
+  }, [selectedCampaignId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // SECURITY DEFINER function — runs as postgres so it can read auth.users for emails
-    supabase
-      .rpc('get_creator_profiles_with_email')
-      .then(({ data: rpcData }) => {
-        const profileData = Array.isArray(rpcData) ? rpcData : [];
-        const seenEmails = new Set<string>();
-        const result: InviteCreator[] = [];
+  // Realtime + polling so new onboarded creators appear automatically
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') fetchCreators(false); };
+    const intervalId = window.setInterval(refresh, 15000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
 
-        for (const row of profileData as Record<string, unknown>[]) {
-          const email = String(row.email ?? '').trim().toLowerCase();
-          if (!email || seenEmails.has(email)) continue;
-          seenEmails.add(email);
-          result.push({
-            id: String(row.id ?? ''),
-            name:
-              String(row.display_name ?? '').trim() ||
-              String(row.creator_name ?? '').trim() ||
-              String(row.social_handle ?? '').trim() ||
-              'Unknown',
-            email,
-            handle: String(row.social_handle ?? '').trim(),
-            tags: extractCreatorTags(row),
-          });
-        }
+    const channel = supabase
+      .channel('invites-creators')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'creator_profiles' }, () => fetchCreators(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'creator_signups' }, () => fetchCreators(false))
+      .subscribe();
 
-        setCreators(result);
-        setCreatorsLoading(false);
-      });
-  }, [selectedCampaignId]);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+      supabase.removeChannel(channel);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allTags = useMemo(() => {
     const tags = new Set<string>();
