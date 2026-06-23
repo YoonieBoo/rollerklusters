@@ -53,6 +53,44 @@ type CampaignRow = {
   updated_at: string | null;
 };
 
+type InviteCreator = {
+  id: string;
+  name: string;
+  email: string;
+  handle: string;
+  tags: string[];
+};
+
+const extractCreatorTags = (row: Record<string, unknown>): string[] => {
+  const sources = [row.interested_content_types, row.primary_creative_focus];
+  const tags = new Set<string>();
+
+  sources.forEach((src) => {
+    if (!src) return;
+    let items: unknown[] = [];
+
+    if (Array.isArray(src)) {
+      items = src;
+    } else {
+      const text = typeof src === 'string' ? src.trim() : String(src).trim();
+      if (!text) return;
+      try {
+        const parsed = JSON.parse(text);
+        items = Array.isArray(parsed) ? parsed : [text];
+      } catch {
+        items = text.split(/[,\n]+/).map((s) => s.trim()).filter(Boolean);
+      }
+    }
+
+    items.forEach((item) => {
+      const tag = (typeof item === 'string' ? item : String(item)).trim();
+      if (tag) tags.add(tag);
+    });
+  });
+
+  return Array.from(tags);
+};
+
 const StatusBadge = ({ status }: { status: string }) => {
   const styles: Record<string, { bg: string; text: string }> = {
     active: { bg: 'bg-green-500/10', text: 'text-green-500' },
@@ -116,6 +154,12 @@ export default function CampaignsPage() {
   const [inviteEmails, setInviteEmails] = useState('');
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [inviteResult, setInviteResult] = useState<{ error?: string; success?: string } | null>(null);
+  const [inviteMode, setInviteMode] = useState<'creators' | 'manual'>('creators');
+  const [inviteCreators, setInviteCreators] = useState<InviteCreator[]>([]);
+  const [inviteCreatorsLoading, setInviteCreatorsLoading] = useState(false);
+  const [selectedCreatorEmails, setSelectedCreatorEmails] = useState<Set<string>>(new Set());
+  const [creatorTagFilter, setCreatorTagFilter] = useState<string | null>(null);
+  const [creatorSearch, setCreatorSearch] = useState('');
 
   // Push notification state
   const [pushCampaign, setPushCampaign] = useState<CampaignRow | null>(null);
@@ -378,25 +422,70 @@ export default function CampaignsPage() {
     setActionSuccess('Campaign deleted successfully');
   };
 
-  const openInviteDialog = (campaign: CampaignRow) => {
+  const openInviteDialog = async (campaign: CampaignRow) => {
     setActionError(null);
     setActionSuccess(null);
     setInviteCampaign(campaign);
     setInviteEmails('');
     setInviteResult(null);
+    setInviteMode('creators');
+    setSelectedCreatorEmails(new Set());
+    setCreatorTagFilter(null);
+    setCreatorSearch('');
+    setInviteCreatorsLoading(true);
+
+    try {
+      const { data } = await supabase
+        .from('creator_signups')
+        .select('id, display_name, email, instagram_handle, tiktok_handle, interested_content_types, primary_creative_focus')
+        .not('email', 'is', null)
+        .order('created_at', { ascending: false });
+
+      const rows = (data ?? []) as Record<string, unknown>[];
+      setInviteCreators(
+        rows
+          .map((row) => ({
+            id: String(row.id ?? Math.random()),
+            name:
+              String(row.display_name ?? '').trim() ||
+              String(row.instagram_handle ?? '').trim() ||
+              String(row.tiktok_handle ?? '').trim() ||
+              'Unknown',
+            email: String(row.email ?? '').trim(),
+            handle:
+              String(row.instagram_handle ?? '').trim() ||
+              String(row.tiktok_handle ?? '').trim(),
+            tags: extractCreatorTags(row),
+          }))
+          .filter((c) => c.email)
+      );
+    } catch {
+      setInviteCreators([]);
+    } finally {
+      setInviteCreatorsLoading(false);
+    }
   };
 
   const handleSendInvite = async () => {
     if (!inviteCampaign) return;
 
-    const emailList = inviteEmails
-      .split(/[\n,]+/)
-      .map((e) => e.trim())
-      .filter(Boolean);
+    let emailList: string[];
 
-    if (emailList.length === 0) {
-      setInviteResult({ error: 'Enter at least one email address.' });
-      return;
+    if (inviteMode === 'creators') {
+      emailList = Array.from(selectedCreatorEmails);
+      if (emailList.length === 0) {
+        setInviteResult({ error: 'Select at least one creator.' });
+        return;
+      }
+    } else {
+      emailList = inviteEmails
+        .split(/[\n,]+/)
+        .map((e) => e.trim())
+        .filter(Boolean);
+      if (emailList.length === 0) {
+        setInviteResult({ error: 'Enter at least one email address.' });
+        return;
+      }
     }
 
     setIsSendingInvite(true);
@@ -510,6 +599,27 @@ export default function CampaignsPage() {
       setExportingCampaignId(null);
     }
   };
+
+  const allCreatorTags = useMemo(() => {
+    const tags = new Set<string>();
+    inviteCreators.forEach((c) => c.tags.forEach((t) => tags.add(t)));
+    return Array.from(tags).sort();
+  }, [inviteCreators]);
+
+  const filteredInviteCreators = useMemo(() => {
+    return inviteCreators.filter((c) => {
+      if (creatorTagFilter && !c.tags.includes(creatorTagFilter)) return false;
+      if (creatorSearch) {
+        const q = creatorSearch.toLowerCase();
+        return (
+          c.name.toLowerCase().includes(q) ||
+          c.email.toLowerCase().includes(q) ||
+          c.handle.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [inviteCreators, creatorTagFilter, creatorSearch]);
 
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter((campaign) => {
@@ -911,7 +1021,7 @@ export default function CampaignsPage() {
           }
         }}
       >
-        <DialogContent className="bg-card border-border">
+        <DialogContent className="bg-card border-border sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Send Brief Invite</DialogTitle>
             <DialogDescription>
@@ -922,23 +1032,156 @@ export default function CampaignsPage() {
               .
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground block">
-                Recipient emails
-              </label>
-              <textarea
-                placeholder="creator@example.com&#10;another@example.com"
-                value={inviteEmails}
-                onChange={(e) => setInviteEmails(e.target.value)}
-                disabled={isSendingInvite}
-                rows={4}
-                className="w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none disabled:opacity-50"
-              />
-              <p className="text-xs text-muted-foreground">
-                One email per line, or comma-separated.
-              </p>
+          <div className="space-y-4 py-2">
+
+            {/* Mode toggle */}
+            <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1">
+              <button
+                type="button"
+                onClick={() => setInviteMode('creators')}
+                className={`flex-1 rounded-md py-1.5 text-sm font-medium transition-colors ${inviteMode === 'creators' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                Choose from creators
+              </button>
+              <button
+                type="button"
+                onClick={() => setInviteMode('manual')}
+                className={`flex-1 rounded-md py-1.5 text-sm font-medium transition-colors ${inviteMode === 'manual' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                Enter manually
+              </button>
             </div>
+
+            {inviteMode === 'creators' ? (
+              <div className="space-y-3">
+                {/* Search + tag filters */}
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or handle..."
+                  value={creatorSearch}
+                  onChange={(e) => setCreatorSearch(e.target.value)}
+                  className="w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                {allCreatorTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setCreatorTagFilter(null)}
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${creatorTagFilter === null ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+                    >
+                      All
+                    </button>
+                    {allCreatorTags.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => setCreatorTagFilter(creatorTagFilter === tag ? null : tag)}
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${creatorTagFilter === tag ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Creator list */}
+                <div className="rounded-md border border-border overflow-hidden">
+                  {/* Header row */}
+                  <div className="flex items-center justify-between border-b border-border bg-muted/60 px-3 py-2">
+                    <span className="text-xs text-muted-foreground">
+                      {inviteCreatorsLoading
+                        ? 'Loading creators...'
+                        : `${filteredInviteCreators.length} creator${filteredInviteCreators.length === 1 ? '' : 's'}`}
+                    </span>
+                    {filteredInviteCreators.length > 0 && (
+                      <button
+                        type="button"
+                        className="text-xs text-primary hover:underline"
+                        onClick={() => {
+                          const allEmails = new Set(filteredInviteCreators.map((c) => c.email));
+                          const allSelected = filteredInviteCreators.every((c) => selectedCreatorEmails.has(c.email));
+                          if (allSelected) {
+                            const next = new Set(selectedCreatorEmails);
+                            filteredInviteCreators.forEach((c) => next.delete(c.email));
+                            setSelectedCreatorEmails(next);
+                          } else {
+                            setSelectedCreatorEmails(new Set([...selectedCreatorEmails, ...allEmails]));
+                          }
+                        }}
+                      >
+                        {filteredInviteCreators.every((c) => selectedCreatorEmails.has(c.email))
+                          ? 'Deselect all'
+                          : 'Select all'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-56 overflow-y-auto divide-y divide-border">
+                    {inviteCreatorsLoading ? (
+                      <div className="px-3 py-6 text-center text-sm text-muted-foreground">Loading...</div>
+                    ) : filteredInviteCreators.length === 0 ? (
+                      <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                        {inviteCreators.length === 0 ? 'No creators with email addresses found.' : 'No creators match your search.'}
+                      </div>
+                    ) : (
+                      filteredInviteCreators.map((creator) => {
+                        const isSelected = selectedCreatorEmails.has(creator.email);
+                        return (
+                          <label
+                            key={creator.id}
+                            className={`flex cursor-pointer items-start gap-3 px-3 py-2.5 hover:bg-muted/40 transition-colors ${isSelected ? 'bg-blue-50/50' : ''}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {
+                                const next = new Set(selectedCreatorEmails);
+                                if (isSelected) next.delete(creator.email);
+                                else next.add(creator.email);
+                                setSelectedCreatorEmails(next);
+                              }}
+                              className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-baseline gap-x-2">
+                                <span className="text-sm font-medium text-foreground">{creator.name}</span>
+                                {creator.handle && (
+                                  <span className="text-xs text-muted-foreground">@{creator.handle.replace(/^@/, '')}</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">{creator.email}</p>
+                              {creator.tags.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {creator.tags.map((tag) => (
+                                    <span key={tag} className="rounded-full bg-blue-100 px-2 py-0 text-[10px] font-medium text-blue-700">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground block">Recipient emails</label>
+                <textarea
+                  placeholder="creator@example.com&#10;another@example.com"
+                  value={inviteEmails}
+                  onChange={(e) => setInviteEmails(e.target.value)}
+                  disabled={isSendingInvite}
+                  rows={5}
+                  className="w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none disabled:opacity-50"
+                />
+                <p className="text-xs text-muted-foreground">One email per line, or comma-separated.</p>
+              </div>
+            )}
+
             {inviteResult?.error && (
               <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2">
                 <p className="text-sm text-red-500">{inviteResult.error}</p>
@@ -949,17 +1192,28 @@ export default function CampaignsPage() {
                 <p className="text-sm text-green-600">{inviteResult.success}</p>
               </div>
             )}
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => { setInviteCampaign(null); setInviteResult(null); }}
-                disabled={isSendingInvite}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleSendInvite} disabled={isSendingInvite}>
-                {isSendingInvite ? 'Sending...' : 'Send Invite'}
-              </Button>
+            <div className="flex items-center justify-between pt-1">
+              {inviteMode === 'creators' && selectedCreatorEmails.size > 0 ? (
+                <span className="text-xs text-muted-foreground">
+                  {selectedCreatorEmails.size} creator{selectedCreatorEmails.size === 1 ? '' : 's'} selected
+                </span>
+              ) : <span />}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => { setInviteCampaign(null); setInviteResult(null); }}
+                  disabled={isSendingInvite}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleSendInvite} disabled={isSendingInvite}>
+                  {isSendingInvite
+                    ? 'Sending...'
+                    : inviteMode === 'creators' && selectedCreatorEmails.size > 0
+                    ? `Send to ${selectedCreatorEmails.size} creator${selectedCreatorEmails.size === 1 ? '' : 's'}`
+                    : 'Send Invite'}
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>
