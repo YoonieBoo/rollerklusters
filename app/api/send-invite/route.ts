@@ -48,15 +48,6 @@ function buildInviteEmail({
 }
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.RESEND_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'Email service not configured. Add RESEND_API_KEY to your .env.local file.' },
-      { status: 503 }
-    );
-  }
-
   let body: unknown;
   try {
     body = await request.json();
@@ -80,10 +71,40 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
+  const resolvedCampaignName = String(campaignName ?? '');
+
+  // Write engagement records to Supabase first — this works even without email configured.
+  if (creatorList && creatorList.length > 0) {
+    const rows = creatorList
+      .filter((c) => c.id)
+      .map((c) => ({
+        campaign_id: String(campaignId),
+        creator_id: c.id,
+        status: 'matched',
+        match_score: 82,
+      }));
+
+    if (rows.length > 0) {
+      const { error: engagementError } = await supabaseAdmin
+        .from('engagements')
+        .upsert(rows, { onConflict: 'campaign_id,creator_id', ignoreDuplicates: true });
+
+      if (engagementError) {
+        console.warn('Could not write engagements to Supabase (table may not exist yet):', engagementError.message);
+      }
+    }
+  }
+
+  // Send emails if Resend is configured — optional, non-blocking for engagement writes above.
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    // Engagements were written; just skip email and return success.
+    return NextResponse.json({ sent: 0, failed: 0, note: 'Invites recorded. Add RESEND_API_KEY to also send email notifications.' });
+  }
+
   const briefUrl = `${getSiteUrl()}/creator-brief/${campaignId}`;
   const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
   const resend = new Resend(apiKey);
-  const resolvedCampaignName = String(campaignName ?? '');
 
   const results = await Promise.allSettled(
     emailList.map((email) =>
@@ -112,29 +133,6 @@ export async function POST(request: NextRequest) {
       firstRejected?.reason?.toString() ??
       'Failed to send emails';
     return NextResponse.json({ error: message }, { status: 500 });
-  }
-
-  // Write engagement records to Supabase so the ecosystem's Invites tab shows them.
-  // Non-fatal: if the table doesn't exist yet, log and continue.
-  if (creatorList && creatorList.length > 0) {
-    const rows = creatorList
-      .filter((c) => c.id)
-      .map((c) => ({
-        campaign_id: String(campaignId),
-        creator_id: c.id,
-        status: 'matched',
-        match_score: 82,
-      }));
-
-    if (rows.length > 0) {
-      const { error: engagementError } = await supabaseAdmin
-        .from('engagements')
-        .upsert(rows, { onConflict: 'campaign_id,creator_id', ignoreDuplicates: true });
-
-      if (engagementError) {
-        console.warn('Could not write engagements to Supabase (table may not exist yet):', engagementError.message);
-      }
-    }
   }
 
   return NextResponse.json({ sent, failed });
