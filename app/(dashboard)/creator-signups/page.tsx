@@ -271,9 +271,12 @@ export default function CreatorSignupsPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'creator_signups' },
-        () => {
-          fetchSignups(false);
-        }
+        () => { fetchSignups(false); }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'creator_profiles' },
+        () => { fetchSignups(false); }
       )
       .subscribe();
 

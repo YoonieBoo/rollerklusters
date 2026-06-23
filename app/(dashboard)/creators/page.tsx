@@ -361,13 +361,26 @@ const enrichCreatorsWithSubmittedFields = (
     });
   });
 
-  return creators.map((creator) => {
+  // Track which signups were matched to a profile (to find unmatched ones below)
+  const matchedSignupEmails = new Set<string>();
+  const matchedSignupHandles = new Set<string>();
+
+  const enriched = creators.map((creator) => {
     const signup = getSignupMatch(
       creator,
       usersById,
       signupsByEmail,
       signupsByIdentifier
     );
+
+    if (signup) {
+      if (signup.email) matchedSignupEmails.add(normalizeEmail(signup.email));
+      [signup.display_name, signup.instagram_handle, signup.tiktok_handle].forEach((id) => {
+        const n = normalizeCreatorIdentifier(id);
+        if (n) matchedSignupHandles.add(n);
+      });
+    }
+
     const scholarshipStudent =
       creator.scholarship_student ??
       creator.is_scholarship_student ??
@@ -401,6 +414,43 @@ const enrichCreatorsWithSubmittedFields = (
       interested_content_types: interestedContentTypes,
     };
   });
+
+  // Include signups that have no matching creator_profile yet (pending onboarding)
+  const unmatchedSignups = signups.filter((signup) => {
+    const email = normalizeEmail(signup.email);
+    if (email && matchedSignupEmails.has(email)) return false;
+    const handles = [signup.display_name, signup.instagram_handle, signup.tiktok_handle].map(
+      normalizeCreatorIdentifier
+    );
+    return !handles.some((h) => h && matchedSignupHandles.has(h));
+  });
+
+  const signupProfiles: CreatorProfile[] = unmatchedSignups.map((signup) => ({
+    id: undefined,
+    user_id: null,
+    email: signup.email,
+    display_name: signup.display_name,
+    social_handle: toText(signup.instagram_handle).trim() || toText(signup.tiktok_handle).trim() || null,
+    platform: toText(signup.tiktok_handle).trim() ? 'TikTok' : toText(signup.instagram_handle).trim() ? 'Instagram' : null,
+    faculty: null,
+    university_program: toText(signup.university_program).trim() || null,
+    manual_follower_count: null,
+    follower_count: null,
+    creator_rank: null,
+    verification_status: 'pending_onboarding',
+    onboarding_completed: false,
+    scholarship_student: getScholarshipStudentValue(signup),
+    is_scholarship_student: null,
+    line_id: signup.line_id,
+    content_categories: null,
+    content_types: null,
+    interested_content_types: signup.interested_content_types ?? signup.primary_creative_focus ?? null,
+    primary_creative_focus: signup.primary_creative_focus ?? null,
+    additional_notes: signup.additional_notes,
+    created_at: null,
+  }));
+
+  return [...enriched, ...signupProfiles];
 };
 
 export default function CreatorsPage() {
@@ -541,9 +591,16 @@ export default function CreatorsPage() {
                         className="space-y-4 px-4 py-4"
                       >
                         <div className="min-w-0">
-                          <p className="break-words font-medium text-foreground">
-                            {getCreatorName(creator)}
-                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="break-words font-medium text-foreground">
+                              {getCreatorName(creator)}
+                            </p>
+                            {creator.verification_status === 'pending_onboarding' && (
+                              <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700">
+                                Pending
+                              </span>
+                            )}
+                          </div>
                           <p className="mt-1 break-words text-sm text-muted-foreground">
                             {toText(creator.social_handle).trim() || 'N/A'} ·{' '}
                             {formatLabel(creator.platform)}
@@ -605,7 +662,14 @@ export default function CreatorsPage() {
                             className="h-11 border-border hover:bg-muted/40"
                           >
                             <TableCell className="py-2 font-medium text-foreground">
-                              {getCreatorName(creator)}
+                              <div className="flex items-center gap-2">
+                                {getCreatorName(creator)}
+                                {creator.verification_status === 'pending_onboarding' && (
+                                  <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700">
+                                    Pending
+                                  </span>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="py-2 text-muted-foreground">
                               {formatLabel(creator.platform)}
