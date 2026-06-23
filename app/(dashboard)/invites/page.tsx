@@ -93,40 +93,34 @@ function InvitesPageInner() {
     setSearch('');
     setResult(null);
 
-    // Fetch from creator_profiles (same source as Onboarded Creators page)
-    // Join with users table to get email
-    Promise.all([
-      supabase.from('creator_profiles').select('id, display_name, creator_name, social_handle, user_id, content_categories, content_types, interested_content_types, primary_creative_focus'),
-      supabase.from('users').select('id, email'),
-    ]).then(([{ data: profileData }, { data: usersData }]) => {
-      const usersById = new Map(
-        (usersData ?? []).map((u) => [String(u.id ?? ''), u as Record<string, unknown>])
-      );
+    // SECURITY DEFINER function — runs as postgres so it can read auth.users for emails
+    supabase
+      .rpc('get_creator_profiles_with_email')
+      .then(({ data: rpcData }) => {
+        const profileData = Array.isArray(rpcData) ? rpcData : [];
+        const seenEmails = new Set<string>();
+        const result: InviteCreator[] = [];
 
-      const seenEmails = new Set<string>();
-      const result: InviteCreator[] = [];
+        for (const row of profileData as Record<string, unknown>[]) {
+          const email = String(row.email ?? '').trim().toLowerCase();
+          if (!email || seenEmails.has(email)) continue;
+          seenEmails.add(email);
+          result.push({
+            id: String(row.id ?? ''),
+            name:
+              String(row.display_name ?? '').trim() ||
+              String(row.creator_name ?? '').trim() ||
+              String(row.social_handle ?? '').trim() ||
+              'Unknown',
+            email,
+            handle: String(row.social_handle ?? '').trim(),
+            tags: extractCreatorTags(row),
+          });
+        }
 
-      for (const row of (profileData ?? []) as Record<string, unknown>[]) {
-        const user = usersById.get(String(row.user_id ?? ''));
-        const email = String(row.email ?? user?.email ?? '').trim().toLowerCase();
-        if (!email || seenEmails.has(email)) continue;
-        seenEmails.add(email);
-        result.push({
-          id: String(row.id ?? ''),
-          name:
-            String(row.display_name ?? '').trim() ||
-            String(row.creator_name ?? '').trim() ||
-            String(row.social_handle ?? '').trim() ||
-            'Unknown',
-          email,
-          handle: String(row.social_handle ?? '').trim(),
-          tags: extractCreatorTags(row),
-        });
-      }
-
-      setCreators(result);
-      setCreatorsLoading(false);
-    });
+        setCreators(result);
+        setCreatorsLoading(false);
+      });
   }, [selectedCampaignId]);
 
   const allTags = useMemo(() => {
