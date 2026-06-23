@@ -14,6 +14,7 @@ import {
   Users,
   UserPlus,
   UserCog,
+  Mail,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
@@ -29,6 +30,7 @@ const navItems = [
   { href: '/campaigns', label: 'Campaigns', icon: FolderOpen },
   { href: '/briefs', label: 'Briefs', icon: FileText },
   { href: '/reviews', label: 'Reviews', icon: CheckSquare },
+  { href: '/invites', label: 'Invites', icon: Mail },
 ];
 
 const SIGNUP_COUNT_REFRESH_INTERVAL_MS = 15000;
