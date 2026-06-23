@@ -161,6 +161,9 @@ export default function CampaignsPage() {
   const [creatorTagFilter, setCreatorTagFilter] = useState<string | null>(null);
   const [creatorSearch, setCreatorSearch] = useState('');
 
+  // Post-creation invite prompt
+  const [postCreateCampaign, setPostCreateCampaign] = useState<{ id: string; name: string } | null>(null);
+
   // Push notification state
   const [pushCampaign, setPushCampaign] = useState<CampaignRow | null>(null);
   const [pushTitle, setPushTitle] = useState('');
@@ -305,7 +308,7 @@ export default function CampaignsPage() {
     resetCreateForm();
     setShowCreateDialog(false);
     setIsCreating(false);
-    router.push(`/briefs?campaign=${encodeURIComponent(newCampaignId)}`);
+    setPostCreateCampaign({ id: newCampaignId, name: campaignName });
   };
 
   const handleDeleteCampaign = (campaign: CampaignRow) => {
@@ -721,7 +724,7 @@ export default function CampaignsPage() {
                 <TableHead className="py-2">Status</TableHead>
                 <TableHead className="py-2">Created</TableHead>
                 <TableHead className="py-2">Updated</TableHead>
-                <TableHead className="w-10 py-2"></TableHead>
+                <TableHead className="w-28 py-2"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -756,73 +759,67 @@ export default function CampaignsPage() {
                     {formatDate(campaign.updated_at)}
                   </TableCell>
                   <TableCell className="py-2 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          aria-label={`Open actions for ${campaign.name || 'campaign'}`}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <MoreHorizontal size={16} />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem
-                          onClick={() => openEditCampaign(campaign)}
-                        >
-                          Edit Campaign
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            router.push(`/briefs?campaign=${encodeURIComponent(campaign.id)}`)
-                          }
-                        >
-                          Open Brief
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            router.push(`/reviews?campaign=${encodeURIComponent(campaign.id)}`)
-                          }
-                        >
-                          Review Submissions
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            router.push(`/reports?campaign=${encodeURIComponent(campaign.id)}`)
-                          }
-                        >
-                          View Report
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleExportCampaignReport(campaign)}
-                          disabled={exportingCampaignId === campaign.id}
-                        >
-                          <FileDown size={14} />
-                          {exportingCampaignId === campaign.id ? 'Exporting PDF...' : 'Export PDF'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => { e.stopPropagation(); openInviteDialog(campaign); }}
-                        >
-                          <Mail size={14} />
-                          Send Brief Invite
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => { e.stopPropagation(); openPushDialog(campaign); }}
-                        >
-                          <Bell size={14} />
-                          Send Notification
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onClick={() => handleDeleteCampaign(campaign)}
-                        >
-                          Delete Campaign
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1 px-2.5 text-xs"
+                        onClick={() => openInviteDialog(campaign)}
+                      >
+                        <Mail size={12} />
+                        Invite
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            aria-label={`Open actions for ${campaign.name || 'campaign'}`}
+                          >
+                            <MoreHorizontal size={15} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem onClick={() => openEditCampaign(campaign)}>
+                            Edit Campaign
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => router.push(`/briefs?campaign=${encodeURIComponent(campaign.id)}`)}
+                          >
+                            Open Brief
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => router.push(`/reviews?campaign=${encodeURIComponent(campaign.id)}`)}
+                          >
+                            Review Submissions
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => router.push(`/reports?campaign=${encodeURIComponent(campaign.id)}`)}
+                          >
+                            View Report
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleExportCampaignReport(campaign)}
+                            disabled={exportingCampaignId === campaign.id}
+                          >
+                            <FileDown size={14} />
+                            {exportingCampaignId === campaign.id ? 'Exporting PDF...' : 'Export PDF'}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openPushDialog(campaign)}>
+                            <Bell size={14} />
+                            Send Notification
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => handleDeleteCampaign(campaign)}
+                          >
+                            Delete Campaign
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -1296,6 +1293,62 @@ export default function CampaignsPage() {
                 {isSendingPush ? 'Sending...' : 'Send Notification'}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Post-creation invite prompt */}
+      <Dialog
+        open={Boolean(postCreateCampaign)}
+        onOpenChange={(open) => { if (!open) setPostCreateCampaign(null); }}
+      >
+        <DialogContent className="bg-card border-border sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Campaign created!</DialogTitle>
+            <DialogDescription>
+              <span className="font-medium text-foreground">{postCreateCampaign?.name}</span> is ready.
+              Would you like to invite creators now, or set up the brief first?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-2">
+            <Button
+              className="w-full gap-2"
+              onClick={() => {
+                const c = postCreateCampaign;
+                setPostCreateCampaign(null);
+                if (c) {
+                  openInviteDialog({
+                    id: c.id,
+                    name: c.name,
+                    client_name: null,
+                    status: null,
+                    created_at: null,
+                    updated_at: null,
+                  });
+                }
+              }}
+            >
+              <Mail size={15} />
+              Send invites now
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                const id = postCreateCampaign?.id;
+                setPostCreateCampaign(null);
+                if (id) router.push(`/briefs?campaign=${encodeURIComponent(id)}`);
+              }}
+            >
+              Go to brief editor
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full text-muted-foreground"
+              onClick={() => setPostCreateCampaign(null)}
+            >
+              Later
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
