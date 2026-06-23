@@ -23,7 +23,7 @@ export async function GET() {
     await Promise.all([
       admin
         .from('creator_profiles')
-        .select('id, display_name, creator_name, social_handle, user_id, content_categories, content_types, interested_content_types, primary_creative_focus'),
+        .select('id, display_name, creator_name, social_handle, user_id, content_categories, content_types'),
       admin.auth.admin.listUsers({ perPage: 1000 }),
     ]);
 
