@@ -236,7 +236,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
     return (
       roleText.includes('campaign-manager') ||
-      roleText.includes('campaign manager')
+      roleText.includes('campaign manager') ||
+      roleText.includes('campaign_manager')
     );
   };
 
@@ -247,6 +248,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
 
     try {
+      const seenEmails = new Set<string>();
       const campaignManagers: SupabaseRow[] = [];
 
       for (let page = 0; ; page += 1) {
@@ -254,7 +256,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         const to = from + CAMPAIGN_MANAGER_COUNT_PAGE_SIZE - 1;
         const { data, error } = await supabase
           .from('creator_signups')
-          .select('id, signup_type, role_label, primary_creative_focus')
+          .select('id, signup_type, role_label, primary_creative_focus, email')
           .range(from, to);
 
         if (error) {
@@ -264,10 +266,28 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         }
 
         const pageRows = (data ?? []) as SupabaseRow[];
-        campaignManagers.push(...pageRows.filter(isCampaignManagerSignup));
+        for (const row of pageRows.filter(isCampaignManagerSignup)) {
+          const email = toText(row.email).trim().toLowerCase();
+          if (email) seenEmails.add(email);
+          campaignManagers.push(row);
+        }
 
         if (pageRows.length < CAMPAIGN_MANAGER_COUNT_PAGE_SIZE) {
           break;
+        }
+      }
+
+      // Also count from creator_signup_profile_sources (auth-based signups)
+      const { data: sourceRows, error: sourceError } = await supabase
+        .from('creator_signup_profile_sources')
+        .select('id, signup_type, role_label, primary_creative_focus, email');
+
+      if (!sourceError) {
+        for (const row of ((sourceRows ?? []) as SupabaseRow[]).filter(isCampaignManagerSignup)) {
+          const email = toText(row.email).trim().toLowerCase();
+          if (!email || seenEmails.has(email)) continue;
+          seenEmails.add(email);
+          campaignManagers.push(row);
         }
       }
 
@@ -344,6 +364,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'creator_signups' },
+        () => {
+          fetchCampaignManagerCount();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'creator_profiles' },
         () => {
           fetchCampaignManagerCount();
         }
