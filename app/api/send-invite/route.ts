@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import webpush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase/server';
+
+const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+const vapidSubject = process.env.VAPID_SUBJECT ?? 'mailto:notifications@rollerkluster.com';
+
+if (vapidPublicKey && vapidPrivateKey) {
+  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+}
 
 function getSiteUrl() {
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
@@ -91,6 +100,41 @@ export async function POST(request: NextRequest) {
 
       if (engagementError) {
         console.warn('Could not write engagements to Supabase (table may not exist yet):', engagementError.message);
+      }
+    }
+
+    // Send push notifications to each invited creator if VAPID is configured
+    if (vapidPublicKey && vapidPrivateKey && creatorList.length > 0) {
+      const creatorIds = creatorList.filter((c) => c.id).map((c) => c.id);
+      const { data: subs } = await supabaseAdmin
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth')
+        .in('creator_id', creatorIds);
+
+      if (subs && subs.length > 0) {
+        const payload = JSON.stringify({
+          title: 'You have a new campaign invite',
+          body: resolvedCampaignName ? `You've been invited to: ${resolvedCampaignName}` : 'Open the app to view your invitation.',
+          url: '/notifications',
+        });
+
+        const expiredEndpoints: string[] = [];
+        await Promise.allSettled(
+          subs.map(async (sub) => {
+            try {
+              await webpush.sendNotification(
+                { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+                payload
+              );
+            } catch (err) {
+              const statusCode = (err as { statusCode?: number })?.statusCode;
+              if (statusCode === 410 || statusCode === 404) expiredEndpoints.push(sub.endpoint);
+            }
+          })
+        );
+        if (expiredEndpoints.length > 0) {
+          await supabaseAdmin.from('push_subscriptions').delete().in('endpoint', expiredEndpoints);
+        }
       }
     }
   }
