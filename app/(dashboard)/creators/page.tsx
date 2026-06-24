@@ -44,6 +44,7 @@ type UserProfile = {
   email?: string | null;
   name?: string | null;
   full_name?: string | null;
+  role?: string | null;
 };
 
 type CreatorSignup = {
@@ -491,9 +492,15 @@ export default function CreatorsPage() {
           setCreators([]);
         }
       } else {
+        const campaignManagerIds = new Set(
+          users.filter((u) => u.role === 'campaign_manager').map((u) => String(u.id ?? ''))
+        );
+        const creatorOnly = (data ?? [] as CreatorProfile[]).filter(
+          (p) => !campaignManagerIds.has(String((p as CreatorProfile).user_id ?? ''))
+        );
         setCreators(
           enrichCreatorsWithSubmittedFields(
-            (data ?? []) as CreatorProfile[],
+            creatorOnly as CreatorProfile[],
             users,
             signups
           )
