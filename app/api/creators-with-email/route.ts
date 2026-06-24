@@ -1,12 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const ADMIN_EMAILS = new Set([
-  'aungkhantbhonemyat09@gmail.com',
-  'u6511158@au.edu',
-  'u6732015@au.edu',
-]);
-
 export async function GET() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -23,6 +17,7 @@ export async function GET() {
     { data: profiles, error: profilesError },
     { data: authData, error: authError },
     { data: signups },
+    { data: publicUsers },
   ] = await Promise.all([
     admin
       .from('creator_profiles')
@@ -31,6 +26,9 @@ export async function GET() {
     admin
       .from('creator_signups')
       .select('email, display_name, instagram_handle, tiktok_handle'),
+    admin
+      .from('users')
+      .select('id, email, role'),
   ]);
 
   if (profilesError) {
@@ -40,13 +38,20 @@ export async function GET() {
     return NextResponse.json({ error: authError.message }, { status: 500 });
   }
 
-  // Primary: email by user_id from auth.users
+  // Build set of non-creator user IDs (admin/brand) to exclude
+  const nonCreatorIds = new Set<string>();
+  for (const u of publicUsers ?? []) {
+    if (u.role && u.role !== 'creator') {
+      nonCreatorIds.add(String(u.id));
+    }
+  }
+
+  // Primary: email by user_id from auth.users — exclude non-creator roles only
   const emailByUserId = new Map<string, string>();
   for (const user of authData?.users ?? []) {
+    if (nonCreatorIds.has(user.id)) continue;
     const email = user.email?.toLowerCase();
-    if (email && !ADMIN_EMAILS.has(email)) {
-      emailByUserId.set(user.id, email);
-    }
+    if (email) emailByUserId.set(user.id, email);
   }
 
   // Fallback: email by handle/name from creator_signups
@@ -54,7 +59,7 @@ export async function GET() {
   const emailByIdentifier = new Map<string, string>();
   for (const signup of signups ?? []) {
     const email = norm(signup.email);
-    if (!email || ADMIN_EMAILS.has(email)) continue;
+    if (!email) continue;
     for (const field of [signup.instagram_handle, signup.tiktok_handle, signup.display_name]) {
       const key = norm(field);
       if (key) emailByIdentifier.set(key, email);
