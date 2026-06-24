@@ -61,25 +61,24 @@ export async function GET() {
     }
   }
 
-  const result = (profiles ?? [])
-    .map((p) => {
-      // Try auth.users first
-      let email = emailByUserId.get(String(p.user_id ?? '')) ?? null;
+  const result = (profiles ?? []).map((p) => {
+    // Try auth.users first
+    let email = emailByUserId.get(String(p.user_id ?? '')) ?? null;
 
-      // Fall back to creator_signups match by social_handle / display_name / creator_name
-      if (!email) {
-        for (const field of [p.social_handle, p.display_name, p.creator_name]) {
-          const key = norm(field);
-          if (key && emailByIdentifier.has(key)) {
-            email = emailByIdentifier.get(key)!;
-            break;
-          }
+    // Fall back to creator_signups match by social_handle / display_name / creator_name
+    if (!email) {
+      for (const field of [p.social_handle, p.display_name, p.creator_name]) {
+        const key = norm(field);
+        if (key && emailByIdentifier.has(key)) {
+          email = emailByIdentifier.get(key)!;
+          break;
         }
       }
+    }
 
-      return { ...p, email };
-    })
-    .filter((p) => p.email);
+    // Always return the profile — email may be null if no match found
+    return { ...p, email };
+  });
 
   return NextResponse.json(result);
 }

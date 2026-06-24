@@ -79,22 +79,29 @@ function InvitesPageInner() {
     const res = await fetch('/api/creators-with-email');
     const profileData: Record<string, unknown>[] = res.ok ? await res.json() : [];
 
+    const seenIds = new Set<string>();
     const seenEmails = new Set<string>();
     const list: InviteCreator[] = [];
 
     for (const row of profileData) {
+      const id = String(row.id ?? '');
+      if (seenIds.has(id)) continue;
+      seenIds.add(id);
+
       const email = String(row.email ?? '').trim().toLowerCase();
-      if (!email || seenEmails.has(email)) continue;
-      seenEmails.add(email);
+      // Deduplicate by email when present, but never drop a creator just for missing email
+      if (email && seenEmails.has(email)) continue;
+      if (email) seenEmails.add(email);
+
       list.push({
-        id: String(row.id ?? ''),
+        id,
         userId: String(row.user_id ?? ''),
         name:
           String(row.display_name ?? '').trim() ||
           String(row.creator_name ?? '').trim() ||
           String(row.social_handle ?? '').trim() ||
           'Unknown',
-        email,
+        email: email || '',
         handle: String(row.social_handle ?? '').trim(),
         tags: extractCreatorTags(row),
       });
@@ -361,17 +368,18 @@ function InvitesPageInner() {
                         type="button"
                         className="text-xs text-primary hover:underline"
                         onClick={() => {
-                          const allSelected = filteredCreators.every((c) => selectedEmails.has(c.email));
+                          const withEmail = filteredCreators.filter((c) => c.email);
+                          const allSelected = withEmail.every((c) => selectedEmails.has(c.email));
                           if (allSelected) {
                             const next = new Set(selectedEmails);
-                            filteredCreators.forEach((c) => next.delete(c.email));
+                            withEmail.forEach((c) => next.delete(c.email));
                             setSelectedEmails(next);
                           } else {
-                            setSelectedEmails(new Set([...selectedEmails, ...filteredCreators.map((c) => c.email)]));
+                            setSelectedEmails(new Set([...selectedEmails, ...withEmail.map((c) => c.email)]));
                           }
                         }}
                       >
-                        {filteredCreators.every((c) => selectedEmails.has(c.email)) ? 'Deselect all' : 'Select all'}
+                        {filteredCreators.filter((c) => c.email).every((c) => selectedEmails.has(c.email)) ? 'Deselect all' : 'Select all'}
                       </button>
                     )}
                   </div>
@@ -381,26 +389,29 @@ function InvitesPageInner() {
                       <div className="px-3 py-8 text-center text-sm text-muted-foreground">Loading...</div>
                     ) : filteredCreators.length === 0 ? (
                       <div className="px-3 py-8 text-center text-sm text-muted-foreground">
-                        {creators.length === 0 ? 'No creators with email addresses found.' : 'No creators match your search.'}
+                        {creators.length === 0 ? 'No onboarded creators found.' : 'No creators match your search.'}
                       </div>
                     ) : (
                       filteredCreators.map((creator) => {
-                        const isSelected = selectedEmails.has(creator.email);
+                        const hasEmail = Boolean(creator.email);
+                        const isSelected = hasEmail && selectedEmails.has(creator.email);
                         return (
                           <label
                             key={creator.id}
-                            className={`flex cursor-pointer items-start gap-3 px-3 py-2.5 hover:bg-muted/40 transition-colors ${isSelected ? 'bg-blue-50/50' : ''}`}
+                            className={`flex items-start gap-3 px-3 py-2.5 transition-colors ${hasEmail ? 'cursor-pointer hover:bg-muted/40' : 'cursor-not-allowed opacity-50'} ${isSelected ? 'bg-blue-50/50' : ''}`}
                           >
                             <input
                               type="checkbox"
                               checked={isSelected}
+                              disabled={!hasEmail}
                               onChange={() => {
+                                if (!hasEmail) return;
                                 const next = new Set(selectedEmails);
                                 if (isSelected) next.delete(creator.email);
                                 else next.add(creator.email);
                                 setSelectedEmails(next);
                               }}
-                              className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                              className="mt-0.5 h-4 w-4 shrink-0 accent-primary disabled:opacity-40"
                             />
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-baseline gap-x-2">
@@ -409,7 +420,10 @@ function InvitesPageInner() {
                                   <span className="text-xs text-muted-foreground">@{creator.handle.replace(/^@/, '')}</span>
                                 )}
                               </div>
-                              <p className="text-xs text-muted-foreground truncate">{creator.email}</p>
+                              {creator.email
+                                ? <p className="text-xs text-muted-foreground truncate">{creator.email}</p>
+                                : <p className="text-xs text-orange-500">No email — cannot invite</p>
+                              }
                               {creator.tags.length > 0 && (
                                 <div className="mt-1 flex flex-wrap gap-1">
                                   {creator.tags.map((tag) => (
