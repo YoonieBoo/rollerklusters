@@ -33,6 +33,7 @@ type SupabaseRow = Record<string, unknown>;
 
 type EngagementRow = {
   id: string;
+  campaign_id: string;
   creator_id: string;
   status: string;
   match_score: number | null;
@@ -48,7 +49,7 @@ type CampaignDetail = {
   updatedAt: string | null;
 };
 
-const StatusBadge = ({ status }: { status: string }) => {
+const StatusBadge = ({ status, label }: { status: string; label?: string }) => {
   const styles: Record<string, string> = {
     active: 'bg-green-500/10 text-green-600',
     draft: 'bg-yellow-500/10 text-yellow-600',
@@ -67,8 +68,8 @@ const StatusBadge = ({ status }: { status: string }) => {
   };
 
   return (
-    <Badge className={`${styles[status] || styles.draft} border-0 capitalize`}>
-      {status.replace(/[_-]/g, ' ')}
+    <Badge className={`${styles[status] || styles.draft} border-0`}>
+      {label ?? status.replace(/[_-]/g, ' ')}
     </Badge>
   );
 };
@@ -112,6 +113,18 @@ const getLatestReviewStatus = (submissionId: string, reviews: SupabaseRow[]) => 
   return '';
 };
 
+const engagementStatusLabels: Record<string, string> = {
+  matched: 'Pending creator response',
+  accepted: 'Accepted by creator',
+  declined: 'Declined by creator',
+  in_discussion: 'In discussion',
+  active: 'Active',
+  completed: 'Completed',
+};
+
+const getEngagementLabel = (status: string) =>
+  engagementStatusLabels[status] ?? status.replace(/[_-]/g, ' ');
+
 export default function CampaignDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -152,7 +165,7 @@ export default function CampaignDetailPage() {
           .order('updated_at', { ascending: false }),
         supabase
           .from('engagements')
-          .select('id, creator_id, status, match_score, created_at')
+          .select('id, campaign_id, creator_id, status, match_score, created_at')
           .eq('campaign_id', campaignId)
           .order('created_at', { ascending: false }),
       ]);
@@ -467,12 +480,7 @@ export default function CampaignDetailPage() {
               <div className="divide-y divide-border">
                 {engagements.map((eng) => {
                   const name = creatorNameById.get(eng.creator_id) ?? 'Unknown creator';
-                  const statusLabel = eng.status === 'matched' ? 'Pending response'
-                    : eng.status === 'accepted' ? 'Accepted'
-                    : eng.status === 'declined' ? 'Declined'
-                    : eng.status === 'active' ? 'Active'
-                    : eng.status === 'completed' ? 'Completed'
-                    : eng.status;
+                  const statusLabel = getEngagementLabel(eng.status);
                   return (
                     <div key={eng.id} className="flex items-center justify-between gap-4 px-5 py-3">
                       <div>
@@ -481,7 +489,7 @@ export default function CampaignDetailPage() {
                           Invited {eng.created_at ? formatDate(eng.created_at) : 'recently'}
                         </p>
                       </div>
-                      <StatusBadge status={eng.status} />
+                      <StatusBadge status={eng.status} label={statusLabel} />
                     </div>
                   );
                 })}
