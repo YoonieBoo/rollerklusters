@@ -475,9 +475,10 @@ export default function CreatorsPage() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      const [users, signups] = await Promise.all([
+      const [users, signups, cmIdsRes] = await Promise.all([
         fetchOptionalRows<UserProfile>('users'),
         fetchOptionalRows<CreatorSignup>('creator_signups', 'created_at'),
+        fetch('/api/campaign-manager-ids').then((r) => r.json()).catch(() => ({ ids: [] })),
       ]);
 
       if (!isMounted) {
@@ -492,10 +493,8 @@ export default function CreatorsPage() {
           setCreators([]);
         }
       } else {
-        const campaignManagerIds = new Set(
-          users.filter((u) => u.role === 'campaign_manager').map((u) => String(u.id ?? ''))
-        );
-        const creatorOnly = (data ?? [] as CreatorProfile[]).filter(
+        const campaignManagerIds = new Set<string>(cmIdsRes?.ids ?? []);
+        const creatorOnly = (data ?? []).filter(
           (p) => !campaignManagerIds.has(String((p as CreatorProfile).user_id ?? ''))
         );
         setCreators(
