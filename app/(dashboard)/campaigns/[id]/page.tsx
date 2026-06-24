@@ -9,7 +9,9 @@ import {
   Clock3,
   FileDown,
   FileText,
+  Mail,
   MessageSquareText,
+  Users,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Card } from '@/components/ui/card';
@@ -28,6 +30,14 @@ import {
 } from '@/lib/report-export';
 
 type SupabaseRow = Record<string, unknown>;
+
+type EngagementRow = {
+  id: string;
+  creator_id: string;
+  status: string;
+  match_score: number | null;
+  created_at: string | null;
+};
 
 type CampaignDetail = {
   id: string;
@@ -49,6 +59,11 @@ const StatusBadge = ({ status }: { status: string }) => {
     rejected: 'bg-red-500/10 text-red-600',
     missing: 'bg-red-500/10 text-red-600',
     pending: 'bg-yellow-500/10 text-yellow-600',
+    // engagement statuses
+    matched: 'bg-yellow-500/10 text-yellow-600',
+    accepted: 'bg-green-500/10 text-green-600',
+    declined: 'bg-red-500/10 text-red-600',
+    in_discussion: 'bg-blue-500/10 text-blue-600',
   };
 
   return (
@@ -106,6 +121,8 @@ export default function CampaignDetailPage() {
   const [submissions, setSubmissions] = useState<SupabaseRow[]>([]);
   const [reviews, setReviews] = useState<SupabaseRow[]>([]);
   const [reports, setReports] = useState<SupabaseRow[]>([]);
+  const [engagements, setEngagements] = useState<EngagementRow[]>([]);
+  const [creatorNameById, setCreatorNameById] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -114,7 +131,7 @@ export default function CampaignDetailPage() {
     setIsLoading(true);
     setErrorMessage(null);
 
-    const [campaignResult, briefResult, submissionsResult, reviewsResult, reportsResult] =
+    const [campaignResult, briefResult, submissionsResult, reviewsResult, reportsResult, engagementsResult] =
       await Promise.all([
         supabase
           .from('campaigns')
@@ -133,6 +150,11 @@ export default function CampaignDetailPage() {
           .select('*')
           .eq('campaign_id', campaignId)
           .order('updated_at', { ascending: false }),
+        supabase
+          .from('engagements')
+          .select('id, creator_id, status, match_score, created_at')
+          .eq('campaign_id', campaignId)
+          .order('created_at', { ascending: false }),
       ]);
 
     const fetchError =
@@ -140,7 +162,8 @@ export default function CampaignDetailPage() {
       briefResult.error ||
       submissionsResult.error ||
       reviewsResult.error ||
-      reportsResult.error;
+      reportsResult.error ||
+      engagementsResult.error;
 
     if (fetchError) {
       console.error('Supabase campaign detail fetch error:', fetchError);
@@ -170,12 +193,49 @@ export default function CampaignDetailPage() {
     setSubmissions((submissionsResult.data ?? []) as SupabaseRow[]);
     setReviews((reviewsResult.data ?? []) as SupabaseRow[]);
     setReports((reportsResult.data ?? []) as SupabaseRow[]);
+
+    const fetchedEngagements = (engagementsResult.data ?? []) as EngagementRow[];
+    setEngagements(fetchedEngagements);
+
+    // Fetch creator names for all engaged creator IDs
+    const creatorIds = fetchedEngagements.map((e) => e.creator_id).filter(Boolean);
+    if (creatorIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('creator_profiles')
+        .select('user_id, display_name, creator_name, social_handle')
+        .in('user_id', creatorIds);
+      const nameMap = new Map<string, string>();
+      for (const p of profiles ?? []) {
+        const name =
+          toText(p.display_name).trim() ||
+          toText(p.creator_name).trim() ||
+          toText(p.social_handle).trim() ||
+          'Unknown creator';
+        nameMap.set(toText(p.user_id), name);
+      }
+      setCreatorNameById(nameMap);
+    }
+
     setIsLoading(false);
   };
 
   useEffect(() => {
     fetchCampaignDetail();
-  }, [campaignId]);
+
+    // Re-fetch when a creator accepts or declines
+    const channel = supabase
+      .channel(`campaign-engagements-${campaignId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'engagements', filter: `campaign_id=eq.${campaignId}` },
+        () => fetchCampaignDetail()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [campaignId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const acceptedEngagements = useMemo(() => engagements.filter((e) => e.status === 'accepted' || e.status === 'active' || e.status === 'completed'), [engagements]);
+  const pendingEngagements = useMemo(() => engagements.filter((e) => e.status === 'matched' || e.status === 'in_discussion'), [engagements]);
+  const declinedEngagements = useMemo(() => engagements.filter((e) => e.status === 'declined'), [engagements]);
 
   const reviewedCount = useMemo(
     () =>
@@ -292,7 +352,7 @@ export default function CampaignDetailPage() {
         </div>
       </section>
 
-      <section className="grid overflow-hidden rounded-lg border border-border bg-card md:grid-cols-3">
+      <section className="grid overflow-hidden rounded-lg border border-border bg-card md:grid-cols-4">
         <div className="border-b border-border px-5 py-4 md:border-b-0 md:border-r">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Clock3 size={16} className="text-blue-700" />
@@ -301,6 +361,16 @@ export default function CampaignDetailPage() {
           <p className="mt-2 text-xl font-semibold capitalize">
             {getBriefStatus(brief).replace(/_/g, ' ')}
           </p>
+        </div>
+        <div className="border-b border-border px-5 py-4 md:border-b-0 md:border-r">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Mail size={16} className="text-blue-700" />
+            Invites
+          </div>
+          <p className="mt-2 text-xl font-semibold">
+            {acceptedEngagements.length}/{engagements.length}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">creators accepted</p>
         </div>
         <div className="border-b border-border px-5 py-4 md:border-b-0 md:border-r">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -325,6 +395,14 @@ export default function CampaignDetailPage() {
       <Tabs defaultValue="overview" className="w-full">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="invites">
+            Invites
+            {engagements.length > 0 && (
+              <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                {engagements.length}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="brief">Brief</TabsTrigger>
           <TabsTrigger value="submissions">Submissions</TabsTrigger>
         </TabsList>
@@ -349,6 +427,66 @@ export default function CampaignDetailPage() {
                 <p className="mt-1 font-medium">{reports.length > 0 ? 'Available' : 'Not created'}</p>
               </div>
             </div>
+          </section>
+        </TabsContent>
+
+        <TabsContent value="invites" className="mt-4">
+          <section className="overflow-hidden rounded-lg border border-border bg-card">
+            <div className="flex items-center justify-between border-b border-border px-5 py-3">
+              <div className="flex gap-4 text-sm">
+                <span className="flex items-center gap-1.5 font-medium text-green-600">
+                  <CheckCircle2 size={14} />
+                  {acceptedEngagements.length} accepted
+                </span>
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <Clock3 size={14} />
+                  {pendingEngagements.length} pending
+                </span>
+                <span className="flex items-center gap-1.5 text-red-500">
+                  <Users size={14} />
+                  {declinedEngagements.length} declined
+                </span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => router.push(`/invites?campaign=${encodeURIComponent(campaign.id)}`)}
+              >
+                Send more invites
+              </Button>
+            </div>
+            {engagements.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 p-8 text-center">
+                <Mail size={28} className="text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">No creators invited yet.</p>
+                <Button size="sm" onClick={() => router.push(`/invites?campaign=${encodeURIComponent(campaign.id)}`)}>
+                  Invite creators
+                </Button>
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {engagements.map((eng) => {
+                  const name = creatorNameById.get(eng.creator_id) ?? 'Unknown creator';
+                  const statusLabel = eng.status === 'matched' ? 'Pending response'
+                    : eng.status === 'accepted' ? 'Accepted'
+                    : eng.status === 'declined' ? 'Declined'
+                    : eng.status === 'active' ? 'Active'
+                    : eng.status === 'completed' ? 'Completed'
+                    : eng.status;
+                  return (
+                    <div key={eng.id} className="flex items-center justify-between gap-4 px-5 py-3">
+                      <div>
+                        <p className="text-sm font-medium">{name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Invited {eng.created_at ? formatDate(eng.created_at) : 'recently'}
+                        </p>
+                      </div>
+                      <StatusBadge status={eng.status} />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
         </TabsContent>
 
