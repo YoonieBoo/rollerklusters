@@ -205,7 +205,10 @@ function InvitesPageInner() {
     setResult(null);
 
     try {
-      // Build payload — creators mode includes userId so the API can write engagements to Supabase
+      // Get admin auth token so the ecosystem API can verify brand/admin identity
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token ?? '';
+
       const creatorMap = new Map(creators.map((c) => [c.email, c]));
       const payload =
         mode === 'creators'
@@ -213,6 +216,7 @@ function InvitesPageInner() {
               campaignId: selectedCampaignId,
               campaignName: selectedCampaign?.name ?? '',
               clientName: selectedCampaign?.client_name ?? '',
+              accessToken,
               creators: emailList.map((email) => ({
                 id: creatorMap.get(email)?.userId ?? '',
                 email,
@@ -222,6 +226,7 @@ function InvitesPageInner() {
               campaignId: selectedCampaignId,
               campaignName: selectedCampaign?.name ?? '',
               clientName: selectedCampaign?.client_name ?? '',
+              accessToken,
               emails: emailList,
             };
 

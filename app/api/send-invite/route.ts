@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const { campaignId, campaignName, clientName, emails, creators } = body as Record<string, unknown>;
+  const { campaignId, campaignName, clientName, emails, creators, accessToken } = body as Record<string, unknown>;
 
   // Accept either a `creators` array (with ids) or a plain `emails` array
   const creatorList = Array.isArray(creators)
@@ -82,61 +82,80 @@ export async function POST(request: NextRequest) {
 
   const resolvedCampaignName = String(campaignName ?? '');
 
-  // Write engagement records to Supabase first — this works even without email configured.
+  // For each creator with a real user ID, call the ecosystem invite API.
+  // That route handles engagement insert + push notification in one place.
+  // Fall back to direct insert + webpush if the ecosystem call fails.
   if (creatorList && creatorList.length > 0) {
-    const rows = creatorList
-      .filter((c) => c.id)
-      .map((c) => ({
-        campaign_id: String(campaignId),
-        creator_id: c.id,
-        status: 'matched',
-        match_score: 82,
-      }));
+    const creatorsWithId = creatorList.filter((c) => c.id);
 
-    if (rows.length > 0) {
-      const { error: engagementError } = await supabaseAdmin
-        .from('engagements')
-        .upsert(rows, { onConflict: 'campaign_id,creator_id', ignoreDuplicates: true });
-
-      if (engagementError) {
-        console.warn('Could not write engagements to Supabase (table may not exist yet):', engagementError.message);
-      }
-    }
-
-    // Send push notifications to each invited creator if VAPID is configured
-    if (vapidPublicKey && vapidPrivateKey && creatorList.length > 0) {
-      const creatorIds = creatorList.filter((c) => c.id).map((c) => c.id);
-      const { data: subs } = await supabaseAdmin
-        .from('push_subscriptions')
-        .select('endpoint, p256dh, auth')
-        .in('creator_id', creatorIds);
-
-      if (subs && subs.length > 0) {
-        const payload = JSON.stringify({
-          title: 'You have a new campaign invite',
-          body: resolvedCampaignName ? `You've been invited to: ${resolvedCampaignName}` : 'Open the app to view your invitation.',
-          url: '/notifications',
-        });
-
-        const expiredEndpoints: string[] = [];
-        await Promise.allSettled(
-          subs.map(async (sub) => {
-            try {
-              await webpush.sendNotification(
-                { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-                payload
-              );
-            } catch (err) {
-              const statusCode = (err as { statusCode?: number })?.statusCode;
-              if (statusCode === 410 || statusCode === 404) expiredEndpoints.push(sub.endpoint);
-            }
-          })
-        );
-        if (expiredEndpoints.length > 0) {
-          await supabaseAdmin.from('push_subscriptions').delete().in('endpoint', expiredEndpoints);
+    await Promise.allSettled(
+      creatorsWithId.map(async (creator) => {
+        // Prefer the ecosystem API so push notification fires correctly
+        if (accessToken) {
+          try {
+            const ecoRes = await fetch('https://rollerkluster-ecosystem.vercel.app/api/engagements/invite', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`,
+              },
+              body: JSON.stringify({
+                campaignId: String(campaignId),
+                creatorId: creator.id,
+                matchScore: 82,
+              }),
+            });
+            if (ecoRes.ok) return; // ecosystem handled it — done
+            const errText = await ecoRes.text().catch(() => '');
+            console.warn(`Ecosystem invite API returned ${ecoRes.status} for creator ${creator.id}:`, errText);
+          } catch (err) {
+            console.warn('Ecosystem invite API unreachable, falling back:', err);
+          }
         }
-      }
-    }
+
+        // Fallback: insert engagement directly + send push via webpush
+        const { error: engagementError } = await supabaseAdmin
+          .from('engagements')
+          .upsert(
+            { campaign_id: String(campaignId), creator_id: creator.id, status: 'matched', match_score: 82 },
+            { onConflict: 'campaign_id,creator_id', ignoreDuplicates: true }
+          );
+        if (engagementError) {
+          console.warn('Fallback engagement insert failed:', engagementError.message);
+        }
+
+        if (vapidPublicKey && vapidPrivateKey) {
+          const { data: subs } = await supabaseAdmin
+            .from('push_subscriptions')
+            .select('endpoint, p256dh, auth')
+            .eq('creator_id', creator.id);
+
+          const pushPayload = JSON.stringify({
+            title: 'You have a new campaign invite',
+            body: resolvedCampaignName ? `You've been invited to: ${resolvedCampaignName}` : 'Open the app to view your invitation.',
+            url: '/notifications',
+          });
+
+          const expiredEndpoints: string[] = [];
+          await Promise.allSettled(
+            (subs ?? []).map(async (sub) => {
+              try {
+                await webpush.sendNotification(
+                  { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+                  pushPayload
+                );
+              } catch (err) {
+                const statusCode = (err as { statusCode?: number })?.statusCode;
+                if (statusCode === 410 || statusCode === 404) expiredEndpoints.push(sub.endpoint);
+              }
+            })
+          );
+          if (expiredEndpoints.length > 0) {
+            await supabaseAdmin.from('push_subscriptions').delete().in('endpoint', expiredEndpoints);
+          }
+        }
+      })
+    );
   }
 
   // Send emails if Resend is configured — optional, non-blocking for engagement writes above.
