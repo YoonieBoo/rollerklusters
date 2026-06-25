@@ -458,7 +458,9 @@ export default function CreatorsPage() {
   const [creators, setCreators] = useState<CreatorProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const creatorGroups = groupCreatorsBySignupDate(creators);
+  const creatorGroups = groupCreatorsBySignupDate(creators).filter(
+    (g) => g.label !== 'Unknown signup date'
+  );
 
   useEffect(() => {
     let isMounted = true;
