@@ -262,7 +262,7 @@ function InvitesPageInner() {
           </p>
 
           {/* Campaign picker — aligned with subtitle */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
             <label className="text-sm font-medium text-foreground whitespace-nowrap">
               Select campaign
             </label>
@@ -273,11 +273,11 @@ function InvitesPageInner() {
                 Create a campaign first
               </button>
             ) : (
-              <div className="relative">
+              <div className="relative flex-1 sm:flex-none">
                 <select
                   value={selectedCampaignId}
                   onChange={(e) => setSelectedCampaignId(e.target.value)}
-                  className="appearance-none rounded-md border border-border bg-card px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring min-w-[220px]"
+                  className="w-full appearance-none rounded-md border border-border bg-card px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring sm:min-w-[220px]"
                 >
                   <option value="">— Choose a campaign —</option>
                   {campaigns.map((c) => (
