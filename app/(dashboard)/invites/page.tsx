@@ -63,8 +63,10 @@ function InvitesPageInner() {
   const [search, setSearch] = useState('');
   const [manualEmails, setManualEmails] = useState('');
 
+  const [invitedUserIds, setInvitedUserIds] = useState<Set<string>>(new Set());
   const [isSending, setIsSending] = useState(false);
   const [result, setResult] = useState<{ success?: string; error?: string } | null>(null);
+  const [confirmResend, setConfirmResend] = useState<number | null>(null);
 
   // Keep a ref so the refresh callback always sees the latest campaign id
   const selectedCampaignIdRef = useRef(selectedCampaignId);
@@ -131,12 +133,22 @@ function InvitesPageInner() {
 
   // Initial fetch when campaign changes (with loading spinner + reset)
   useEffect(() => {
-    if (!selectedCampaignId) { setCreators([]); return; }
+    if (!selectedCampaignId) { setCreators([]); setInvitedUserIds(new Set()); return; }
     setSelectedEmails(new Set());
     setTagFilter(null);
     setSearch('');
     setResult(null);
+    setConfirmResend(null);
     fetchCreators(true);
+
+    // Fetch existing engagements to know who's already invited
+    supabase
+      .from('engagements')
+      .select('creator_id')
+      .eq('campaign_id', selectedCampaignId)
+      .then(({ data }) => {
+        setInvitedUserIds(new Set((data ?? []).map((e) => String(e.creator_id))));
+      });
   }, [selectedCampaignId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Realtime + polling so new onboarded creators appear automatically
@@ -183,7 +195,7 @@ function InvitesPageInner() {
 
   const selectedCampaign = campaigns.find((c) => c.id === selectedCampaignId) ?? null;
 
-  const handleSend = async () => {
+  const handleSend = async (force = false) => {
     if (!selectedCampaignId) return;
 
     let emailList: string[];
@@ -201,6 +213,20 @@ function InvitesPageInner() {
       return;
     }
 
+    // Check if any selected creators were already invited
+    if (!force && mode === 'creators') {
+      const creatorMap = new Map(creators.map((c) => [c.email, c]));
+      const alreadyInvitedCount = emailList.filter((email) => {
+        const userId = creatorMap.get(email)?.userId;
+        return userId && invitedUserIds.has(userId);
+      }).length;
+      if (alreadyInvitedCount > 0) {
+        setConfirmResend(alreadyInvitedCount);
+        return;
+      }
+    }
+
+    setConfirmResend(null);
     setIsSending(true);
     setResult(null);
 
@@ -244,6 +270,14 @@ function InvitesPageInner() {
         setResult({ success: `Invite sent to ${emailList.length} creator${emailList.length === 1 ? '' : 's'}.` });
         setSelectedEmails(new Set());
         setManualEmails('');
+        // Refresh invited list so newly invited creators get the badge immediately
+        supabase
+          .from('engagements')
+          .select('creator_id')
+          .eq('campaign_id', selectedCampaignId)
+          .then(({ data }) => {
+            setInvitedUserIds(new Set((data ?? []).map((e) => String(e.creator_id))));
+          });
       }
     } catch {
       setResult({ error: 'Network error. Please try again.' });
@@ -399,6 +433,7 @@ function InvitesPageInner() {
                       filteredCreators.map((creator) => {
                         const hasEmail = Boolean(creator.email);
                         const isSelected = hasEmail && selectedEmails.has(creator.email);
+                        const alreadyInvited = Boolean(creator.userId && invitedUserIds.has(creator.userId));
                         return (
                           <label
                             key={creator.id}
@@ -418,10 +453,15 @@ function InvitesPageInner() {
                               className="mt-0.5 h-4 w-4 shrink-0 accent-primary disabled:opacity-40"
                             />
                             <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-baseline gap-x-2">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                                 <span className="text-sm font-medium text-foreground">{creator.name}</span>
                                 {creator.handle && (
                                   <span className="text-xs text-muted-foreground">@{creator.handle.replace(/^@/, '')}</span>
+                                )}
+                                {alreadyInvited && (
+                                  <span className="rounded-full bg-amber-100 px-2 py-0 text-[10px] font-semibold text-amber-700">
+                                    Already invited
+                                  </span>
                                 )}
                               </div>
                               {creator.email
@@ -472,6 +512,37 @@ function InvitesPageInner() {
               </div>
             )}
 
+            {/* Resend confirmation */}
+            {confirmResend !== null && (
+              <div className="rounded-md border border-amber-400/40 bg-amber-50 px-4 py-3 max-w-md space-y-2">
+                <p className="text-sm font-medium text-amber-800">
+                  {confirmResend === 1
+                    ? 'This creator has already been invited to this campaign.'
+                    : `${confirmResend} of the selected creators have already been invited to this campaign.`}
+                </p>
+                <p className="text-sm text-amber-700">Do you want to send the invitation again?</p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => void handleSend(true)}
+                    disabled={isSending}
+                    className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5"
+                  >
+                    <Send size={13} />
+                    {isSending ? 'Sending...' : 'Yes, send again'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setConfirmResend(null)}
+                    disabled={isSending}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Send bar */}
             <div className="flex items-center gap-4 pt-1 border-t border-border">
               {mode === 'creators' && selectedEmails.size > 0 && (
@@ -480,7 +551,7 @@ function InvitesPageInner() {
                 </span>
               )}
               <Button
-                onClick={handleSend}
+                onClick={() => void handleSend()}
                 disabled={isSending || !selectedCampaignId}
                 className="gap-2 ml-auto"
               >
