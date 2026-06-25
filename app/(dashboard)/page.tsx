@@ -614,6 +614,12 @@ export default function DashboardPage() {
       {/* Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <MetricCard
+          icon={<Users size={24} />}
+          label={['Onboarded', 'Creators']}
+          value={onboardedCreatorsCount}
+          href="/creators"
+        />
+        <MetricCard
           icon={<FolderOpen size={24} />}
           label={['Active', 'Campaigns']}
           value={activeCampaignsCount}
@@ -636,12 +642,6 @@ export default function DashboardPage() {
           label={['Approved', 'Content']}
           value={approvedItemsCount}
           href="/reports"
-        />
-        <MetricCard
-          icon={<Users size={24} />}
-          label={['Onboarded', 'Creators']}
-          value={onboardedCreatorsCount}
-          href="/creators"
         />
       </div>
 
