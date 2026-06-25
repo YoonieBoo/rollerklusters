@@ -279,7 +279,14 @@ export default function CreatorDetailPage() {
                 @{handle.replace(/^@/, '')} · {platform}
               </p>
             )}
-            <p className="mt-2 text-sm text-muted-foreground">{program}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="text-sm text-muted-foreground">{program}</span>
+              {interests !== 'N/A' && interests.split(', ').map((tag) => (
+                <span key={tag} className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 border border-blue-100">
+                  {tag}
+                </span>
+              ))}
+            </div>
 
             <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
               <span className="text-muted-foreground">Followers <span className="font-medium text-foreground">{followers}</span></span>
@@ -287,16 +294,6 @@ export default function CreatorDetailPage() {
               <span className="text-muted-foreground">Scholarship <span className="font-medium text-foreground">{scholarship}</span></span>
               <span className="text-muted-foreground">Joined <span className="font-medium text-foreground">{formatDate(toText(profile.created_at) || null)}</span></span>
             </div>
-
-            {interests !== 'N/A' && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {interests.split(', ').map((tag) => (
-                  <span key={tag} className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 border border-blue-100">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>
