@@ -3,14 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Instagram, Users, Send, CheckCircle2, FileText, Clock } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { LoadingDots } from '@/components/ui/loading-dots';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend,
-} from 'recharts';
+
+const ActivityChart = dynamic(() => import('./ActivityChart'), { ssr: false });
 
 type SupabaseRow = Record<string, unknown>;
 
@@ -332,20 +331,7 @@ export default function CreatorDetailPage() {
           {engagements.length === 0 && submissions.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No activity data yet.</p>
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={buildActivityData(engagements, submissions, period)} margin={{ top: 4, right: 16, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))', fontSize: 12 }}
-                  cursor={{ fill: 'hsl(var(--muted)/0.4)' }}
-                />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="Invites" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={32} />
-                <Bar dataKey="Submissions" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32} />
-              </BarChart>
-            </ResponsiveContainer>
+            <ActivityChart data={buildActivityData(engagements, submissions, period)} />
           )}
         </div>
       </div>
