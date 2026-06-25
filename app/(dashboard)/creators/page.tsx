@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { LoadingDots } from '@/components/ui/loading-dots';
 import {
@@ -456,6 +457,7 @@ const enrichCreatorsWithSubmittedFields = (
 };
 
 export default function CreatorsPage() {
+  const router = useRouter();
   const [creators, setCreators] = useState<CreatorProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -595,7 +597,8 @@ export default function CreatorsPage() {
                           toText(creator.id) ||
                           `${creator.social_handle ?? 'creator'}-${group.label}-${index}`
                         }
-                        className="space-y-4 px-4 py-4"
+                        className="space-y-4 px-4 py-4 cursor-pointer hover:bg-muted/40 active:bg-muted/60 transition-colors"
+                        onClick={() => creator.id && router.push(`/creators/${creator.id}`)}
                       >
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -666,7 +669,8 @@ export default function CreatorsPage() {
                               toText(creator.id) ||
                               `${creator.social_handle ?? 'creator'}-${group.label}-${index}`
                             }
-                            className="h-11 border-border hover:bg-muted/40"
+                            className="h-11 border-border hover:bg-muted/40 cursor-pointer"
+                            onClick={() => creator.id && router.push(`/creators/${creator.id}`)}
                           >
                             <TableCell className="py-2 font-medium text-foreground">
                               <div className="flex items-center gap-2">
