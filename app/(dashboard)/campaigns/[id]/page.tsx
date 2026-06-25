@@ -445,8 +445,8 @@ export default function CampaignDetailPage() {
 
         <TabsContent value="invites" className="mt-4">
           <section className="overflow-hidden rounded-lg border border-border bg-card">
-            <div className="flex items-center justify-between border-b border-border px-5 py-3">
-              <div className="flex gap-4 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
+              <div className="flex flex-wrap gap-3 text-sm">
                 <span className="flex items-center gap-1.5 font-medium text-green-600">
                   <CheckCircle2 size={14} />
                   {acceptedEngagements.length} accepted

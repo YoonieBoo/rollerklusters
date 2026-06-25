@@ -699,7 +699,8 @@ export default function ReviewsPage() {
 
       {!isLoading && !errorMessage && normalizedSubmissions.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-border bg-card/30">
-          <Table>
+          <div className="overflow-x-auto">
+          <Table className="min-w-[640px]">
             <TableHeader className="bg-muted/40">
               <TableRow className="hover:bg-muted/40">
                 <TableHead>Creator</TableHead>
@@ -770,6 +771,7 @@ export default function ReviewsPage() {
               )}
             </TableBody>
           </Table>
+          </div>
         </div>
       )}
 
