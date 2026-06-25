@@ -28,6 +28,9 @@ import {
   getCampaignReportExportData,
   toText,
 } from '@/lib/report-export';
+import BriefTabContent from './_tabs/BriefTabContent';
+import ReviewsTabContent from './_tabs/ReviewsTabContent';
+import InvitesTabContent from './_tabs/InvitesTabContent';
 
 type SupabaseRow = Record<string, unknown>;
 
@@ -324,14 +327,6 @@ export default function CampaignDetailPage() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => router.push(`/reviews?campaign=${encodeURIComponent(campaign.id)}`)}
-          >
-            <MessageSquareText size={16} />
-            Review Submissions
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
             onClick={() => router.push(`/reports?campaign=${encodeURIComponent(campaign.id)}`)}
           >
             <FileText size={16} />
@@ -408,6 +403,7 @@ export default function CampaignDetailPage() {
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="brief">Brief</TabsTrigger>
           <TabsTrigger value="invites">
             Invites
             {engagements.length > 0 && (
@@ -416,8 +412,7 @@ export default function CampaignDetailPage() {
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="brief">Brief</TabsTrigger>
-          <TabsTrigger value="submissions">Submissions</TabsTrigger>
+          <TabsTrigger value="reviews">Reviews</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -443,10 +438,16 @@ export default function CampaignDetailPage() {
           </section>
         </TabsContent>
 
-        <TabsContent value="invites" className="mt-4">
-          <section className="overflow-hidden rounded-lg border border-border bg-card">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
-              <div className="flex flex-wrap gap-3 text-sm">
+        <TabsContent value="brief" className="mt-4">
+          <BriefTabContent campaignId={campaignId} />
+        </TabsContent>
+
+        <TabsContent value="invites" className="mt-4 space-y-4">
+          <InvitesTabContent campaignId={campaignId} />
+
+          {engagements.length > 0 && (
+            <section className="overflow-hidden rounded-lg border border-border bg-card">
+              <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3 text-sm">
                 <span className="flex items-center gap-1.5 font-medium text-green-600">
                   <CheckCircle2 size={14} />
                   {acceptedEngagements.length} accepted
@@ -460,23 +461,6 @@ export default function CampaignDetailPage() {
                   {declinedEngagements.length} declined
                 </span>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => router.push(`/invites?campaign=${encodeURIComponent(campaign.id)}`)}
-              >
-                Send more invites
-              </Button>
-            </div>
-            {engagements.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 p-8 text-center">
-                <Mail size={28} className="text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">No creators invited yet.</p>
-                <Button size="sm" onClick={() => router.push(`/invites?campaign=${encodeURIComponent(campaign.id)}`)}>
-                  Invite creators
-                </Button>
-              </div>
-            ) : (
               <div className="divide-y divide-border">
                 {engagements.map((eng) => {
                   const name = creatorNameById.get(eng.creator_id) ?? 'Unknown creator';
@@ -494,91 +478,12 @@ export default function CampaignDetailPage() {
                   );
                 })}
               </div>
-            )}
-          </section>
+            </section>
+          )}
         </TabsContent>
 
-        <TabsContent value="brief" className="mt-4">
-          <section className="rounded-lg border border-border bg-card px-5 py-4">
-            {brief ? (
-              <div className="space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-semibold">Campaign Brief</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {getBriefStatus(brief).replace(/_/g, ' ')}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => router.push(`/briefs?campaign=${encodeURIComponent(campaign.id)}`)}
-                  >
-                    Open Brief
-                  </Button>
-                </div>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div>
-                    <p className="text-xs font-medium uppercase text-muted-foreground">Objective</p>
-                    <p className="mt-2 text-sm">{toText(brief.objective) || 'Not added'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium uppercase text-muted-foreground">Audience</p>
-                    <p className="mt-2 text-sm">{toText(brief.target_audience) || 'Not added'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium uppercase text-muted-foreground">Direction</p>
-                    <p className="mt-2 text-sm">{toText(brief.content_direction) || 'Not added'}</p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center">
-                <p className="mb-4 text-sm text-muted-foreground">No brief created yet</p>
-                <Button onClick={() => router.push(`/briefs?campaign=${encodeURIComponent(campaign.id)}`)}>
-                  Create Brief
-                </Button>
-              </div>
-            )}
-          </section>
-        </TabsContent>
-
-        <TabsContent value="submissions" className="mt-4">
-          <section className="overflow-hidden rounded-lg border border-border bg-card">
-            {submissions.length > 0 ? (
-              <div className="divide-y divide-border">
-                {submissions.map((submission) => {
-                  const status =
-                    getLatestReviewStatus(toText(submission.id), reviews) ||
-                    toText(submission.status) ||
-                    'pending';
-
-                  return (
-                    <div key={toText(submission.id)} className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
-                      <div className="min-w-0">
-                        <p className="font-medium">{toText(submission.creator_ref) || 'Unknown creator'}</p>
-                        <a
-                          href={toText(submission.submission_link) || undefined}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-1 block truncate text-sm text-primary hover:underline"
-                        >
-                          {toText(submission.submission_link) || 'No content link'}
-                        </a>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Submitted {formatDate(toText(submission.submitted_at) || null)}
-                        </p>
-                      </div>
-                      <StatusBadge status={status} />
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="p-6 text-center">
-                <p className="text-sm text-muted-foreground">No submissions yet</p>
-              </div>
-            )}
-          </section>
+        <TabsContent value="reviews" className="mt-4">
+          <ReviewsTabContent campaignId={campaignId} />
         </TabsContent>
       </Tabs>
     </div>

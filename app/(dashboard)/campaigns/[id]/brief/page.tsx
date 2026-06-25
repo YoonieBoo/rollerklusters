@@ -14,7 +14,7 @@ export default function LegacyCampaignBriefRedirectPage() {
       return;
     }
 
-    router.replace(`/briefs?campaign=${encodeURIComponent(campaignId)}`);
+    router.replace(`/campaigns/${encodeURIComponent(campaignId)}`);
   }, [campaignId, router]);
 
   return (

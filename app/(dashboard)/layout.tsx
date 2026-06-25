@@ -9,12 +9,9 @@ import {
   LogOut,
   Menu,
   X,
-  FileText,
-  CheckSquare,
   Users,
   UserPlus,
   UserCog,
-  Mail,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
@@ -25,13 +22,10 @@ import { LoadingDots } from '@/components/ui/loading-dots';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/campaigns', label: 'Campaigns', icon: FolderOpen },
   { href: '/creators', label: 'Onboarded Creators', icon: Users },
   { href: '/campaign-managers', label: 'Campaign Managers', icon: UserCog },
   { href: '/creator-signups', label: 'Creator Details', icon: UserPlus },
-  { href: '/campaigns', label: 'Campaigns', icon: FolderOpen },
-  { href: '/briefs', label: 'Briefs', icon: FileText },
-  { href: '/reviews', label: 'Reviews', icon: CheckSquare },
-  { href: '/invites', label: 'Invites', icon: Mail },
 ];
 
 const SIGNUP_COUNT_REFRESH_INTERVAL_MS = 15000;

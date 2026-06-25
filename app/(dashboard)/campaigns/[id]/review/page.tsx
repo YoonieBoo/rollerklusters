@@ -14,7 +14,7 @@ export default function LegacyCampaignReviewRedirectPage() {
       return;
     }
 
-    router.replace(`/reviews?campaign=${encodeURIComponent(campaignId)}`);
+    router.replace(`/campaigns/${encodeURIComponent(campaignId)}`);
   }, [campaignId, router]);
 
   return (
