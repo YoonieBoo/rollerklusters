@@ -254,42 +254,42 @@ function InvitesPageInner() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Invites</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+      <div>
+        <h1 className="text-2xl font-semibold text-foreground">Invites</h1>
+        <div className="mt-1 flex items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
             Send creator brief invites by email.
           </p>
-        </div>
 
-        {/* Campaign picker — top right */}
-        <div className="flex items-center gap-2 shrink-0">
-          <label className="text-sm font-medium text-foreground whitespace-nowrap">
-            Select campaign
-          </label>
-          {campaignsLoading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : campaigns.length === 0 ? (
-            <button className="text-sm text-primary underline" onClick={() => router.push('/campaigns')}>
-              Create a campaign first
-            </button>
-          ) : (
-            <div className="relative">
-              <select
-                value={selectedCampaignId}
-                onChange={(e) => setSelectedCampaignId(e.target.value)}
-                className="appearance-none rounded-md border border-border bg-card px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring min-w-[220px]"
-              >
-                <option value="">— Choose a campaign —</option>
-                {campaigns.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name ?? 'Untitled'}{c.client_name ? ` · ${c.client_name}` : ''}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            </div>
-          )}
+          {/* Campaign picker — aligned with subtitle */}
+          <div className="flex items-center gap-2 shrink-0">
+            <label className="text-sm font-medium text-foreground whitespace-nowrap">
+              Select campaign
+            </label>
+            {campaignsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : campaigns.length === 0 ? (
+              <button className="text-sm text-primary underline" onClick={() => router.push('/campaigns')}>
+                Create a campaign first
+              </button>
+            ) : (
+              <div className="relative">
+                <select
+                  value={selectedCampaignId}
+                  onChange={(e) => setSelectedCampaignId(e.target.value)}
+                  className="appearance-none rounded-md border border-border bg-card px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring min-w-[220px]"
+                >
+                  <option value="">— Choose a campaign —</option>
+                  {campaigns.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name ?? 'Untitled'}{c.client_name ? ` · ${c.client_name}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
