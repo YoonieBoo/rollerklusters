@@ -630,10 +630,6 @@ export default function CreatorsPage() {
                             value={getCreatorProgram(creator)}
                           />
                           <CreatorMetric
-                            label="Consistency"
-                            value={getCreatorConsistency(creator)}
-                          />
-                          <CreatorMetric
                             label="Interest"
                             value={getCreatorInterest(creator)}
                           />
@@ -648,16 +644,14 @@ export default function CreatorsPage() {
                 </div>
 
                 <div className="hidden overflow-x-auto md:block">
-                  <Table className="min-w-[1160px]">
+                  <Table className="min-w-[860px]">
                     <TableHeader className="bg-muted/60">
                       <TableRow className="h-10 hover:bg-muted/60">
                         <TableHead className="py-2">Creator</TableHead>
                         <TableHead className="py-2">Platform</TableHead>
-                        <TableHead className="py-2">Social handle</TableHead>
                         <TableHead className="py-2">Program</TableHead>
                         <TableHead className="py-2">Followers</TableHead>
                         <TableHead className="py-2">Rank</TableHead>
-                        <TableHead className="py-2">Consistency</TableHead>
                         <TableHead className="py-2">Interest</TableHead>
                         <TableHead className="py-2">Scholarship Student</TableHead>
                       </TableRow>
@@ -685,9 +679,6 @@ export default function CreatorsPage() {
                             <TableCell className="py-2 text-muted-foreground">
                               {formatLabel(creator.platform)}
                             </TableCell>
-                            <TableCell className="py-2 text-muted-foreground">
-                              {toText(creator.social_handle).trim() || 'N/A'}
-                            </TableCell>
                             <TableCell className="max-w-56 whitespace-normal break-words py-2 text-muted-foreground">
                               {getCreatorProgram(creator)}
                             </TableCell>
@@ -696,9 +687,6 @@ export default function CreatorsPage() {
                             </TableCell>
                             <TableCell className="py-2 text-muted-foreground">
                               {formatLabel(creator.creator_rank)}
-                            </TableCell>
-                            <TableCell className="py-2 text-muted-foreground">
-                              {getCreatorConsistency(creator)}
                             </TableCell>
                             <TableCell className="max-w-56 whitespace-normal break-words py-2 text-muted-foreground">
                               {getCreatorInterest(creator)}
