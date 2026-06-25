@@ -309,7 +309,7 @@ export default function CampaignManagersPage() {
               </div>
 
               <Card className="gap-0 overflow-hidden border-border bg-card py-0">
-                <div className="lg:hidden">
+                <div className="md:hidden">
                   <div className="divide-y divide-border">
                     {group.rows.map((signup, index) => (
                       <div
@@ -355,8 +355,8 @@ export default function CampaignManagersPage() {
                   </div>
                 </div>
 
-                <div className="hidden overflow-x-auto lg:block">
-                  <Table className="min-w-[1520px]">
+                <div className="hidden overflow-x-auto md:block">
+                  <Table className="min-w-[1200px]">
                     <TableHeader className="bg-muted/60">
                       <TableRow className="h-10 hover:bg-muted/60">
                         <TableHead className="py-2">Name</TableHead>

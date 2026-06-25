@@ -549,7 +549,8 @@ export default function CampaignsPage() {
             <p className="text-sm text-muted-foreground">{errorMessage}</p>
           </div>
         ) : filteredCampaigns.length > 0 ? (
-          <Table>
+          <div className="overflow-x-auto">
+          <Table className="min-w-[560px]">
             <TableHeader className="bg-muted/60">
               <TableRow className="h-10 hover:bg-muted/60">
                 <TableHead className="py-2">Name</TableHead>
@@ -649,6 +650,7 @@ export default function CampaignsPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         ) : (
           <div className="p-6 text-center">
             <p className="text-muted-foreground mb-2">No campaigns found</p>

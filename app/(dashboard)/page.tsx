@@ -679,7 +679,8 @@ export default function DashboardPage() {
 
         <Card className="gap-0 border-border bg-card overflow-hidden py-0">
           {recentCampaigns.length > 0 ? (
-            <Table>
+            <div className="overflow-x-auto">
+            <Table className="min-w-[640px]">
               <TableHeader className="bg-muted/60">
                 <TableRow className="h-10 hover:bg-muted/60">
                   <TableHead className="py-2">Campaign Name</TableHead>
@@ -732,6 +733,7 @@ export default function DashboardPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           ) : (
             <div className="p-6 text-center">
               <p className="text-muted-foreground mb-2">No campaigns found</p>

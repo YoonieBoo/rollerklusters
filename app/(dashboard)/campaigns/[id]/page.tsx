@@ -406,7 +406,7 @@ export default function CampaignDetailPage() {
       </section>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="invites">
             Invites

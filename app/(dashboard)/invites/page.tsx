@@ -256,7 +256,7 @@ function InvitesPageInner() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Invites</h1>
-        <div className="mt-1 flex items-center justify-between gap-4">
+        <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <p className="text-sm text-muted-foreground">
             Send creator brief invites by email.
           </p>
