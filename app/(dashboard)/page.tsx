@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { Card } from '@/components/ui/card';
+import { LoadingDots } from '@/components/ui/loading-dots';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -646,9 +647,9 @@ export default function DashboardPage() {
       </div>
 
       {isLoading && (
-        <Card className="p-6 text-center bg-card border-border">
-          <p className="text-muted-foreground">Loading dashboard...</p>
-        </Card>
+        <div className="flex justify-center py-12">
+          <LoadingDots text="Loading dashboard..." />
+        </div>
       )}
 
       {errorMessage && (

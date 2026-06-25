@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
+import { LoadingDots } from '@/components/ui/loading-dots';
 import {
   Table,
   TableBody,
@@ -288,11 +289,9 @@ export default function CampaignManagersPage() {
       </div>
 
       {isLoading ? (
-        <Card className="gap-0 overflow-hidden border-border bg-card py-0">
-          <div className="p-6 text-center">
-            <p className="text-muted-foreground">Loading campaign managers...</p>
-          </div>
-        </Card>
+        <div className="flex justify-center py-12">
+          <LoadingDots text="Loading campaign managers..." />
+        </div>
       ) : errorMessage ? (
         <Card className="gap-0 overflow-hidden border-border bg-card py-0">
           <div className="p-6 text-center">

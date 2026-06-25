@@ -21,6 +21,7 @@ import type { User } from '@supabase/supabase-js';
 import {
   toText,
 } from '@/lib/workflow-updates';
+import { LoadingDots } from '@/components/ui/loading-dots';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -450,10 +451,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   if (isCheckingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="rounded-xl border border-border bg-card px-6 py-5 text-center shadow-xs">
-          <p className="text-sm font-medium text-foreground">Loading RollerKluster</p>
-          <p className="mt-1 text-xs text-muted-foreground">Checking your session...</p>
-        </div>
+        <LoadingDots text="Loading RollerKluster..." />
       </div>
     );
   }
@@ -461,10 +459,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="rounded-xl border border-border bg-card px-6 py-5 text-center shadow-xs">
-          <p className="text-sm font-medium text-foreground">Redirecting to login</p>
-          <p className="mt-1 text-xs text-muted-foreground">Please sign in to continue.</p>
-        </div>
+        <LoadingDots text="Redirecting to login..." />
       </div>
     );
   }

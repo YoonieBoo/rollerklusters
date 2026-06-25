@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Bell, FileDown, Mail, MoreHorizontal, Plus, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
+import { LoadingDots } from '@/components/ui/loading-dots';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -540,8 +541,8 @@ export default function CampaignsPage() {
       {/* Campaigns table */}
       <Card className="gap-0 border-border bg-transparent py-0 overflow-hidden">
         {isLoading ? (
-          <div className="p-6 text-center">
-            <p className="text-muted-foreground">Loading campaigns...</p>
+          <div className="flex justify-center p-10">
+            <LoadingDots text="Loading campaigns..." />
           </div>
         ) : errorMessage ? (
           <div className="p-6 text-center">
