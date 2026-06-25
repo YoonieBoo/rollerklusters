@@ -7,6 +7,10 @@ import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { LoadingDots } from '@/components/ui/loading-dots';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend,
+} from 'recharts';
 
 type SupabaseRow = Record<string, unknown>;
 
@@ -63,6 +67,66 @@ const statusColors: Record<string, string> = {
   completed: 'bg-blue-100 text-blue-700',
 };
 
+type ActivityPeriod = 'week' | 'month';
+
+function buildActivityData(
+  engagements: SupabaseRow[],
+  submissions: SupabaseRow[],
+  period: ActivityPeriod
+) {
+  const now = new Date();
+  const slots = period === 'week' ? 8 : 6;
+  const labels: string[] = [];
+  const inviteCounts: number[] = Array(slots).fill(0);
+  const submitCounts: number[] = Array(slots).fill(0);
+
+  for (let i = slots - 1; i >= 0; i--) {
+    if (period === 'week') {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i * 7);
+      labels.push(`W${String(d.getDate()).padStart(2, '0')}/${d.getMonth() + 1}`);
+    } else {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      labels.push(d.toLocaleString('default', { month: 'short', year: '2-digit' }));
+    }
+  }
+
+  const slotIndex = (dateStr: string) => {
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return -1;
+    for (let i = slots - 1; i >= 0; i--) {
+      const slotStart = new Date(now);
+      if (period === 'week') {
+        slotStart.setDate(slotStart.getDate() - i * 7);
+        slotStart.setHours(0, 0, 0, 0);
+        const slotEnd = new Date(slotStart);
+        slotEnd.setDate(slotEnd.getDate() + 7);
+        if (d >= slotStart && d < slotEnd) return slots - 1 - i;
+      } else {
+        const slotMonth = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        if (d.getFullYear() === slotMonth.getFullYear() && d.getMonth() === slotMonth.getMonth())
+          return slots - 1 - i;
+      }
+    }
+    return -1;
+  };
+
+  for (const eng of engagements) {
+    const idx = slotIndex(toText(eng.created_at));
+    if (idx >= 0) inviteCounts[idx]++;
+  }
+  for (const sub of submissions) {
+    const idx = slotIndex(toText(sub.submitted_at));
+    if (idx >= 0) submitCounts[idx]++;
+  }
+
+  return labels.map((label, i) => ({
+    label,
+    Invites: inviteCounts[i],
+    Submissions: submitCounts[i],
+  }));
+}
+
 function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string | number; sub?: string }) {
   return (
     <div className="rounded-xl border border-border bg-card px-5 py-4">
@@ -83,6 +147,7 @@ export default function CreatorDetailPage() {
   const [submissions, setSubmissions] = useState<SupabaseRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [period, setPeriod] = useState<ActivityPeriod>('week');
 
   useEffect(() => {
     const load = async () => {
@@ -242,6 +307,50 @@ export default function CreatorDetailPage() {
         <StatCard icon={<CheckCircle2 size={15} />} label="Campaigns Accepted" value={accepted} />
         <StatCard icon={<FileText size={15} />} label="Content Submitted" value={submissions.length} />
         <StatCard icon={<Users size={15} />} label="Completed" value={completed} sub="campaigns finished" />
+      </div>
+
+      {/* Activity Chart */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+          <div>
+            <h2 className="font-semibold text-foreground">Activity Overview</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">Invites received and content submitted over time</p>
+          </div>
+          <div className="flex rounded-lg border border-border bg-muted/40 p-1 text-xs font-medium gap-1">
+            <button
+              onClick={() => setPeriod('week')}
+              className={`rounded-md px-3 py-1.5 transition-colors ${period === 'week' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Weekly
+            </button>
+            <button
+              onClick={() => setPeriod('month')}
+              className={`rounded-md px-3 py-1.5 transition-colors ${period === 'month' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Monthly
+            </button>
+          </div>
+        </div>
+        <div className="px-2 py-5">
+          {engagements.length === 0 && submissions.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No activity data yet.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={buildActivityData(engagements, submissions, period)} margin={{ top: 4, right: 16, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))', fontSize: 12 }}
+                  cursor={{ fill: 'hsl(var(--muted)/0.4)' }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="Invites" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                <Bar dataKey="Submissions" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
       </div>
 
       {/* Campaign history */}
