@@ -146,7 +146,15 @@ export default function CampaignsPage() {
 
   useEffect(() => {
     fetchCampaigns();
-  }, []);
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    if (params?.get('create') === '1') {
+      resetCreateForm();
+      setShowCreateDialog(true);
+      // Remove the param from the URL without triggering a navigation
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState(null, '', cleanUrl);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resetCreateForm = () => {
     setEditingCampaignId(null);

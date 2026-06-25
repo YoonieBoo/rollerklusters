@@ -671,11 +671,9 @@ export default function DashboardPage() {
               Your active campaigns at a glance
             </p>
           </div>
-          <Link href="/campaigns">
-            <Button variant="outline" size="sm">
-              View All
-            </Button>
-          </Link>
+          <Button size="sm" className="gap-1.5" onClick={() => router.push('/campaigns?create=1')}>
+            + Create Campaign
+          </Button>
         </div>
 
         <Card className="gap-0 border-border bg-card overflow-hidden py-0">
