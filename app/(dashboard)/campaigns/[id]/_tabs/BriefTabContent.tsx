@@ -900,8 +900,8 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
       <input ref={posterFileInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" multiple className="hidden" onChange={(e) => handlePosterUpload(e.target.files)} />
 
       {/* Additional details popup — appears after first "Apply all" */}
-      <Dialog open={showDetailsDialog} onOpenChange={(open) => { if (!open) handleDetailsSave(); }}>
-        <DialogContent className="sm:max-w-lg">
+      <Dialog open={showDetailsDialog} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-lg" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Add campaign details</DialogTitle>
             <DialogDescription>
@@ -947,8 +947,7 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
               </div>
             </div>
           </div>
-          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="ghost" onClick={handleDetailsSave}>Skip for now</Button>
+          <div className="flex justify-end pt-2">
             <Button type="button" disabled={isSaving} onClick={handleDetailsSave}>
               {isSaving ? 'Saving…' : 'Save & continue'}
             </Button>
