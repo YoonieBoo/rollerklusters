@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, Loader2, Send } from 'lucide-react';
+import { Sparkles, Loader2, ArrowUp } from 'lucide-react';
 import type { BriefAssistResult } from '@/app/api/brief-assist/route';
 import { downloadCreatorBriefPdf } from '@/lib/creator-brief-export';
 import type { CreatorBriefDocument } from '@/lib/creator-brief-export';
@@ -649,64 +649,28 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
             </div>
 
             {showDescribeScreen ? (
-              /* Chat UI */
-              <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-card/20" style={{ height: '480px' }}>
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                  {/* AI greeting */}
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary">
-                      <Sparkles size={13} className="text-white" />
+              /* AI Mode hero */
+              <div className="flex flex-col items-center py-10">
+                {!sentMessage ? (
+                  <>
+                    {/* Heading */}
+                    <div className="mb-8 text-center">
+                      <h2 className="text-3xl font-bold tracking-tight text-foreground">
+                        {editingBrief ? 'Regenerate Your Brief' : 'Create Your Brief with AI'}
+                      </h2>
+                      <p className="mt-2 text-base text-muted-foreground">
+                        {editingBrief
+                          ? "Tell me what's different or what you'd like to improve."
+                          : 'Describe your campaign and AI will generate a complete brief instantly.'}
+                      </p>
                     </div>
-                    <div className="max-w-[82%] rounded-2xl rounded-tl-none bg-muted px-4 py-3 text-sm leading-6 text-foreground">
-                      {editingBrief && selectedBrief
-                        ? "What would you like to change or improve? Describe the campaign again — or tell me what's different — and I'll regenerate the brief."
-                        : "Hi! I'm your brief assistant. Tell me about this campaign — the goal, target audience, tone, and any specific requirements. I'll generate a complete brief for you."}
-                    </div>
-                  </div>
 
-                  {/* User message bubble */}
-                  {sentMessage && (
-                    <div className="flex justify-end">
-                      <div className="max-w-[82%] rounded-2xl rounded-tr-none bg-primary px-4 py-3 text-sm leading-6 text-white">
-                        {sentMessage}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* AI response bubble */}
-                  {sentMessage && (
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary">
-                        <Sparkles size={13} className="text-white" />
-                      </div>
-                      <div className="max-w-[82%] rounded-2xl rounded-tl-none bg-muted px-4 py-3 text-sm leading-6 text-foreground">
-                        {isAiAssisting ? (
-                          <span className="flex items-center gap-2 text-muted-foreground">
-                            <Loader2 size={13} className="animate-spin" />
-                            Generating your brief…
-                          </span>
-                        ) : (
-                          <span>Brief ready! Review and edit the suggestions in the panel above, then click <strong>Apply all</strong> to save.</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {aiError && (
-                    <p className="pl-11 text-xs text-red-500">{aiError} — try again below.</p>
-                  )}
-
-                  <div ref={messagesEndRef} />
-                </div>
-
-                {/* Input bar — hidden after user sends */}
-                {!sentMessage && (
-                  <div className="border-t border-border bg-card/40 px-4 py-4">
-                    <div className="flex items-end gap-3">
-                      <Textarea
-                        className="min-h-[80px] flex-1 resize-none bg-background/60 text-sm"
-                        placeholder="Example: We're launching a new skincare line targeting university women aged 18–25 in Bangkok. The tone should be fresh and authentic. We want TikTok and Instagram content…"
+                    {/* Input card */}
+                    <div className="ai-input-card w-full max-w-2xl">
+                      <textarea
+                        className="ai-input-textarea"
+                        placeholder="Describe your campaign — the goal, target audience, tone, and any requirements…"
+                        rows={3}
                         value={campaignDescription}
                         onChange={(e) => setCampaignDescription(e.target.value)}
                         onKeyDown={(e) => {
@@ -716,22 +680,75 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
                           }
                         }}
                       />
-                      <Button
-                        type="button"
-                        className="ai-glow-btn shrink-0 gap-1.5 px-4 py-2"
-                        disabled={!campaignDescription.trim()}
-                        onClick={handleAiAssist}
-                      >
-                        <Send size={14} />
-                        Send
-                      </Button>
+                      <div className="flex items-center justify-between px-4 pb-4 pt-1">
+                        <p className="text-xs text-muted-foreground/50">⌘ Return to send</p>
+                        <button
+                          className="ai-send-circle"
+                          disabled={!campaignDescription.trim()}
+                          onClick={handleAiAssist}
+                          type="button"
+                        >
+                          <ArrowUp size={16} />
+                        </button>
+                      </div>
                     </div>
-                    <p className="mt-2 text-xs text-muted-foreground">Cmd+Enter to send</p>
+
+                    {/* Suggestion prompts */}
+                    <div className="mt-4 w-full max-w-2xl space-y-0.5">
+                      {[
+                        'Launch a new skincare line for university women in Bangkok on TikTok & Instagram',
+                        'Promote an energy drink targeting gym-goers aged 18–25 with an energetic vibe',
+                        'Build awareness for a sustainable fashion brand using authentic creator content',
+                      ].map((s) => (
+                        <button key={s} className="ai-suggestion-row" type="button" onClick={() => setCampaignDescription(s)}>
+                          <Sparkles size={12} className="shrink-0 opacity-40" />
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+
+                    {aiError && <p className="mt-4 text-sm text-red-500">{aiError}</p>}
                     {editingBrief && selectedBrief && (
-                      <Button type="button" variant="ghost" size="sm" className="mt-2 h-7 px-0 text-xs text-muted-foreground" onClick={() => setEditingBrief(false)}>
-                        Cancel regeneration
-                      </Button>
+                      <button type="button" className="mt-5 text-xs text-muted-foreground underline-offset-2 hover:underline" onClick={() => setEditingBrief(false)}>
+                        Cancel — keep current brief
+                      </button>
                     )}
+                  </>
+                ) : (
+                  /* After send — show chat bubbles */
+                  <div className="w-full max-w-2xl space-y-5">
+                    <div className="mb-2 text-center">
+                      <h2 className="text-3xl font-bold tracking-tight text-foreground">
+                        {editingBrief ? 'Regenerate Your Brief' : 'Create Your Brief with AI'}
+                      </h2>
+                    </div>
+                    <div className="flex justify-end">
+                      <div className="max-w-[82%] rounded-2xl rounded-tr-none bg-primary px-4 py-3 text-sm leading-6 text-white">
+                        {sentMessage}
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary">
+                        <Sparkles size={13} className="text-white" />
+                      </div>
+                      <div className="rounded-2xl rounded-tl-none bg-muted px-4 py-3 text-sm leading-6 text-foreground">
+                        {isAiAssisting ? (
+                          <span className="flex items-center gap-2 text-muted-foreground">
+                            <Loader2 size={13} className="animate-spin" />
+                            Generating your brief…
+                          </span>
+                        ) : (
+                          <span>Brief ready! Review and edit the suggestions, then click <strong>Apply all</strong> to save.</span>
+                        )}
+                      </div>
+                    </div>
+                    {aiError && (
+                      <p className="pl-11 text-xs text-red-500">
+                        {aiError} —{' '}
+                        <button type="button" className="underline" onClick={() => setSentMessage('')}>try again</button>.
+                      </p>
+                    )}
+                    <div ref={messagesEndRef} />
                   </div>
                 )}
               </div>
