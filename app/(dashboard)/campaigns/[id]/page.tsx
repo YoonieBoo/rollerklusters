@@ -7,8 +7,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   Clock3,
-  FileDown,
-  FileText,
   Mail,
   MessageSquareText,
   Users,
@@ -24,8 +22,6 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import {
-  downloadCampaignReportPdf,
-  getCampaignReportExportData,
   toText,
 } from '@/lib/report-export';
 import BriefTabContent from './_tabs/BriefTabContent';
@@ -142,7 +138,6 @@ export default function CampaignDetailPage() {
   const [engagements, setEngagements] = useState<EngagementRow[]>([]);
   const [creatorNameById, setCreatorNameById] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
-  const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const fetchCampaignDetail = async () => {
@@ -275,24 +270,6 @@ export default function CampaignDetailPage() {
     [reviews, submissions]
   );
 
-  const handleExportReport = async () => {
-    setIsExporting(true);
-    setErrorMessage(null);
-
-    try {
-      const reportData = await getCampaignReportExportData(campaignId);
-      downloadCampaignReportPdf(reportData);
-    } catch (error) {
-      console.error('Campaign detail report export error:', error);
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Unable to export campaign report. Please try again.'
-      );
-    } finally {
-      setIsExporting(false);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -325,20 +302,6 @@ export default function CampaignDetailPage() {
           <ArrowLeft size={16} />
           Back to Campaigns
         </Button>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => router.push(`/reports?campaign=${encodeURIComponent(campaign.id)}`)}
-          >
-            <FileText size={16} />
-            View Report
-          </Button>
-          <Button className="gap-2" onClick={handleExportReport} disabled={isExporting}>
-            <FileDown size={16} />
-            {isExporting ? 'Exporting...' : 'Export PDF'}
-          </Button>
-        </div>
       </div>
 
       {errorMessage && (

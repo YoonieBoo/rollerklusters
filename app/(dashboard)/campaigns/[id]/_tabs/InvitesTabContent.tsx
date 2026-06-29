@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { supabase } from '@/lib/supabase/client';
 
 type Campaign = {
@@ -180,14 +179,12 @@ export default function InvitesTabContent({ campaignId }: { campaignId: string }
 
   return (
     <div className="space-y-5">
-      <Card className="border-border bg-card gap-0 py-0 overflow-hidden">
-        <div className="border-b border-border px-5 py-4">
+      <div className="space-y-4">
           <p className="text-sm font-medium text-foreground">
             Inviting to: <span className="text-primary">{campaign?.name ?? 'Loading...'}</span>
           </p>
-        </div>
 
-        <div className="p-5 space-y-4">
+        <div className="space-y-4">
           {/* Mode toggle */}
           <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1 max-w-sm">
             <button type="button" onClick={() => setMode('creators')}
@@ -337,7 +334,7 @@ export default function InvitesTabContent({ campaignId }: { campaignId: string }
             </Button>
           </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
