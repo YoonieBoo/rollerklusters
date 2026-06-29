@@ -198,6 +198,7 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
   const [isAiAssisting, setIsAiAssisting] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<BriefAssistResult | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [showAiInput, setShowAiInput] = useState(true);
 
   const fetchBriefData = async () => {
     setIsLoading(true);
@@ -296,6 +297,7 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
     setContactSupport(selectedBrief?.contactSupport ?? '');
     setPosterImageUrls(selectedBrief?.posterImageUrls ?? []);
     setSaveError(null);
+    setShowAiInput(!selectedBrief);
   }, [campaignId, selectedBrief]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -563,6 +565,7 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
     if (cleanMentions.length > 0) setMentions(cleanMentions);
     if (suggestions.cta) setCta(suggestions.cta);
     setAiSuggestions(null);
+    setShowAiInput(false);
     saveAfterAiRef.current = true;
   };
 
@@ -603,54 +606,56 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
             </div>
           )}
 
-          {/* Always-visible AI input */}
-          <div className="flex flex-col items-center py-8">
-            <div className="mb-8 text-center">
-              <h2 className="text-3xl font-bold tracking-tight text-foreground">Create Your Brief with AI</h2>
-              <p className="mt-2 text-base text-muted-foreground">Describe your campaign and AI will generate a complete brief instantly.</p>
-            </div>
-            <div className="ai-input-card w-full max-w-2xl">
-              <textarea
-                className="ai-input-textarea"
-                placeholder="Describe your campaign — the goal, target audience, tone, and any requirements…"
-                rows={3}
-                value={campaignDescription}
-                onChange={(e) => setCampaignDescription(e.target.value)}
-                onKeyDown={(e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAiAssist();
-                  }
-                }}
-              />
-              <div className="flex items-center justify-between px-4 pb-4 pt-1">
-                <p className="text-xs text-muted-foreground/50">⌘ Return to send</p>
-                <button
-                  className="ai-send-circle"
-                  disabled={!campaignDescription.trim() || isAiAssisting}
-                  onClick={handleAiAssist}
-                  type="button"
-                >
-                  {isAiAssisting ? <Loader2 size={15} className="animate-spin" /> : <ArrowUp size={16} />}
-                </button>
+          {/* AI input — hidden once brief is applied */}
+          {showAiInput && (
+            <div className="flex flex-col items-center py-8">
+              <div className="mb-8 text-center">
+                <h2 className="text-3xl font-bold tracking-tight text-foreground">Create Your Brief with AI</h2>
+                <p className="mt-2 text-base text-muted-foreground">Describe your campaign and AI will generate a complete brief instantly.</p>
               </div>
-            </div>
-            {!isAiAssisting && !aiSuggestions && !selectedBrief && (
-              <div className="mt-4 w-full max-w-2xl space-y-0.5">
-                {[
-                  'Launch a new skincare line for university women in Bangkok on TikTok & Instagram',
-                  'Promote an energy drink targeting gym-goers aged 18–25 with an energetic vibe',
-                  'Build awareness for a sustainable fashion brand using authentic creator content',
-                ].map((s) => (
-                  <button key={s} className="ai-suggestion-row" type="button" onClick={() => setCampaignDescription(s)}>
-                    <Sparkles size={12} className="shrink-0 opacity-40" />
-                    {s}
+              <div className="ai-input-card w-full max-w-2xl">
+                <textarea
+                  className="ai-input-textarea"
+                  placeholder="Describe your campaign — the goal, target audience, tone, and any requirements…"
+                  rows={3}
+                  value={campaignDescription}
+                  onChange={(e) => setCampaignDescription(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAiAssist();
+                    }
+                  }}
+                />
+                <div className="flex items-center justify-between px-4 pb-4 pt-1">
+                  <p className="text-xs text-muted-foreground/50">⌘ Return to send</p>
+                  <button
+                    className="ai-send-circle"
+                    disabled={!campaignDescription.trim() || isAiAssisting}
+                    onClick={handleAiAssist}
+                    type="button"
+                  >
+                    {isAiAssisting ? <Loader2 size={15} className="animate-spin" /> : <ArrowUp size={16} />}
                   </button>
-                ))}
+                </div>
               </div>
-            )}
-            {aiError && <p className="mt-4 text-sm text-red-500">{aiError}</p>}
-          </div>
+              {!isAiAssisting && !aiSuggestions && !selectedBrief && (
+                <div className="mt-4 w-full max-w-2xl space-y-0.5">
+                  {[
+                    'Launch a new skincare line for university women in Bangkok on TikTok & Instagram',
+                    'Promote an energy drink targeting gym-goers aged 18–25 with an energetic vibe',
+                    'Build awareness for a sustainable fashion brand using authentic creator content',
+                  ].map((s) => (
+                    <button key={s} className="ai-suggestion-row" type="button" onClick={() => setCampaignDescription(s)}>
+                      <Sparkles size={12} className="shrink-0 opacity-40" />
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {aiError && <p className="mt-4 text-sm text-red-500">{aiError}</p>}
+            </div>
+          )}
 
           {/* Loading state */}
           {isAiAssisting && (
@@ -812,9 +817,14 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
               </div>
 
               <div className="flex flex-wrap gap-2 border-t border-border/60 pt-5">
-                <Button type="button" onClick={handleViewCreatorBrief}>View Creator Brief</Button>
-                <Button type="button" variant="outline" disabled={isExportingBrief} onClick={handleExportCreatorBrief}>
-                  {isExportingBrief ? 'Generating...' : 'Download PDF'}
+                <Button type="button" disabled={isExportingBrief} onClick={handleExportCreatorBrief}>
+                  {isExportingBrief ? 'Generating...' : 'Download Brief'}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => { setCampaignDescription(''); setAiSuggestions(null); setShowAiInput(true); }}>
+                  Regenerate with AI
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setAiSuggestions({ objective, targetAudience, contentDirection, platforms, keyMessages: keyMessages.filter(Boolean), brandRulesDo: brandRulesDo.filter(Boolean), brandRulesDont: brandRulesDont.filter(Boolean), hashtags: hashtags.filter(Boolean), mentions: mentions.filter(Boolean), cta })}>
+                  Edit Brief
                 </Button>
               </div>
 
