@@ -660,10 +660,10 @@ export default function CreatorsPage() {
           variant="outline"
           size="sm"
           className="gap-1.5 shrink-0"
-          disabled={isExporting || creatorGroups.length === 0}
+          disabled={isExporting || creators.length === 0}
           onClick={async () => {
             setIsExporting(true);
-            try { await downloadCreatorsListPdf(creatorGroups.flatMap((g) => g.rows)); } finally { setIsExporting(false); }
+            try { await downloadCreatorsListPdf(creators); } finally { setIsExporting(false); }
           }}
         >
           <FileDown size={15} />
