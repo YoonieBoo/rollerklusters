@@ -19,6 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Sparkles } from 'lucide-react';
+import type { BriefAssistResult } from '@/app/api/brief-assist/route';
 import { Textarea } from '@/components/ui/textarea';
 import {
   downloadCreatorBriefPdf,
@@ -311,8 +313,53 @@ export default function BriefsPage() {
   const [activeStep, setActiveStep] = useState(0);
   const [editingPublishedBrief, setEditingPublishedBrief] = useState(false);
   const [publishedCampaignIds, setPublishedCampaignIds] = useState<string[]>([]);
+  const [isAiAssisting, setIsAiAssisting] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<BriefAssistResult | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const platformOptions = ['Instagram', 'TikTok', 'YouTube', 'LinkedIn', 'Twitter', 'Facebook'];
+
+  const handleAiAssist = async () => {
+    if (!selectedCampaignId) return;
+    setIsAiAssisting(true);
+    setAiError(null);
+    setAiSuggestions(null);
+    try {
+      const res = await fetch('/api/brief-assist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignName: toText(selectedCampaign?.name) || 'Untitled campaign',
+          clientName: toText(selectedCampaign?.client_name) || '',
+          objective: objective.trim() || undefined,
+          targetAudience: targetAudience.trim() || undefined,
+          contentDirection: contentDirection.trim() || undefined,
+          platforms: platforms.length > 0 ? platforms : undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setAiError(json.error ?? 'AI assist failed.'); return; }
+      setAiSuggestions(json as BriefAssistResult);
+    } catch {
+      setAiError('Network error. Please try again.');
+    } finally {
+      setIsAiAssisting(false);
+    }
+  };
+
+  const applyAiSuggestions = (suggestions: BriefAssistResult) => {
+    if (suggestions.objective) setObjective(suggestions.objective);
+    if (suggestions.targetAudience) setTargetAudience(suggestions.targetAudience);
+    if (suggestions.contentDirection) setContentDirection(suggestions.contentDirection);
+    if (suggestions.platforms.length > 0) setPlatforms(suggestions.platforms);
+    if (suggestions.keyMessages.length > 0) setKeyMessages(suggestions.keyMessages);
+    if (suggestions.brandRulesDo.length > 0) setBrandRulesDo(suggestions.brandRulesDo);
+    if (suggestions.brandRulesDont.length > 0) setBrandRulesDont(suggestions.brandRulesDont);
+    if (suggestions.hashtags.length > 0) setHashtags(suggestions.hashtags);
+    if (suggestions.mentions.length > 0) setMentions(suggestions.mentions);
+    if (suggestions.cta) setCta(suggestions.cta);
+    setAiSuggestions(null);
+  };
 
   const fetchBriefData = async () => {
     setIsLoading(true);
@@ -1291,16 +1338,28 @@ export default function BriefsPage() {
               <div className="flex flex-col items-start gap-3 md:items-end">
                 {!showPublishedOverview && (
                   <>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
-                      disabled={isSaving}
-                      onClick={() => saveBrief('draft')}
-                    >
-                      {isSaving ? 'Saving...' : 'Save draft'}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 gap-1.5 bg-violet-600 px-3 text-xs text-white hover:bg-violet-700"
+                        disabled={isAiAssisting || !selectedCampaignId}
+                        onClick={handleAiAssist}
+                      >
+                        <Sparkles size={13} />
+                        {isAiAssisting ? 'Generating...' : 'AI Assist'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+                        disabled={isSaving}
+                        onClick={() => saveBrief('draft')}
+                      >
+                        {isSaving ? 'Saving...' : 'Save draft'}
+                      </Button>
+                    </div>
                     <div className="flex items-center gap-1.5">
                       {briefSteps.map((step, index) => (
                         <button
@@ -1948,6 +2007,64 @@ export default function BriefsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* AI Assist suggestions dialog */}
+      <Dialog open={Boolean(aiSuggestions)} onOpenChange={(open) => { if (!open) setAiSuggestions(null); }}>
+        <DialogContent className="bg-card border-border sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles size={18} className="text-violet-500" />
+              AI Brief Suggestions
+            </DialogTitle>
+            <DialogDescription>
+              Review the suggestions below. Click <strong>Apply all</strong> to fill all fields at once, or copy individual sections.
+            </DialogDescription>
+          </DialogHeader>
+
+          {aiSuggestions && (
+            <div className="space-y-4 pt-1">
+              {[
+                { label: 'Campaign Goal', value: aiSuggestions.objective },
+                { label: 'Target Audience', value: aiSuggestions.targetAudience },
+                { label: 'Content Direction', value: aiSuggestions.contentDirection },
+                { label: 'Platforms', value: aiSuggestions.platforms.join(', ') },
+                { label: 'Key Messages', value: aiSuggestions.keyMessages.join('\n') },
+                { label: 'Brand Do Rules', value: aiSuggestions.brandRulesDo.join('\n') },
+                { label: 'Brand Don\'t Rules', value: aiSuggestions.brandRulesDont.join('\n') },
+                { label: 'Hashtags', value: aiSuggestions.hashtags.join('  ') },
+                { label: 'Mentions', value: aiSuggestions.mentions.join('  ') },
+                { label: 'Call to Action', value: aiSuggestions.cta },
+              ].map(({ label, value }) => (
+                <div key={label} className="rounded-lg border border-border bg-muted/30 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+                  <p className="mt-1 whitespace-pre-line text-sm text-foreground">{value || '—'}</p>
+                </div>
+              ))}
+
+              <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:justify-end">
+                <Button variant="outline" onClick={() => setAiSuggestions(null)}>
+                  Discard
+                </Button>
+                <Button
+                  className="gap-2 bg-violet-600 hover:bg-violet-700 text-white"
+                  onClick={() => applyAiSuggestions(aiSuggestions)}
+                >
+                  <Sparkles size={15} />
+                  Apply all
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* AI error toast */}
+      {aiError && (
+        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3 rounded-lg border border-red-500/30 bg-card px-4 py-3 text-sm text-red-500 shadow-lg">
+          {aiError}
+          <button type="button" onClick={() => setAiError(null)} className="text-muted-foreground hover:text-foreground">✕</button>
+        </div>
+      )}
     </div>
   );
 }
