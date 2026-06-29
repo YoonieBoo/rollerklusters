@@ -288,7 +288,6 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
 
   const selectedCampaign = campaigns.find((c) => c.id === selectedCampaignId);
   const selectedBrief = briefs.find((b) => b.campaignId === selectedCampaignId);
-  const creatorBriefUrl = selectedCampaignId ? `/creator-brief/${encodeURIComponent(selectedCampaignId)}` : '';
 
   useEffect(() => {
     setObjective(selectedBrief?.objective ?? '');
@@ -324,10 +323,6 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
     setIsSaving(false);
   };
 
-  const handleViewCreatorBrief = () => {
-    if (!creatorBriefUrl) return;
-    window.open(creatorBriefUrl, '_blank', 'noopener,noreferrer');
-  };
 
   const buildCurrentCreatorBriefDocument = (): CreatorBriefDocument => {
     const keyMessageValues = cleanTextList(keyMessages);
@@ -613,15 +608,6 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
 
       {!isLoading && !errorMessage && selectedCampaign && (
         <main className="rounded-xl bg-card/35 px-5 py-5 shadow-sm md:px-6 md:py-6">
-          {/* Header actions */}
-          {selectedBrief && (
-            <div className="mb-4 flex items-center justify-end gap-3">
-              <Button type="button" variant="outline" size="sm" onClick={handleViewCreatorBrief}>View Brief</Button>
-              <Button type="button" size="sm" disabled={isExportingBrief} onClick={handleExportCreatorBrief}>
-                {isExportingBrief ? 'Generating...' : 'Download PDF'}
-              </Button>
-            </div>
-          )}
 
           {/* AI input — hidden once brief is applied */}
           {showAiInput && (

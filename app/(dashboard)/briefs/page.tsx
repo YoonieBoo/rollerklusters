@@ -306,7 +306,7 @@ export default function BriefsPage() {
 
   const selectedCampaign = campaigns.find((c) => c.id === selectedCampaignId);
   const selectedBrief = briefs.find((b) => b.campaignId === selectedCampaignId);
-  const creatorBriefUrl = selectedCampaignId ? `/creator-brief/${encodeURIComponent(selectedCampaignId)}` : '';
+
 
   useEffect(() => {
     setObjective(selectedBrief?.objective ?? '');
@@ -349,11 +349,6 @@ export default function BriefsPage() {
     setSaveError(message);
     showToast({ message, type: 'error' });
     setIsSaving(false);
-  };
-
-  const handleViewCreatorBrief = () => {
-    if (!creatorBriefUrl) return;
-    window.open(creatorBriefUrl, '_blank', 'noopener,noreferrer');
   };
 
   // Used only to keep completionPercentage for saveBrief
@@ -664,18 +659,8 @@ export default function BriefsPage() {
 
       {!isLoading && !errorMessage && campaigns.length > 0 && (
         <main className="rounded-xl bg-card/35 px-5 py-5 shadow-sm md:px-6 md:py-6">
-          {/* Header — campaign picker always top-right */}
+          {/* Header — campaign picker top-right */}
           <div className="mb-6 flex items-center justify-end gap-3">
-            {selectedBrief && (
-              <>
-                <Button type="button" variant="outline" size="sm" onClick={handleViewCreatorBrief}>
-                  View Brief
-                </Button>
-                <Button type="button" size="sm" disabled={isExportingBrief} onClick={handleExportCreatorBrief}>
-                  {isExportingBrief ? 'Generating...' : 'Download PDF'}
-                </Button>
-              </>
-            )}
             <Select value={selectedCampaignId} onValueChange={handleCampaignChange}>
               <SelectTrigger className="w-52 border-border bg-card/70">
                 <SelectValue placeholder="Choose a campaign" />
