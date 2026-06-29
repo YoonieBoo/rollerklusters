@@ -144,12 +144,6 @@ const saveWithOptionalColumns = async <T extends SupabaseRow>(
   return { data: null, error: { message: `Unable to save ${tableName}: too many schema retries` }, removedColumns };
 };
 
-const formatDate = (date: string | null) => {
-  if (!date) return 'N/A';
-  const parsedDate = new Date(date);
-  if (Number.isNaN(parsedDate.getTime())) return 'N/A';
-  return parsedDate.getDate() + '/' + (parsedDate.getMonth() + 1) + '/' + parsedDate.getFullYear();
-};
 
 const formatCampaignDate = (date: string | null) => {
   if (!date) return '';
@@ -670,32 +664,35 @@ export default function BriefsPage() {
         </div>
       )}
 
-      {!isLoading && !errorMessage && selectedCampaign && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
-          <main className="rounded-xl bg-card/35 px-5 py-5 shadow-sm md:px-6 md:py-6">
-            {/* Header */}
-            <div className="mb-6 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  {selectedBrief
-                    ? `Last saved ${formatDate(selectedBrief.updatedAt ?? selectedBrief.createdAt)}`
-                    : 'No brief yet'}
-                </p>
-                <h2 className="mt-0.5 text-xl font-semibold">
-                  {selectedBrief?.campaignName ?? toText(selectedCampaign.name) ?? 'Untitled campaign'}
-                </h2>
-              </div>
-              {selectedBrief && !editingBrief && (
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={handleViewCreatorBrief}>
-                    View Brief
-                  </Button>
-                  <Button type="button" size="sm" disabled={isExportingBrief} onClick={handleExportCreatorBrief}>
-                    {isExportingBrief ? 'Generating...' : 'Download PDF'}
-                  </Button>
-                </div>
-              )}
-            </div>
+      {!isLoading && !errorMessage && campaigns.length > 0 && (
+        <main className="rounded-xl bg-card/35 px-5 py-5 shadow-sm md:px-6 md:py-6">
+          {/* Header — campaign picker always top-right */}
+          <div className="mb-6 flex items-center justify-end gap-3">
+            {selectedBrief && !editingBrief && (
+              <>
+                <Button type="button" variant="outline" size="sm" onClick={handleViewCreatorBrief}>
+                  View Brief
+                </Button>
+                <Button type="button" size="sm" disabled={isExportingBrief} onClick={handleExportCreatorBrief}>
+                  {isExportingBrief ? 'Generating...' : 'Download PDF'}
+                </Button>
+              </>
+            )}
+            <Select value={selectedCampaignId} onValueChange={handleCampaignChange}>
+              <SelectTrigger className="w-52 border-border bg-card/70">
+                <SelectValue placeholder="Choose a campaign" />
+              </SelectTrigger>
+              <SelectContent>
+                {campaigns.map((c) => (
+                  <SelectItem key={toText(c.id)} value={toText(c.id)}>
+                    {toText(c.name) || 'Untitled campaign'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedCampaign ? (<>
 
             {showDescribeScreen ? (
               /* AI Mode hero */
@@ -950,69 +947,11 @@ export default function BriefsPage() {
                 </div>
               </section>
             )}
-          </main>
-
-          {/* Sidebar */}
-          <aside className="sticky top-6 rounded-xl bg-card/45 p-4 shadow-sm">
-            <div className="mb-5 border-b border-border/60 pb-5">
-              <label className="block text-sm font-medium">Choose campaign</label>
-              <Select value={selectedCampaignId} onValueChange={handleCampaignChange}>
-                <SelectTrigger className="mt-2 border-border bg-card/70">
-                  <SelectValue placeholder="Choose a campaign" />
-                </SelectTrigger>
-                <SelectContent>
-                  {campaigns.map((c) => (
-                    <SelectItem key={toText(c.id)} value={toText(c.id)}>
-                      {toText(c.name) || 'Untitled campaign'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="mt-2 text-xs text-muted-foreground">This brief will be linked to the selected campaign.</p>
-            </div>
-
-            <p className="text-sm font-medium">Brief status</p>
-            {selectedBrief ? (
-              <>
-                <div className="mt-2 rounded-lg border border-green-500/20 bg-green-500/10 px-3 py-2">
-                  <p className="text-xs font-medium text-green-700">Generated &amp; saved</p>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Last saved {formatDate(selectedBrief.updatedAt ?? selectedBrief.createdAt)}
-                </p>
-              </>
-            ) : (
-              <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                No brief yet. Describe your campaign and let AI generate one for you.
-              </p>
-            )}
-
-            <div className="mt-5 border-t border-border/60 pt-5">
-              <p className="text-sm font-medium">Creator brief document</p>
-              <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                {selectedBrief
-                  ? 'Download a professional PDF brief for clients and creators.'
-                  : 'Generate a brief first to enable download.'}
-              </p>
-              <div className="mt-3 space-y-2">
-                {selectedBrief && (
-                  <Button type="button" variant="outline" className="w-full" onClick={handleViewCreatorBrief}>
-                    View Creator Brief
-                  </Button>
-                )}
-                <Button type="button" className="w-full" disabled={isExportingBrief || !selectedBrief} onClick={handleExportCreatorBrief}>
-                  {isExportingBrief ? 'Generating...' : 'Download Brief PDF'}
-                </Button>
-              </div>
-            </div>
-          </aside>
-        </div>
-      )}
-
-      {!isLoading && !errorMessage && !selectedCampaign && campaigns.length > 0 && (
-        <div className="rounded-lg bg-card/40 p-6 text-center">
-          <p className="text-sm text-muted-foreground">Select a campaign to edit its brief</p>
-        </div>
+          </>
+          ) : (
+            <p className="py-16 text-center text-sm text-muted-foreground">Select a campaign to get started.</p>
+          )}
+        </main>
       )}
 
       {/* Toast */}
