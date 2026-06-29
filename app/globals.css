@@ -155,28 +155,33 @@
   opacity: 0.45;
 }
 
+/* Running neon border for AI input card */
+@property --neon-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes neon-spin {
+  to { --neon-angle: 360deg; }
+}
+
 /* AI Mode input card */
 .ai-input-card {
   position: relative;
-  background: rgba(255, 255, 255, 0.88);
+  border: 2px solid transparent;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.92)) padding-box,
+    conic-gradient(from var(--neon-angle), #3b82f6, #818cf8, #a855f7, #c084fc, #60a5fa, #3b82f6) border-box;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: 18px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.05), 0 0 0 1.5px rgba(147, 197, 253, 0.25);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.06),
+    0 0 18px rgba(99, 102, 241, 0.22),
+    0 0 40px rgba(59, 130, 246, 0.12);
+  animation: neon-spin 3s linear infinite;
   overflow: hidden;
-}
-
-.ai-input-card::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 8%;
-  right: 8%;
-  height: 2px;
-  background: linear-gradient(90deg, #f87171, #fb923c, #facc15, #4ade80, #60a5fa, #a78bfa, #f87171);
-  border-radius: 0 0 2px 2px;
-  opacity: 0.75;
 }
 
 .ai-input-textarea {
