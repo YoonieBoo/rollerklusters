@@ -837,53 +837,6 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
                 </div>
               )}
 
-                {/* Additional details — editable after brief is saved */}
-                <div className="border-t border-border/60 pt-5">
-                  <p className="text-sm font-semibold">Additional details</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Submission deadline, contact info, and campaign posters.</p>
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Submission Deadline</label>
-                      <Input type="date" value={submissionDeadline} onChange={(e) => setSubmissionDeadline(e.target.value)} className="bg-background/50" />
-                    </div>
-                    <div className="space-y-1.5 sm:col-span-2">
-                      <label className="text-sm font-medium">Contact / Support</label>
-                      <Textarea
-                        placeholder="Who should creators contact if they have questions?"
-                        value={contactSupport}
-                        onChange={(e) => setContactSupport(e.target.value)}
-                        className="min-h-20 resize-none bg-background/50"
-                      />
-                    </div>
-                    <div className="space-y-2 sm:col-span-2">
-                      <label className="text-sm font-medium">Posters / Campaign Images</label>
-                      <div className="rounded-lg border border-dashed border-border bg-background/50 px-4 py-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-xs text-muted-foreground">PNG, JPG, WebP · up to 5 images · 5MB each</p>
-                          <Button type="button" variant="outline" size="sm" disabled={isUploadingPosters || posterImageUrls.length >= 5} onClick={() => posterFileInputRef.current?.click()}>
-                            {isUploadingPosters ? 'Uploading...' : 'Choose images'}
-                          </Button>
-                        </div>
-                        {posterUploadError && <p className="mt-2 text-sm text-red-500">{posterUploadError}</p>}
-                        {posterImageUrls.length > 0 && (
-                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                            {posterImageUrls.map((url) => (
-                              <div key={url} className="overflow-hidden rounded-md border border-border bg-card">
-                                <img src={url} alt="Campaign visual" className="h-28 w-full object-cover" />
-                                <div className="flex justify-end px-3 py-1.5">
-                                  <Button type="button" variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-red-500" onClick={() => handleRemovePosterImage(url)}>Remove</Button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <Button type="button" variant="outline" size="sm" className="mt-4" disabled={isSaving} onClick={() => saveBrief('draft')}>
-                    {isSaving ? 'Saving...' : 'Save details'}
-                  </Button>
-                </div>
               </section>
             )}
         </main>
