@@ -15,6 +15,13 @@ import {
 import { Sparkles, Loader2, ArrowUp } from 'lucide-react';
 import type { BriefAssistResult } from '@/app/api/brief-assist/route';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { downloadCreatorBriefPdf } from '@/lib/creator-brief-export';
 import type { CreatorBriefDocument } from '@/lib/creator-brief-export';
 
@@ -208,6 +215,7 @@ export default function BriefsPage() {
   const [aiSuggestions, setAiSuggestions] = useState<BriefAssistResult | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [showAiInput, setShowAiInput] = useState(true);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
 
   const fetchBriefData = async () => {
     setIsLoading(true);
@@ -617,10 +625,19 @@ export default function BriefsPage() {
     if (suggestions.cta) setCta(suggestions.cta);
     setAiSuggestions(null);
     setShowAiInput(false);
-    saveAfterAiRef.current = true;
+    if (!selectedBrief) {
+      setShowDetailsDialog(true);
+    } else {
+      saveAfterAiRef.current = true;
+    }
   };
 
-  // Fires after applyAiSuggestions commits all state, then auto-saves
+  const handleDetailsSave = () => {
+    setShowDetailsDialog(false);
+    saveBrief('draft');
+  };
+
+  // Fires after applyAiSuggestions (edit flow) commits all state, then auto-saves
   useEffect(() => {
     if (!saveAfterAiRef.current) return;
     saveAfterAiRef.current = false;
@@ -899,7 +916,7 @@ export default function BriefsPage() {
                     </div>
                   )}
 
-                  {/* Additional details */}
+                  {/* Additional details — editable after brief is saved */}
                   <div className="border-t border-border/60 pt-5">
                     <p className="text-sm font-semibold">Additional details</p>
                     <p className="mt-1 text-xs text-muted-foreground">Submission deadline, contact info, and campaign posters.</p>
@@ -920,7 +937,6 @@ export default function BriefsPage() {
                       <div className="space-y-2 sm:col-span-2">
                         <label className="text-sm font-medium">Posters / Campaign Images</label>
                         <div className="rounded-lg border border-dashed border-border bg-background/50 px-4 py-4">
-                          <input ref={posterFileInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" multiple className="hidden" onChange={(e) => handlePosterUpload(e.target.files)} />
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-xs text-muted-foreground">PNG, JPG, WebP · up to 5 images · 5MB each</p>
                             <Button type="button" variant="outline" size="sm" disabled={isUploadingPosters || posterImageUrls.length >= 5} onClick={() => posterFileInputRef.current?.click()}>
@@ -962,6 +978,66 @@ export default function BriefsPage() {
           <p className={`text-sm ${toast.type === 'success' ? 'text-green-500' : 'text-red-500'}`}>{toast.message}</p>
         </div>
       )}
+
+      {/* Hidden file input — always in DOM so dialog can trigger it */}
+      <input ref={posterFileInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" multiple className="hidden" onChange={(e) => handlePosterUpload(e.target.files)} />
+
+      {/* Additional details popup — appears after first "Apply all" */}
+      <Dialog open={showDetailsDialog} onOpenChange={(open) => { if (!open) handleDetailsSave(); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add campaign details</DialogTitle>
+            <DialogDescription>
+              These optional details will appear on the creator brief. You can skip and update them later.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Submission Deadline</label>
+              <Input type="date" value={submissionDeadline} onChange={(e) => setSubmissionDeadline(e.target.value)} className="bg-background/50" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Contact / Support</label>
+              <Textarea
+                placeholder="Who should creators contact if they have questions?"
+                value={contactSupport}
+                onChange={(e) => setContactSupport(e.target.value)}
+                className="min-h-20 resize-none bg-background/50"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Posters / Campaign Images</label>
+              <div className="rounded-lg border border-dashed border-border bg-background/50 px-4 py-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs text-muted-foreground">PNG, JPG, WebP · up to 5 images · 5MB each</p>
+                  <Button type="button" variant="outline" size="sm" disabled={isUploadingPosters || posterImageUrls.length >= 5} onClick={() => posterFileInputRef.current?.click()}>
+                    {isUploadingPosters ? 'Uploading...' : 'Choose images'}
+                  </Button>
+                </div>
+                {posterUploadError && <p className="mt-2 text-sm text-red-500">{posterUploadError}</p>}
+                {posterImageUrls.length > 0 && (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {posterImageUrls.map((url) => (
+                      <div key={url} className="overflow-hidden rounded-md border border-border bg-card">
+                        <img src={url} alt="Campaign visual" className="h-28 w-full object-cover" />
+                        <div className="flex justify-end px-3 py-1.5">
+                          <Button type="button" variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-red-500" onClick={() => handleRemovePosterImage(url)}>Remove</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="ghost" onClick={handleDetailsSave}>Skip for now</Button>
+            <Button type="button" disabled={isSaving} onClick={handleDetailsSave}>
+              {isSaving ? 'Saving…' : 'Save & continue'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
