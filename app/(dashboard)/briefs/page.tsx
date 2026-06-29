@@ -12,13 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Sparkles, Loader2, ArrowUp } from 'lucide-react';
 import type { BriefAssistResult } from '@/app/api/brief-assist/route';
 import { Textarea } from '@/components/ui/textarea';
@@ -181,7 +174,6 @@ export default function BriefsPage() {
   void router;
   const posterFileInputRef = useRef<HTMLInputElement | null>(null);
   const saveAfterAiRef = useRef(false);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [briefs, setBriefs] = useState<BriefView[]>([]);
@@ -211,9 +203,7 @@ export default function BriefsPage() {
   const [posterUploadError, setPosterUploadError] = useState<string | null>(null);
 
   // AI-first flow state
-  const [editingBrief, setEditingBrief] = useState(false);
   const [campaignDescription, setCampaignDescription] = useState('');
-  const [sentMessage, setSentMessage] = useState('');
   const [isAiAssisting, setIsAiAssisting] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<BriefAssistResult | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -325,9 +315,7 @@ export default function BriefsPage() {
     setPosterImageUrls(selectedBrief?.posterImageUrls ?? []);
     setPosterUploadError(null);
     setSaveError(null);
-    setEditingBrief(false);
     setCampaignDescription('');
-    setSentMessage('');
   }, [selectedCampaignId, selectedBrief]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -335,10 +323,6 @@ export default function BriefsPage() {
     const timeout = window.setTimeout(() => setToast(null), 3000);
     return () => window.clearTimeout(timeout);
   }, [toast]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [sentMessage, isAiAssisting]);
 
   const showToast = (next: BriefToast) => setToast(next);
 
@@ -590,8 +574,6 @@ export default function BriefsPage() {
   const handleAiAssist = async () => {
     const msg = campaignDescription.trim();
     if (!selectedCampaignId || !msg) return;
-    setSentMessage(msg);
-    setCampaignDescription('');
     setIsAiAssisting(true);
     setAiError(null);
     setAiSuggestions(null);
@@ -606,11 +588,10 @@ export default function BriefsPage() {
         }),
       });
       const json = await res.json();
-      if (!res.ok) { setAiError(json.error ?? 'AI assist failed.'); setSentMessage(''); return; }
+      if (!res.ok) { setAiError(json.error ?? 'AI assist failed.'); return; }
       setAiSuggestions(json as BriefAssistResult);
     } catch {
       setAiError('Network error. Please try again.');
-      setSentMessage('');
     } finally {
       setIsAiAssisting(false);
     }
@@ -633,7 +614,6 @@ export default function BriefsPage() {
     if (cleanMentions.length > 0) setMentions(cleanMentions);
     if (suggestions.cta) setCta(suggestions.cta);
     setAiSuggestions(null);
-    setEditingBrief(false);
     saveAfterAiRef.current = true;
   };
 
@@ -643,8 +623,6 @@ export default function BriefsPage() {
     saveAfterAiRef.current = false;
     saveBrief('draft');
   }); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const showDescribeScreen = !selectedBrief || editingBrief;
 
   return (
     <div className="space-y-4">
@@ -668,7 +646,7 @@ export default function BriefsPage() {
         <main className="rounded-xl bg-card/35 px-5 py-5 shadow-sm md:px-6 md:py-6">
           {/* Header — campaign picker always top-right */}
           <div className="mb-6 flex items-center justify-end gap-3">
-            {selectedBrief && !editingBrief && (
+            {selectedBrief && (
               <>
                 <Button type="button" variant="outline" size="sm" onClick={handleViewCreatorBrief}>
                   View Brief
@@ -692,262 +670,279 @@ export default function BriefsPage() {
             </Select>
           </div>
 
-          {selectedCampaign ? (<>
+          {selectedCampaign ? (
+            <>
+              {/* Always-visible AI input */}
+              <div className="flex flex-col items-center py-8">
+                <div className="mb-8 text-center">
+                  <h2 className="text-3xl font-bold tracking-tight text-foreground">Create Your Brief with AI</h2>
+                  <p className="mt-2 text-base text-muted-foreground">Describe your campaign and AI will generate a complete brief instantly.</p>
+                </div>
+                <div className="ai-input-card w-full max-w-2xl">
+                  <textarea
+                    className="ai-input-textarea"
+                    placeholder="Describe your campaign — the goal, target audience, tone, and any requirements…"
+                    rows={3}
+                    value={campaignDescription}
+                    onChange={(e) => setCampaignDescription(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAiAssist();
+                      }
+                    }}
+                  />
+                  <div className="flex items-center justify-between px-4 pb-4 pt-1">
+                    <p className="text-xs text-muted-foreground/50">⌘ Return to send</p>
+                    <button
+                      className="ai-send-circle"
+                      disabled={!campaignDescription.trim() || isAiAssisting}
+                      onClick={handleAiAssist}
+                      type="button"
+                    >
+                      {isAiAssisting ? <Loader2 size={15} className="animate-spin" /> : <ArrowUp size={16} />}
+                    </button>
+                  </div>
+                </div>
+                {!isAiAssisting && !aiSuggestions && !selectedBrief && (
+                  <div className="mt-4 w-full max-w-2xl space-y-0.5">
+                    {[
+                      'Launch a new skincare line for university women in Bangkok on TikTok & Instagram',
+                      'Promote an energy drink targeting gym-goers aged 18–25 with an energetic vibe',
+                      'Build awareness for a sustainable fashion brand using authentic creator content',
+                    ].map((s) => (
+                      <button key={s} className="ai-suggestion-row" type="button" onClick={() => setCampaignDescription(s)}>
+                        <Sparkles size={12} className="shrink-0 opacity-40" />
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {aiError && <p className="mt-4 text-sm text-red-500">{aiError}</p>}
+              </div>
 
-            {showDescribeScreen ? (
-              /* AI Mode hero */
-              <div className="flex flex-col items-center py-10">
-                {!sentMessage ? (
-                  <>
-                    {/* Heading */}
-                    <div className="mb-8 text-center">
-                      <h2 className="text-3xl font-bold tracking-tight text-foreground">
-                        {editingBrief ? 'Regenerate Your Brief' : 'Create Your Brief with AI'}
-                      </h2>
-                      <p className="mt-2 text-base text-muted-foreground">
-                        {editingBrief
-                          ? "Tell me what's different or what you'd like to improve."
-                          : 'Describe your campaign and AI will generate a complete brief instantly.'}
-                      </p>
-                    </div>
+              {/* Loading */}
+              {isAiAssisting && (
+                <div className="flex items-center justify-center gap-3 border-t border-border/40 py-10">
+                  <Loader2 size={18} className="animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Generating your brief…</p>
+                </div>
+              )}
 
-                    {/* Input card */}
-                    <div className="ai-input-card w-full max-w-2xl">
-                      <textarea
-                        className="ai-input-textarea"
-                        placeholder="Describe your campaign — the goal, target audience, tone, and any requirements…"
-                        rows={3}
-                        value={campaignDescription}
-                        onChange={(e) => setCampaignDescription(e.target.value)}
-                        onKeyDown={(e) => {
-                          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAiAssist();
-                          }
-                        }}
-                      />
-                      <div className="flex items-center justify-between px-4 pb-4 pt-1">
-                        <p className="text-xs text-muted-foreground/50">⌘ Return to send</p>
-                        <button
-                          className="ai-send-circle"
-                          disabled={!campaignDescription.trim() || !selectedCampaignId}
-                          onClick={handleAiAssist}
-                          type="button"
-                        >
-                          <ArrowUp size={16} />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Suggestion prompts */}
-                    <div className="mt-4 w-full max-w-2xl space-y-0.5">
-                      {[
-                        'Launch a new skincare line for university women in Bangkok on TikTok & Instagram',
-                        'Promote an energy drink targeting gym-goers aged 18–25 with an energetic vibe',
-                        'Build awareness for a sustainable fashion brand using authentic creator content',
-                      ].map((s) => (
-                        <button key={s} className="ai-suggestion-row" type="button" onClick={() => setCampaignDescription(s)}>
-                          <Sparkles size={12} className="shrink-0 opacity-40" />
-                          {s}
-                        </button>
+              {/* Inline suggestions review */}
+              {!isAiAssisting && aiSuggestions && (
+                <section className="space-y-4 border-t border-border/40 pt-6">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Campaign Goal</label>
+                    <Textarea value={aiSuggestions.objective} onChange={(e) => setAiSuggestions({ ...aiSuggestions, objective: e.target.value })} className="min-h-20 resize-none bg-background/50 text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Target Audience</label>
+                    <Textarea value={aiSuggestions.targetAudience} onChange={(e) => setAiSuggestions({ ...aiSuggestions, targetAudience: e.target.value })} className="min-h-20 resize-none bg-background/50 text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Content Direction</label>
+                    <Textarea value={aiSuggestions.contentDirection} onChange={(e) => setAiSuggestions({ ...aiSuggestions, contentDirection: e.target.value })} className="min-h-20 resize-none bg-background/50 text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Platforms</label>
+                    <div className="flex flex-wrap gap-2">
+                      {platformOptions.map((p) => (
+                        <Button key={p} type="button" size="sm" variant={aiSuggestions.platforms.includes(p) ? 'default' : 'outline'} className="h-8 rounded-full px-3 text-xs"
+                          onClick={() => setAiSuggestions({ ...aiSuggestions, platforms: aiSuggestions.platforms.includes(p) ? aiSuggestions.platforms.filter((x) => x !== p) : [...aiSuggestions.platforms, p] })}>
+                          {p}
+                        </Button>
                       ))}
                     </div>
-
-                    {aiError && <p className="mt-4 text-sm text-red-500">{aiError}</p>}
-                    {editingBrief && selectedBrief && (
-                      <button type="button" className="mt-5 text-xs text-muted-foreground underline-offset-2 hover:underline" onClick={() => setEditingBrief(false)}>
-                        Cancel — keep current brief
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  /* After send — show chat bubbles */
-                  <div className="w-full max-w-2xl space-y-5">
-                    <div className="mb-2 text-center">
-                      <h2 className="text-3xl font-bold tracking-tight text-foreground">
-                        {editingBrief ? 'Regenerate Your Brief' : 'Create Your Brief with AI'}
-                      </h2>
-                    </div>
-                    <div className="flex justify-end">
-                      <div className="max-w-[82%] rounded-2xl rounded-tr-none bg-primary px-4 py-3 text-sm leading-6 text-white">
-                        {sentMessage}
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary">
-                        <Sparkles size={13} className="text-white" />
-                      </div>
-                      <div className="rounded-2xl rounded-tl-none bg-muted px-4 py-3 text-sm leading-6 text-foreground">
-                        {isAiAssisting ? (
-                          <span className="flex items-center gap-2 text-muted-foreground">
-                            <Loader2 size={13} className="animate-spin" />
-                            Generating your brief…
-                          </span>
-                        ) : (
-                          <span>Brief ready! Review and edit the suggestions, then click <strong>Apply all</strong> to save.</span>
-                        )}
-                      </div>
-                    </div>
-                    {aiError && (
-                      <p className="pl-11 text-xs text-red-500">
-                        {aiError} —{' '}
-                        <button type="button" className="underline" onClick={() => setSentMessage('')}>try again</button>.
-                      </p>
-                    )}
-                    <div ref={messagesEndRef} />
                   </div>
-                )}
-              </div>
-            ) : (
-              /* Brief summary */
-              <section className="max-w-4xl space-y-6">
-                <div className="rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-3">
-                  <p className="text-sm font-medium text-green-700">Brief ready</p>
-                  <p className="mt-0.5 text-sm text-green-700/80">
-                    AI-generated brief is saved. Review it below, download the PDF, or regenerate with a new description.
-                  </p>
-                </div>
-
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Campaign Goal</p>
-                    <p className="text-sm leading-6 text-foreground">{selectedBrief.objective || '—'}</p>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Key Messages <span className="normal-case font-normal">(one per line)</span></label>
+                    <Textarea value={aiSuggestions.keyMessages.join('\n')} onChange={(e) => setAiSuggestions({ ...aiSuggestions, keyMessages: e.target.value.split('\n') })} className="min-h-20 resize-none bg-background/50 text-sm" />
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Target Audience</p>
-                    <p className="text-sm leading-6 text-foreground">{selectedBrief.targetAudience || '—'}</p>
-                  </div>
-                  <div className="space-y-1 sm:col-span-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Content Direction</p>
-                    <p className="whitespace-pre-line text-sm leading-6 text-foreground">{selectedBrief.contentDirection || '—'}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Platforms</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedBrief.platforms.length > 0
-                        ? selectedBrief.platforms.map((p) => (
-                            <span key={p} className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">{p}</span>
-                          ))
-                        : <span className="text-sm text-muted-foreground">—</span>}
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Call to Action</p>
-                    <p className="text-sm leading-6 text-foreground">{selectedBrief.cta || '—'}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Key Messages</p>
-                    <ul className="space-y-1.5">
-                      {selectedBrief.keyMessages.length > 0
-                        ? selectedBrief.keyMessages.map((m, i) => (
-                            <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />{m}
-                            </li>
-                          ))
-                        : <li className="text-sm text-muted-foreground">—</li>}
-                    </ul>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Brand Do Rules</p>
-                    <ul className="space-y-1.5">
-                      {selectedBrief.brandRulesDo.length > 0
-                        ? selectedBrief.brandRulesDo.map((r, i) => (
-                            <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />{r}
-                            </li>
-                          ))
-                        : <li className="text-sm text-muted-foreground">—</li>}
-                    </ul>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Brand Don&apos;t Rules</p>
-                    <ul className="space-y-1.5">
-                      {selectedBrief.brandRulesDont.length > 0
-                        ? selectedBrief.brandRulesDont.map((r, i) => (
-                            <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />{r}
-                            </li>
-                          ))
-                        : <li className="text-sm text-muted-foreground">—</li>}
-                    </ul>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Hashtags</p>
-                    <p className="text-sm text-foreground">{selectedBrief.hashtags.join('   ') || '—'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mentions</p>
-                    <p className="text-sm text-foreground">{selectedBrief.mentions.join('   ') || '—'}</p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2 border-t border-border/60 pt-5">
-                  <Button type="button" onClick={handleViewCreatorBrief}>View Creator Brief</Button>
-                  <Button type="button" variant="outline" disabled={isExportingBrief} onClick={handleExportCreatorBrief}>
-                    {isExportingBrief ? 'Generating...' : 'Download PDF'}
-                  </Button>
-                  <Button type="button" variant="ghost" onClick={() => { setCampaignDescription(''); setSentMessage(''); setEditingBrief(true); }}>
-                    Regenerate with AI
-                  </Button>
-                </div>
-
-                {saveError && (
-                  <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2">
-                    <p className="text-sm text-red-500">{saveError}</p>
-                  </div>
-                )}
-
-                {/* Additional details */}
-                <div className="border-t border-border/60 pt-5">
-                  <p className="text-sm font-semibold">Additional details</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Submission deadline, contact info, and campaign posters.</p>
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Submission Deadline</label>
-                      <Input type="date" value={submissionDeadline} onChange={(e) => setSubmissionDeadline(e.target.value)} className="bg-background/50" />
+                      <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Brand Do Rules <span className="normal-case font-normal">(one per line)</span></label>
+                      <Textarea value={aiSuggestions.brandRulesDo.join('\n')} onChange={(e) => setAiSuggestions({ ...aiSuggestions, brandRulesDo: e.target.value.split('\n') })} className="min-h-24 resize-none bg-background/50 text-sm" />
                     </div>
-                    <div className="space-y-1.5 sm:col-span-2">
-                      <label className="text-sm font-medium">Contact / Support</label>
-                      <Textarea
-                        placeholder="Who should creators contact if they have questions?"
-                        value={contactSupport}
-                        onChange={(e) => setContactSupport(e.target.value)}
-                        className="min-h-20 resize-none bg-background/50"
-                      />
-                    </div>
-                    <div className="space-y-2 sm:col-span-2">
-                      <label className="text-sm font-medium">Posters / Campaign Images</label>
-                      <div className="rounded-lg border border-dashed border-border bg-background/50 px-4 py-4">
-                        <input ref={posterFileInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" multiple className="hidden" onChange={(e) => handlePosterUpload(e.target.files)} />
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-xs text-muted-foreground">PNG, JPG, WebP · up to 5 images · 5MB each</p>
-                          <Button type="button" variant="outline" size="sm" disabled={isUploadingPosters || posterImageUrls.length >= 5} onClick={() => posterFileInputRef.current?.click()}>
-                            {isUploadingPosters ? 'Uploading...' : 'Choose images'}
-                          </Button>
-                        </div>
-                        {posterUploadError && <p className="mt-2 text-sm text-red-500">{posterUploadError}</p>}
-                        {posterImageUrls.length > 0 && (
-                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                            {posterImageUrls.map((url) => (
-                              <div key={url} className="overflow-hidden rounded-md border border-border bg-card">
-                                <img src={url} alt="Campaign visual" className="h-28 w-full object-cover" />
-                                <div className="flex justify-end px-3 py-1.5">
-                                  <Button type="button" variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-red-500" onClick={() => handleRemovePosterImage(url)}>Remove</Button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Brand Don&apos;t Rules <span className="normal-case font-normal">(one per line)</span></label>
+                      <Textarea value={aiSuggestions.brandRulesDont.join('\n')} onChange={(e) => setAiSuggestions({ ...aiSuggestions, brandRulesDont: e.target.value.split('\n') })} className="min-h-24 resize-none bg-background/50 text-sm" />
                     </div>
                   </div>
-                  <Button type="button" variant="outline" size="sm" className="mt-4" disabled={isSaving} onClick={() => saveBrief('draft')}>
-                    {isSaving ? 'Saving...' : 'Save details'}
-                  </Button>
-                </div>
-              </section>
-            )}
-          </>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Hashtags <span className="normal-case font-normal">(one per line)</span></label>
+                      <Textarea value={aiSuggestions.hashtags.join('\n')} onChange={(e) => setAiSuggestions({ ...aiSuggestions, hashtags: e.target.value.split('\n') })} className="min-h-20 resize-none bg-background/50 text-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mentions <span className="normal-case font-normal">(one per line)</span></label>
+                      <Textarea value={aiSuggestions.mentions.join('\n')} onChange={(e) => setAiSuggestions({ ...aiSuggestions, mentions: e.target.value.split('\n') })} className="min-h-20 resize-none bg-background/50 text-sm" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Call to Action</label>
+                    <Input value={aiSuggestions.cta} onChange={(e) => setAiSuggestions({ ...aiSuggestions, cta: e.target.value })} className="bg-background/50 text-sm" />
+                  </div>
+                  <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:justify-end">
+                    <Button variant="outline" onClick={() => setAiSuggestions(null)}>Discard</Button>
+                    <Button className="gap-2" onClick={() => applyAiSuggestions(aiSuggestions)}>
+                      <Sparkles size={15} />
+                      Apply all
+                    </Button>
+                  </div>
+                </section>
+              )}
+
+              {/* Brief summary */}
+              {!isAiAssisting && !aiSuggestions && selectedBrief && (
+                <section className="max-w-4xl space-y-6 border-t border-border/40 pt-6">
+                  <div className="rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-3">
+                    <p className="text-sm font-medium text-green-700">Brief ready</p>
+                    <p className="mt-0.5 text-sm text-green-700/80">
+                      AI-generated brief is saved. Review it below, download the PDF, or regenerate with a new description.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Campaign Goal</p>
+                      <p className="text-sm leading-6 text-foreground">{selectedBrief.objective || '—'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Target Audience</p>
+                      <p className="text-sm leading-6 text-foreground">{selectedBrief.targetAudience || '—'}</p>
+                    </div>
+                    <div className="space-y-1 sm:col-span-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Content Direction</p>
+                      <p className="whitespace-pre-line text-sm leading-6 text-foreground">{selectedBrief.contentDirection || '—'}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Platforms</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedBrief.platforms.length > 0
+                          ? selectedBrief.platforms.map((p) => (
+                              <span key={p} className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">{p}</span>
+                            ))
+                          : <span className="text-sm text-muted-foreground">—</span>}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Call to Action</p>
+                      <p className="text-sm leading-6 text-foreground">{selectedBrief.cta || '—'}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Key Messages</p>
+                      <ul className="space-y-1.5">
+                        {selectedBrief.keyMessages.length > 0
+                          ? selectedBrief.keyMessages.map((m, i) => (
+                              <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />{m}
+                              </li>
+                            ))
+                          : <li className="text-sm text-muted-foreground">—</li>}
+                      </ul>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Brand Do Rules</p>
+                      <ul className="space-y-1.5">
+                        {selectedBrief.brandRulesDo.length > 0
+                          ? selectedBrief.brandRulesDo.map((r, i) => (
+                              <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />{r}
+                              </li>
+                            ))
+                          : <li className="text-sm text-muted-foreground">—</li>}
+                      </ul>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Brand Don&apos;t Rules</p>
+                      <ul className="space-y-1.5">
+                        {selectedBrief.brandRulesDont.length > 0
+                          ? selectedBrief.brandRulesDont.map((r, i) => (
+                              <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />{r}
+                              </li>
+                            ))
+                          : <li className="text-sm text-muted-foreground">—</li>}
+                      </ul>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Hashtags</p>
+                      <p className="text-sm text-foreground">{selectedBrief.hashtags.join('   ') || '—'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mentions</p>
+                      <p className="text-sm text-foreground">{selectedBrief.mentions.join('   ') || '—'}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 border-t border-border/60 pt-5">
+                    <Button type="button" onClick={handleViewCreatorBrief}>View Creator Brief</Button>
+                    <Button type="button" variant="outline" disabled={isExportingBrief} onClick={handleExportCreatorBrief}>
+                      {isExportingBrief ? 'Generating...' : 'Download PDF'}
+                    </Button>
+                    <Button type="button" variant="ghost" onClick={() => { setCampaignDescription(''); setAiSuggestions(null); }}>
+                      Regenerate with AI
+                    </Button>
+                  </div>
+
+                  {saveError && (
+                    <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2">
+                      <p className="text-sm text-red-500">{saveError}</p>
+                    </div>
+                  )}
+
+                  {/* Additional details */}
+                  <div className="border-t border-border/60 pt-5">
+                    <p className="text-sm font-semibold">Additional details</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Submission deadline, contact info, and campaign posters.</p>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium">Submission Deadline</label>
+                        <Input type="date" value={submissionDeadline} onChange={(e) => setSubmissionDeadline(e.target.value)} className="bg-background/50" />
+                      </div>
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-sm font-medium">Contact / Support</label>
+                        <Textarea
+                          placeholder="Who should creators contact if they have questions?"
+                          value={contactSupport}
+                          onChange={(e) => setContactSupport(e.target.value)}
+                          className="min-h-20 resize-none bg-background/50"
+                        />
+                      </div>
+                      <div className="space-y-2 sm:col-span-2">
+                        <label className="text-sm font-medium">Posters / Campaign Images</label>
+                        <div className="rounded-lg border border-dashed border-border bg-background/50 px-4 py-4">
+                          <input ref={posterFileInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" multiple className="hidden" onChange={(e) => handlePosterUpload(e.target.files)} />
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs text-muted-foreground">PNG, JPG, WebP · up to 5 images · 5MB each</p>
+                            <Button type="button" variant="outline" size="sm" disabled={isUploadingPosters || posterImageUrls.length >= 5} onClick={() => posterFileInputRef.current?.click()}>
+                              {isUploadingPosters ? 'Uploading...' : 'Choose images'}
+                            </Button>
+                          </div>
+                          {posterUploadError && <p className="mt-2 text-sm text-red-500">{posterUploadError}</p>}
+                          {posterImageUrls.length > 0 && (
+                            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                              {posterImageUrls.map((url) => (
+                                <div key={url} className="overflow-hidden rounded-md border border-border bg-card">
+                                  <img src={url} alt="Campaign visual" className="h-28 w-full object-cover" />
+                                  <div className="flex justify-end px-3 py-1.5">
+                                    <Button type="button" variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-red-500" onClick={() => handleRemovePosterImage(url)}>Remove</Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" className="mt-4" disabled={isSaving} onClick={() => saveBrief('draft')}>
+                      {isSaving ? 'Saving...' : 'Save details'}
+                    </Button>
+                  </div>
+                </section>
+              )}
+            </>
           ) : (
             <p className="py-16 text-center text-sm text-muted-foreground">Select a campaign to get started.</p>
           )}
@@ -960,91 +955,6 @@ export default function BriefsPage() {
           <p className={`text-sm ${toast.type === 'success' ? 'text-green-500' : 'text-red-500'}`}>{toast.message}</p>
         </div>
       )}
-
-      {/* AI dialog */}
-      <Dialog open={isAiAssisting || Boolean(aiSuggestions)} onOpenChange={(open) => { if (!open) { setAiSuggestions(null); setSentMessage(''); } }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-card sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles size={18} className="text-primary" />
-              AI Brief Suggestions
-            </DialogTitle>
-            <DialogDescription>
-              Edit any field below before applying. Click <strong>Apply all</strong> to save the brief.
-            </DialogDescription>
-          </DialogHeader>
-
-          {isAiAssisting && (
-            <div className="flex flex-col items-center justify-center gap-4 py-12">
-              <Loader2 size={36} className="animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Generating your brief suggestions…</p>
-            </div>
-          )}
-
-          {!isAiAssisting && aiSuggestions && (
-            <div className="space-y-4 pt-1">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Campaign Goal</label>
-                <Textarea value={aiSuggestions.objective} onChange={(e) => setAiSuggestions({ ...aiSuggestions, objective: e.target.value })} className="min-h-20 resize-none bg-background/50 text-sm" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Target Audience</label>
-                <Textarea value={aiSuggestions.targetAudience} onChange={(e) => setAiSuggestions({ ...aiSuggestions, targetAudience: e.target.value })} className="min-h-20 resize-none bg-background/50 text-sm" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Content Direction</label>
-                <Textarea value={aiSuggestions.contentDirection} onChange={(e) => setAiSuggestions({ ...aiSuggestions, contentDirection: e.target.value })} className="min-h-20 resize-none bg-background/50 text-sm" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Platforms</label>
-                <div className="flex flex-wrap gap-2">
-                  {platformOptions.map((p) => (
-                    <Button key={p} type="button" size="sm" variant={aiSuggestions.platforms.includes(p) ? 'default' : 'outline'} className="h-8 rounded-full px-3 text-xs"
-                      onClick={() => setAiSuggestions({ ...aiSuggestions, platforms: aiSuggestions.platforms.includes(p) ? aiSuggestions.platforms.filter((x) => x !== p) : [...aiSuggestions.platforms, p] })}>
-                      {p}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Key Messages <span className="normal-case font-normal">(one per line)</span></label>
-                <Textarea value={aiSuggestions.keyMessages.join('\n')} onChange={(e) => setAiSuggestions({ ...aiSuggestions, keyMessages: e.target.value.split('\n') })} className="min-h-20 resize-none bg-background/50 text-sm" />
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Brand Do Rules <span className="normal-case font-normal">(one per line)</span></label>
-                  <Textarea value={aiSuggestions.brandRulesDo.join('\n')} onChange={(e) => setAiSuggestions({ ...aiSuggestions, brandRulesDo: e.target.value.split('\n') })} className="min-h-24 resize-none bg-background/50 text-sm" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Brand Don&apos;t Rules <span className="normal-case font-normal">(one per line)</span></label>
-                  <Textarea value={aiSuggestions.brandRulesDont.join('\n')} onChange={(e) => setAiSuggestions({ ...aiSuggestions, brandRulesDont: e.target.value.split('\n') })} className="min-h-24 resize-none bg-background/50 text-sm" />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Hashtags <span className="normal-case font-normal">(one per line)</span></label>
-                  <Textarea value={aiSuggestions.hashtags.join('\n')} onChange={(e) => setAiSuggestions({ ...aiSuggestions, hashtags: e.target.value.split('\n') })} className="min-h-20 resize-none bg-background/50 text-sm" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mentions <span className="normal-case font-normal">(one per line)</span></label>
-                  <Textarea value={aiSuggestions.mentions.join('\n')} onChange={(e) => setAiSuggestions({ ...aiSuggestions, mentions: e.target.value.split('\n') })} className="min-h-20 resize-none bg-background/50 text-sm" />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Call to Action</label>
-                <Input value={aiSuggestions.cta} onChange={(e) => setAiSuggestions({ ...aiSuggestions, cta: e.target.value })} className="bg-background/50 text-sm" />
-              </div>
-              <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:justify-end">
-                <Button variant="outline" onClick={() => { setAiSuggestions(null); setSentMessage(''); }}>Discard</Button>
-                <Button className="gap-2" onClick={() => applyAiSuggestions(aiSuggestions)}>
-                  <Sparkles size={15} />
-                  Apply all
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
