@@ -285,6 +285,7 @@ export default function BriefsPage() {
   const firstBriefSectionRef = useRef<HTMLElement | null>(null);
   const posterFileInputRef = useRef<HTMLInputElement | null>(null);
   const hasScrolledToBriefRef = useRef(false);
+  const saveAfterAiRef = useRef(false);
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [briefs, setBriefs] = useState<BriefView[]>([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
@@ -364,6 +365,8 @@ export default function BriefsPage() {
     if (cleanMentions.length > 0) setMentions(cleanMentions);
     if (suggestions.cta) setCta(suggestions.cta);
     setAiSuggestions(null);
+    setActiveStep(4);
+    saveAfterAiRef.current = true;
   };
 
   const fetchBriefData = async () => {
@@ -833,6 +836,13 @@ export default function BriefsPage() {
 
     return () => window.clearTimeout(timeout);
   }, [toast]);
+
+  // Fires once after applyAiSuggestions commits all state, then auto-saves as draft
+  useEffect(() => {
+    if (!saveAfterAiRef.current) return;
+    saveAfterAiRef.current = false;
+    saveBrief('draft');
+  }); // eslint-disable-line react-hooks/exhaustive-deps
 
   const requiredFieldsValidation = useMemo(
     () => ({
