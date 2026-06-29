@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 export type BriefAssistRequest = {
   campaignName: string;
   clientName: string;
+  campaignDescription?: string;
   objective?: string;
   targetAudience?: string;
   contentDirection?: string;
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json() as BriefAssistRequest;
-  const { campaignName, clientName, objective, targetAudience, contentDirection, platforms } = body;
+  const { campaignName, clientName, campaignDescription, objective, targetAudience, contentDirection, platforms } = body;
 
   if (!campaignName) {
     return NextResponse.json({ error: 'Campaign name is required.' }, { status: 400 });
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
   const openai = new OpenAI({ apiKey });
 
   const existingContext = [
+    campaignDescription ? `Campaign description from manager: ${campaignDescription}` : '',
     objective ? `Campaign goal: ${objective}` : '',
     targetAudience ? `Target audience: ${targetAudience}` : '',
     contentDirection ? `Content direction: ${contentDirection}` : '',
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
 
 Campaign: "${campaignName}"
 Client / Brand: "${clientName || 'Not specified'}"
-${existingContext ? `\nExisting brief context:\n${existingContext}` : ''}
+${existingContext ? `\nContext provided by the campaign manager:\n${existingContext}` : ''}
 
 Generate a complete, professional creator campaign brief for this campaign. The brief will be sent to university student creators on TikTok and Instagram.
 
