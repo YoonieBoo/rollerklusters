@@ -663,7 +663,8 @@ export default function CreatorsPage() {
           disabled={isExporting || creators.length === 0}
           onClick={async () => {
             setIsExporting(true);
-            try { await downloadCreatorsListPdf(creators); } finally { setIsExporting(false); }
+            // Only include actual creator_profiles (id defined), not unmatched signup stubs
+            try { await downloadCreatorsListPdf(creators.filter((c) => c.id !== undefined)); } finally { setIsExporting(false); }
           }}
         >
           <FileDown size={15} />
