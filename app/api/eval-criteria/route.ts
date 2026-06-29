@@ -35,7 +35,7 @@ export async function POST(request: Request) {
 
   const openai = new OpenAI({ apiKey });
 
-  const prompt = `You are a campaign quality reviewer at a creator marketing platform (AU Creator Campus, Bangkok). Based on the campaign brief below, generate clear evaluation criteria for reviewing creator content submissions.
+  const prompt = `You are helping a campaign manager review creator video submissions. Based on the brief below, write a simple checklist they can use during review.
 
 Campaign: "${campaignName}"
 Objective: ${objective}
@@ -48,12 +48,12 @@ Brand Don't Rules: ${brandRulesDont.join(' | ')}
 Call to Action: ${cta}
 
 Return a JSON object with exactly these fields:
-- acceptanceCriteria: Array of 4-5 specific, measurable requirements that content MUST meet to be approved (e.g., "Must mention the campaign hashtag at least once", "Product must be shown in use for at least 3 seconds")
-- goodContentExamples: Array of 4-5 concrete descriptions of what approved content looks like for this specific campaign (reference the brand, audience, and tone)
-- badContentExamples: Array of 4-5 descriptions of content that would be rejected, with specific reasons tied to this brief (not generic)
-- edgeCases: Array of 3-5 specific edge cases reviewers must watch for with this campaign (e.g., "Creator mentions competitor products", "CTA placed at beginning instead of end", "Tone mismatch with ${targetAudience} audience")
+- acceptanceCriteria: Array of 4-5 short, plain-English rules the video MUST follow to be approved. Start each with a verb. Example: "Shows the product being used", "Includes the hashtag at least once", "Ends with the call to action"
+- goodContentExamples: Array of 4-5 short sentences describing what a good video looks like. Write like you are describing it to a colleague. Example: "The creator feels genuine and relaxed, not scripted", "The product is clearly shown and looks appealing"
+- badContentExamples: Array of 4-5 short sentences describing what would get a video rejected. Example: "The creator never shows or mentions the product", "The tone feels too formal for the target audience"
+- edgeCases: Array of 3-5 short sentences about tricky situations to watch out for. Example: "Video looks good but the CTA is missing at the end", "Creator mentions a competitor brand by name"
 
-Be specific to this campaign — reference the brand, audience, platforms, and tone. Do not give generic advice. Write for a campaign manager reviewing real student creator submissions.`;
+Use short, simple sentences. No jargon. Write as if texting a teammate what to look for. Be specific to this campaign.`;
 
   try {
     const completion = await openai.chat.completions.create({
