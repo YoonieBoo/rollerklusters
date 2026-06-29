@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Sparkles, Loader2, ArrowUp } from 'lucide-react';
 import type { BriefAssistResult } from '@/app/api/brief-assist/route';
+import type { EvalCriteriaResult } from '@/app/api/eval-criteria/route';
 import { downloadCreatorBriefPdf } from '@/lib/creator-brief-export';
 import {
   Dialog,
@@ -47,6 +48,10 @@ type BriefView = {
   publishedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  aiAcceptanceCriteria: string[];
+  goodContentExamples: string[];
+  badContentExamples: string[];
+  evalEdgeCases: string[];
 };
 
 type BriefToast = { message: string; type: 'success' | 'error' };
@@ -210,6 +215,12 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
   const [showAiInput, setShowAiInput] = useState(true);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
 
+  // Module B — eval criteria state
+  const [evalSuggestions, setEvalSuggestions] = useState<EvalCriteriaResult | null>(null);
+  const [isGeneratingEval, setIsGeneratingEval] = useState(false);
+  const [isSavingEval, setIsSavingEval] = useState(false);
+  const [evalError, setEvalError] = useState<string | null>(null);
+
   const fetchBriefData = async () => {
     setIsLoading(true);
     setErrorMessage(null);
@@ -275,6 +286,10 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
           publishedAt: toText(brief.published_at ?? rawBrief.published_at) || null,
           createdAt: toText(brief.created_at) || null,
           updatedAt: toText(brief.updated_at) || null,
+          aiAcceptanceCriteria: toTextList(criteria.ai_acceptance_criteria),
+          goodContentExamples: toTextList(criteria.good_content_examples),
+          badContentExamples: toTextList(criteria.bad_content_examples),
+          evalEdgeCases: toTextList(criteria.eval_edge_cases),
         };
       })
       .sort((a, b) => new Date(b.updatedAt ?? b.createdAt ?? 0).getTime() - new Date(a.updatedAt ?? a.createdAt ?? 0).getTime());
@@ -583,6 +598,75 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
     saveBrief('draft');
   };
 
+  const handleGenerateEval = async () => {
+    if (!selectedBrief) return;
+    setIsGeneratingEval(true);
+    setEvalError(null);
+    setEvalSuggestions(null);
+    try {
+      const res = await fetch('/api/eval-criteria', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignName: selectedBrief.campaignName,
+          objective,
+          targetAudience,
+          contentDirection,
+          platforms,
+          keyMessages: keyMessages.filter(Boolean),
+          brandRulesDo: brandRulesDo.filter(Boolean),
+          brandRulesDont: brandRulesDont.filter(Boolean),
+          cta,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setEvalError(json.error ?? 'Failed to generate criteria.'); return; }
+      setEvalSuggestions(json as EvalCriteriaResult);
+    } catch {
+      setEvalError('Network error. Please try again.');
+    } finally {
+      setIsGeneratingEval(false);
+    }
+  };
+
+  const handleSaveEval = async () => {
+    if (!evalSuggestions || !selectedCampaignId) return;
+    setIsSavingEval(true);
+    const now = new Date().toISOString();
+    const briefId = selectedBrief?.id;
+    const evalPayload = {
+      campaign_id: selectedCampaignId,
+      brief_id: briefId,
+      ai_acceptance_criteria: evalSuggestions.acceptanceCriteria,
+      good_content_examples: evalSuggestions.goodContentExamples,
+      bad_content_examples: evalSuggestions.badContentExamples,
+      eval_edge_cases: evalSuggestions.edgeCases,
+      updated_at: now,
+    };
+    const existing = await supabase
+      .from('acceptance_criteria')
+      .select('*')
+      .or(`brief_id.eq.${briefId},campaign_id.eq.${selectedCampaignId}`)
+      .limit(1)
+      .maybeSingle();
+    const existingId = toText(existing.data?.id);
+    const result = existingId
+      ? await saveWithOptionalColumns('acceptance_criteria', evalPayload, async (p) =>
+          supabase.from('acceptance_criteria').update(p).eq('id', existingId).select('*').maybeSingle()
+        )
+      : await saveWithOptionalColumns('acceptance_criteria', evalPayload, async (p) =>
+          supabase.from('acceptance_criteria').insert(p).select('*').maybeSingle()
+        );
+    if (result.error) {
+      showToast({ message: 'Failed to save criteria.', type: 'error' });
+    } else {
+      showToast({ message: 'Evaluation criteria saved.', type: 'success' });
+      setEvalSuggestions(null);
+      await fetchBriefData();
+    }
+    setIsSavingEval(false);
+  };
+
   // Fires after applyAiSuggestions (edit flow) commits all state, then auto-saves
   useEffect(() => {
     if (!saveAfterAiRef.current) return;
@@ -831,6 +915,113 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
                 <Button type="button" variant="outline" onClick={() => setAiSuggestions({ objective, targetAudience, contentDirection, platforms, keyMessages: keyMessages.filter(Boolean), brandRulesDo: brandRulesDo.filter(Boolean), brandRulesDont: brandRulesDont.filter(Boolean), hashtags: hashtags.filter(Boolean), mentions: mentions.filter(Boolean), cta })}>
                   Edit Brief
                 </Button>
+              </div>
+
+              {/* Module B — Content Evaluation Design */}
+              <div className="mt-2 border-t border-border/40 pt-6 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Content Evaluation Criteria</h3>
+                    <p className="mt-0.5 text-xs text-muted-foreground">AI-generated criteria for reviewing creator submissions against this brief.</p>
+                  </div>
+                  {!evalSuggestions && !isGeneratingEval && (
+                    <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={handleGenerateEval}>
+                      <Sparkles size={13} />
+                      {selectedBrief.aiAcceptanceCriteria.length > 0 ? 'Regenerate' : 'Generate Criteria'}
+                    </Button>
+                  )}
+                </div>
+
+                {isGeneratingEval && (
+                  <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
+                    <Loader2 size={15} className="animate-spin" />
+                    Analyzing brief and generating evaluation criteria…
+                  </div>
+                )}
+
+                {evalError && <p className="text-sm text-red-500">{evalError}</p>}
+
+                {evalSuggestions && !isGeneratingEval && (
+                  <div className="space-y-4 rounded-xl border border-border bg-background/40 p-4">
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Acceptance Criteria <span className="normal-case font-normal">(one per line)</span></p>
+                      <Textarea value={evalSuggestions.acceptanceCriteria.join('\n')} onChange={(e) => setEvalSuggestions({ ...evalSuggestions, acceptanceCriteria: e.target.value.split('\n') })} className="min-h-24 resize-none bg-background/50 text-sm" />
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-green-600">Good Content <span className="normal-case font-normal text-muted-foreground">(one per line)</span></p>
+                        <Textarea value={evalSuggestions.goodContentExamples.join('\n')} onChange={(e) => setEvalSuggestions({ ...evalSuggestions, goodContentExamples: e.target.value.split('\n') })} className="min-h-28 resize-none bg-background/50 text-sm" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-red-500">Bad Content / Rejections <span className="normal-case font-normal text-muted-foreground">(one per line)</span></p>
+                        <Textarea value={evalSuggestions.badContentExamples.join('\n')} onChange={(e) => setEvalSuggestions({ ...evalSuggestions, badContentExamples: e.target.value.split('\n') })} className="min-h-28 resize-none bg-background/50 text-sm" />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">Edge Cases to Watch <span className="normal-case font-normal text-muted-foreground">(one per line)</span></p>
+                      <Textarea value={evalSuggestions.edgeCases.join('\n')} onChange={(e) => setEvalSuggestions({ ...evalSuggestions, edgeCases: e.target.value.split('\n') })} className="min-h-20 resize-none bg-background/50 text-sm" />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <Button type="button" variant="outline" size="sm" onClick={() => setEvalSuggestions(null)}>Discard</Button>
+                      <Button type="button" size="sm" className="gap-1.5" disabled={isSavingEval} onClick={handleSaveEval}>
+                        {isSavingEval ? <><Loader2 size={13} className="animate-spin" />Saving…</> : 'Save Criteria'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {!evalSuggestions && !isGeneratingEval && selectedBrief.aiAcceptanceCriteria.length > 0 && (
+                  <div className="space-y-5 rounded-xl border border-border bg-background/40 p-4">
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Acceptance Criteria</p>
+                      <ul className="space-y-1.5">
+                        {selectedBrief.aiAcceptanceCriteria.map((item, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />{item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                      {selectedBrief.goodContentExamples.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-green-600">Good Content</p>
+                          <ul className="space-y-1.5">
+                            {selectedBrief.goodContentExamples.map((item, i) => (
+                              <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />{item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {selectedBrief.badContentExamples.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-red-500">Bad Content / Rejections</p>
+                          <ul className="space-y-1.5">
+                            {selectedBrief.badContentExamples.map((item, i) => (
+                              <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />{item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                    {selectedBrief.evalEdgeCases.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">Edge Cases to Watch</p>
+                        <ul className="space-y-1.5">
+                          {selectedBrief.evalEdgeCases.map((item, i) => (
+                            <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />{item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {saveError && (
