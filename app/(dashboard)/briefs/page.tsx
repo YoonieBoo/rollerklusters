@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import type { BriefAssistResult } from '@/app/api/brief-assist/route';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -2014,7 +2014,7 @@ export default function BriefsPage() {
       </Dialog>
 
       {/* AI Assist suggestions dialog */}
-      <Dialog open={Boolean(aiSuggestions)} onOpenChange={(open) => { if (!open) setAiSuggestions(null); }}>
+      <Dialog open={isAiAssisting || Boolean(aiSuggestions)} onOpenChange={(open) => { if (!open) { setAiSuggestions(null); } }}>
         <DialogContent className="bg-card border-border sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -2026,7 +2026,14 @@ export default function BriefsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          {aiSuggestions && (
+          {isAiAssisting && (
+            <div className="flex flex-col items-center justify-center gap-4 py-12">
+              <Loader2 size={36} className="animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Generating your brief suggestions…</p>
+            </div>
+          )}
+
+          {!isAiAssisting && aiSuggestions && (
             <div className="space-y-4 pt-1">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Campaign Goal</label>
@@ -2141,7 +2148,7 @@ export default function BriefsPage() {
                   Discard
                 </Button>
                 <Button
-                  className="gap-2 bg-violet-600 hover:bg-violet-700 text-white"
+                  className="gap-2"
                   onClick={() => applyAiSuggestions(aiSuggestions)}
                 >
                   <Sparkles size={15} />
