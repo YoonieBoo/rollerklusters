@@ -884,11 +884,11 @@ export default function BriefsPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-2 border-t border-border/60 pt-5">
-                    <Button type="button" disabled={isExportingBrief} onClick={handleExportCreatorBrief}>
-                      {isExportingBrief ? 'Generating...' : 'Download Brief'}
+                    <Button type="button" onClick={() => router.push(`/campaigns/${selectedCampaignId}?tab=invites`)}>
+                      Invite Onboarded Creators
                     </Button>
-                    <Button type="button" variant="outline" onClick={() => { setCampaignDescription(''); setAiSuggestions(null); setShowAiInput(true); }}>
-                      Regenerate with AI
+                    <Button type="button" variant="outline" disabled={isExportingBrief} onClick={handleExportCreatorBrief}>
+                      {isExportingBrief ? 'Generating...' : 'Download Brief'}
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setAiSuggestions({ objective, targetAudience, contentDirection, platforms, keyMessages: keyMessages.filter(Boolean), brandRulesDo: brandRulesDo.filter(Boolean), brandRulesDont: brandRulesDont.filter(Boolean), hashtags: hashtags.filter(Boolean), mentions: mentions.filter(Boolean), cta })}>
                       Edit Brief

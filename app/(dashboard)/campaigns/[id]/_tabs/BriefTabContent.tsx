@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -169,6 +170,7 @@ const getPosterStoragePath = (url: string) => {
 const platformOptions = ['Instagram', 'TikTok', 'YouTube', 'LinkedIn', 'Twitter', 'Facebook'];
 
 export default function BriefTabContent({ campaignId }: { campaignId: string }) {
+  const router = useRouter();
   const posterFileInputRef = useRef<HTMLInputElement | null>(null);
   const saveAfterAiRef = useRef(false);
 
@@ -820,11 +822,11 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
               </div>
 
               <div className="flex flex-wrap gap-2 border-t border-border/60 pt-5">
-                <Button type="button" disabled={isExportingBrief} onClick={handleExportCreatorBrief}>
-                  {isExportingBrief ? 'Generating...' : 'Download Brief'}
+                <Button type="button" onClick={() => router.push(`?tab=invites`)}>
+                  Invite Onboarded Creators
                 </Button>
-                <Button type="button" variant="outline" onClick={() => { setCampaignDescription(''); setAiSuggestions(null); setShowAiInput(true); }}>
-                  Regenerate with AI
+                <Button type="button" variant="outline" disabled={isExportingBrief} onClick={handleExportCreatorBrief}>
+                  {isExportingBrief ? 'Generating...' : 'Download Brief'}
                 </Button>
                 <Button type="button" variant="outline" onClick={() => setAiSuggestions({ objective, targetAudience, contentDirection, platforms, keyMessages: keyMessages.filter(Boolean), brandRulesDo: brandRulesDo.filter(Boolean), brandRulesDont: brandRulesDont.filter(Boolean), hashtags: hashtags.filter(Boolean), mentions: mentions.filter(Boolean), cta })}>
                   Edit Brief

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -131,6 +131,8 @@ const getEngagementLabel = (status: string) =>
 export default function CampaignDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get('tab') ?? 'overview';
   const campaignId = params.id as string;
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [brief, setBrief] = useState<SupabaseRow | null>(null);
@@ -400,7 +402,7 @@ export default function CampaignDetailPage() {
         </div>
       </section>
 
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs value={activeTab} onValueChange={(v) => router.push(`?tab=${v}`)} className="w-full">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="brief">Brief</TabsTrigger>
