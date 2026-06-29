@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { FileDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { LoadingDots } from '@/components/ui/loading-dots';
 import {
@@ -220,18 +222,104 @@ const getFirstValue = (creator: CreatorProfile, keys: string[]) => {
   return null;
 };
 
-const getCreatorConsistency = (creator: CreatorProfile) =>
-  formatLabel(
-    getFirstValue(creator, [
-      'consistency',
-      'consistency_score',
-      'consistencyScore',
-      'posting_consistency',
-      'postingConsistency',
-      'content_consistency',
-      'contentConsistency',
-    ])
-  );
+const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
+  const { jsPDF } = await import('jspdf/dist/jspdf.es.min.js');
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const marginX = 40;
+  const marginTop = 50;
+  const marginBottom = 50;
+  const black = '#111827';
+  const muted = '#6b7280';
+  const headerBg = '#f3f4f6';
+  const rowAlt = '#fafafa';
+  const border = '#e5e7eb';
+
+  const cols = [
+    { label: 'Name', width: 140 },
+    { label: 'Platform', width: 70 },
+    { label: 'Program', width: 130 },
+    { label: 'Followers', width: 75 },
+    { label: 'Rank', width: 60 },
+    { label: 'Interest', width: 140 },
+    { label: 'Scholarship', width: 65 },
+  ];
+
+  const totalTableWidth = cols.reduce((sum, c) => sum + c.width, 0);
+  const tableStartX = marginX;
+
+  const setFont = (size: number, style: 'normal' | 'bold' = 'normal', color = black) => {
+    pdf.setFont('helvetica', style);
+    pdf.setFontSize(size);
+    pdf.setTextColor(color);
+  };
+
+  const drawRow = (y: number, cells: string[], isHeader: boolean, isAlt: boolean) => {
+    const rowHeight = 22;
+    if (isHeader) {
+      pdf.setFillColor(headerBg);
+      pdf.rect(tableStartX, y, totalTableWidth, rowHeight, 'F');
+    } else if (isAlt) {
+      pdf.setFillColor(rowAlt);
+      pdf.rect(tableStartX, y, totalTableWidth, rowHeight, 'F');
+    }
+    pdf.setDrawColor(border);
+    pdf.rect(tableStartX, y, totalTableWidth, rowHeight, 'S');
+    let x = tableStartX;
+    cells.forEach((text, i) => {
+      const col = cols[i];
+      const cellText = pdf.splitTextToSize(text || '—', col.width - 8) as string[];
+      setFont(isHeader ? 8.5 : 8, isHeader ? 'bold' : 'normal', isHeader ? black : muted);
+      pdf.text(cellText[0] ?? '', x + 4, y + 14);
+      x += col.width;
+    });
+  };
+
+  let cursorY = marginTop;
+
+  // Title
+  setFont(16, 'bold', black);
+  pdf.text('Onboarded Creators', marginX, cursorY);
+  cursorY += 18;
+  setFont(9, 'normal', muted);
+  pdf.text(`Generated ${new Date().toLocaleDateString('en-GB')} · ${creators.length} creator${creators.length === 1 ? '' : 's'}`, marginX, cursorY);
+  cursorY += 20;
+
+  // Header row
+  drawRow(cursorY, cols.map((c) => c.label), true, false);
+  cursorY += 22;
+
+  // Data rows
+  creators.forEach((creator, idx) => {
+    if (cursorY + 22 > pageHeight - marginBottom) {
+      pdf.addPage();
+      cursorY = marginTop;
+      drawRow(cursorY, cols.map((c) => c.label), true, false);
+      cursorY += 22;
+    }
+    drawRow(cursorY, [
+      getCreatorName(creator),
+      formatLabel(creator.platform),
+      getCreatorProgram(creator),
+      formatFollowers(creator),
+      formatLabel(creator.creator_rank),
+      getCreatorInterest(creator),
+      formatScholarshipStudent(creator),
+    ], false, idx % 2 === 1);
+    cursorY += 22;
+  });
+
+  // Footer page numbers
+  const pageCount = pdf.getNumberOfPages();
+  for (let p = 1; p <= pageCount; p++) {
+    pdf.setPage(p);
+    setFont(8, 'normal', muted);
+    pdf.text(`Page ${p} of ${pageCount}`, pageWidth - marginX, pageHeight - 20, { align: 'right' });
+  }
+
+  pdf.save(`onboarded-creators-${new Date().toISOString().slice(0, 10)}.pdf`);
+};
 
 const getCreatorInterest = (creator: CreatorProfile) =>
   formatLabel(
@@ -460,6 +548,7 @@ export default function CreatorsPage() {
   const router = useRouter();
   const [creators, setCreators] = useState<CreatorProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const creatorGroups = groupCreatorsBySignupDate(creators).filter(
     (g) => g.label !== 'Unknown signup date'
@@ -565,8 +654,21 @@ export default function CreatorsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
+      <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-foreground">Onboarded Creators</h1>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 shrink-0"
+          disabled={isExporting || creators.length === 0}
+          onClick={async () => {
+            setIsExporting(true);
+            try { await downloadCreatorsListPdf(creators); } finally { setIsExporting(false); }
+          }}
+        >
+          <FileDown size={15} />
+          {isExporting ? 'Generating...' : 'Download PDF'}
+        </Button>
       </div>
 
       {isLoading ? (
