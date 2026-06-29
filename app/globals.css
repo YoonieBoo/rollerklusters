@@ -123,3 +123,34 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes ai-shimmer {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+@keyframes ai-glow {
+  0%, 100% {
+    box-shadow: 0 0 6px 1px rgba(29, 78, 216, 0.55), 0 0 18px 4px rgba(59, 130, 246, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 14px 4px rgba(29, 78, 216, 0.8), 0 0 30px 8px rgba(59, 130, 246, 0.38);
+  }
+}
+
+.ai-glow-btn {
+  background: linear-gradient(90deg, #1e40af 0%, #2563eb 30%, #60a5fa 50%, #2563eb 70%, #1e40af 100%) !important;
+  background-size: 200% auto !important;
+  color: #fff !important;
+  animation: ai-shimmer 3s linear infinite, ai-glow 2s ease-in-out infinite;
+}
+
+.ai-glow-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.ai-glow-btn:disabled {
+  animation: none !important;
+  background: #1d4ed8 !important;
+  opacity: 0.45;
+}

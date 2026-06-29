@@ -1347,7 +1347,7 @@ export default function BriefsPage() {
                       <Button
                         type="button"
                         size="sm"
-                        className="h-8 gap-1.5 bg-violet-600 px-3 text-xs text-white hover:bg-violet-700"
+                        className="ai-glow-btn h-8 gap-1.5 px-3 text-xs"
                         disabled={isAiAssisting || !selectedCampaignId}
                         onClick={handleAiAssist}
                       >
