@@ -352,11 +352,16 @@ export default function BriefsPage() {
     if (suggestions.targetAudience) setTargetAudience(suggestions.targetAudience);
     if (suggestions.contentDirection) setContentDirection(suggestions.contentDirection);
     if (suggestions.platforms.length > 0) setPlatforms(suggestions.platforms);
-    if (suggestions.keyMessages.length > 0) setKeyMessages(suggestions.keyMessages);
-    if (suggestions.brandRulesDo.length > 0) setBrandRulesDo(suggestions.brandRulesDo);
-    if (suggestions.brandRulesDont.length > 0) setBrandRulesDont(suggestions.brandRulesDont);
-    if (suggestions.hashtags.length > 0) setHashtags(suggestions.hashtags);
-    if (suggestions.mentions.length > 0) setMentions(suggestions.mentions);
+    const cleanMessages = suggestions.keyMessages.filter(Boolean);
+    if (cleanMessages.length > 0) setKeyMessages(cleanMessages);
+    const cleanDo = suggestions.brandRulesDo.filter(Boolean);
+    if (cleanDo.length > 0) setBrandRulesDo(cleanDo);
+    const cleanDont = suggestions.brandRulesDont.filter(Boolean);
+    if (cleanDont.length > 0) setBrandRulesDont(cleanDont);
+    const cleanHashtags = suggestions.hashtags.filter(Boolean);
+    if (cleanHashtags.length > 0) setHashtags(cleanHashtags);
+    const cleanMentions = suggestions.mentions.filter(Boolean);
+    if (cleanMentions.length > 0) setMentions(cleanMentions);
     if (suggestions.cta) setCta(suggestions.cta);
     setAiSuggestions(null);
   };
@@ -2017,29 +2022,119 @@ export default function BriefsPage() {
               AI Brief Suggestions
             </DialogTitle>
             <DialogDescription>
-              Review the suggestions below. Click <strong>Apply all</strong> to fill all fields at once, or copy individual sections.
+              Edit any field below before applying. Click <strong>Apply all</strong> to fill the brief with your changes.
             </DialogDescription>
           </DialogHeader>
 
           {aiSuggestions && (
             <div className="space-y-4 pt-1">
-              {[
-                { label: 'Campaign Goal', value: aiSuggestions.objective },
-                { label: 'Target Audience', value: aiSuggestions.targetAudience },
-                { label: 'Content Direction', value: aiSuggestions.contentDirection },
-                { label: 'Platforms', value: aiSuggestions.platforms.join(', ') },
-                { label: 'Key Messages', value: aiSuggestions.keyMessages.join('\n') },
-                { label: 'Brand Do Rules', value: aiSuggestions.brandRulesDo.join('\n') },
-                { label: 'Brand Don\'t Rules', value: aiSuggestions.brandRulesDont.join('\n') },
-                { label: 'Hashtags', value: aiSuggestions.hashtags.join('  ') },
-                { label: 'Mentions', value: aiSuggestions.mentions.join('  ') },
-                { label: 'Call to Action', value: aiSuggestions.cta },
-              ].map(({ label, value }) => (
-                <div key={label} className="rounded-lg border border-border bg-muted/30 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-                  <p className="mt-1 whitespace-pre-line text-sm text-foreground">{value || '—'}</p>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Campaign Goal</label>
+                <Textarea
+                  value={aiSuggestions.objective}
+                  onChange={(e) => setAiSuggestions({ ...aiSuggestions, objective: e.target.value })}
+                  className="min-h-20 resize-none bg-background/50 text-sm"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Target Audience</label>
+                <Textarea
+                  value={aiSuggestions.targetAudience}
+                  onChange={(e) => setAiSuggestions({ ...aiSuggestions, targetAudience: e.target.value })}
+                  className="min-h-20 resize-none bg-background/50 text-sm"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Content Direction</label>
+                <Textarea
+                  value={aiSuggestions.contentDirection}
+                  onChange={(e) => setAiSuggestions({ ...aiSuggestions, contentDirection: e.target.value })}
+                  className="min-h-20 resize-none bg-background/50 text-sm"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Platforms</label>
+                <div className="flex flex-wrap gap-2">
+                  {platformOptions.map((p) => (
+                    <Button
+                      key={p}
+                      type="button"
+                      size="sm"
+                      variant={aiSuggestions.platforms.includes(p) ? 'default' : 'outline'}
+                      className="h-8 rounded-full px-3 text-xs"
+                      onClick={() =>
+                        setAiSuggestions({
+                          ...aiSuggestions,
+                          platforms: aiSuggestions.platforms.includes(p)
+                            ? aiSuggestions.platforms.filter((x) => x !== p)
+                            : [...aiSuggestions.platforms, p],
+                        })
+                      }
+                    >
+                      {p}
+                    </Button>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Key Messages <span className="normal-case font-normal">(one per line)</span></label>
+                <Textarea
+                  value={aiSuggestions.keyMessages.join('\n')}
+                  onChange={(e) => setAiSuggestions({ ...aiSuggestions, keyMessages: e.target.value.split('\n') })}
+                  className="min-h-20 resize-none bg-background/50 text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Brand Do Rules <span className="normal-case font-normal">(one per line)</span></label>
+                  <Textarea
+                    value={aiSuggestions.brandRulesDo.join('\n')}
+                    onChange={(e) => setAiSuggestions({ ...aiSuggestions, brandRulesDo: e.target.value.split('\n') })}
+                    className="min-h-24 resize-none bg-background/50 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Brand Don't Rules <span className="normal-case font-normal">(one per line)</span></label>
+                  <Textarea
+                    value={aiSuggestions.brandRulesDont.join('\n')}
+                    onChange={(e) => setAiSuggestions({ ...aiSuggestions, brandRulesDont: e.target.value.split('\n') })}
+                    className="min-h-24 resize-none bg-background/50 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Hashtags <span className="normal-case font-normal">(one per line)</span></label>
+                  <Textarea
+                    value={aiSuggestions.hashtags.join('\n')}
+                    onChange={(e) => setAiSuggestions({ ...aiSuggestions, hashtags: e.target.value.split('\n') })}
+                    className="min-h-20 resize-none bg-background/50 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mentions <span className="normal-case font-normal">(one per line)</span></label>
+                  <Textarea
+                    value={aiSuggestions.mentions.join('\n')}
+                    onChange={(e) => setAiSuggestions({ ...aiSuggestions, mentions: e.target.value.split('\n') })}
+                    className="min-h-20 resize-none bg-background/50 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Call to Action</label>
+                <Input
+                  value={aiSuggestions.cta}
+                  onChange={(e) => setAiSuggestions({ ...aiSuggestions, cta: e.target.value })}
+                  className="bg-background/50 text-sm"
+                />
+              </div>
 
               <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:justify-end">
                 <Button variant="outline" onClick={() => setAiSuggestions(null)}>
