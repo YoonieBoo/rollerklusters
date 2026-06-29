@@ -317,24 +317,12 @@ export default function CampaignDetailPage() {
             <h1 className="mt-1 text-3xl font-semibold text-foreground">
               {campaign.name}
             </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Created {formatDate(campaign.createdAt)} · Updated {formatDate(campaign.updatedAt)}
-            </p>
           </div>
           <StatusBadge status={campaign.status} />
         </div>
       </section>
 
-      <section className="grid overflow-hidden rounded-lg border border-border bg-card md:grid-cols-4">
-        <div className="border-b border-border px-5 py-4 md:border-b-0 md:border-r">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Clock3 size={16} className="text-blue-700" />
-            Brief
-          </div>
-          <p className="mt-2 text-xl font-semibold capitalize">
-            {getBriefStatus(brief).replace(/_/g, ' ')}
-          </p>
-        </div>
+      <section className="grid overflow-hidden rounded-lg border border-border bg-card md:grid-cols-3">
         <div className="border-b border-border px-5 py-4 md:border-b-0 md:border-r">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Mail size={16} className="text-blue-700" />
