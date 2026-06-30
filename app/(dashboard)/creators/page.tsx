@@ -224,17 +224,17 @@ const getFirstValue = (creator: CreatorProfile, keys: string[]) => {
   return null;
 };
 
+const sanitizeHandle = (h: string) => h.replace(/^[@\-]+/, '').trim();
+
 const getChannelLink = (creator: CreatorProfile): string => {
   const platform = toText(creator.platform).trim().toLowerCase();
   const genericRaw = toText(creator.social_handle).trim();
 
-  // If social_handle is already a full URL, use it directly
   if (genericRaw.startsWith('http://') || genericRaw.startsWith('https://')) return genericRaw;
 
-  const genericHandle = genericRaw.replace(/^@/, '');
-  // Platform-specific handles from signup form take priority over generic social_handle
-  const tiktokHandle = encodeURIComponent(toText(creator.tiktok_handle).trim().replace(/^@/, '') || genericHandle);
-  const instagramHandle = encodeURIComponent(toText(creator.instagram_handle).trim().replace(/^@/, '') || genericHandle);
+  const genericHandle = sanitizeHandle(genericRaw);
+  const tiktokHandle = encodeURIComponent(sanitizeHandle(toText(creator.tiktok_handle).trim()) || genericHandle);
+  const instagramHandle = encodeURIComponent(sanitizeHandle(toText(creator.instagram_handle).trim()) || genericHandle);
   const youtubeHandle = encodeURIComponent(genericHandle);
 
   if (platform === 'tiktok') return tiktokHandle ? `https://www.tiktok.com/@${tiktokHandle}` : '';
