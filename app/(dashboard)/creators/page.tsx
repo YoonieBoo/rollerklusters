@@ -23,6 +23,8 @@ type CreatorProfile = {
   display_name?: string | null;
   creator_name?: string | null;
   social_handle?: string | null;
+  tiktok_handle?: string | null;
+  instagram_handle?: string | null;
   platform?: string | null;
   faculty?: string | null;
   university_program?: string | null;
@@ -223,16 +225,21 @@ const getFirstValue = (creator: CreatorProfile, keys: string[]) => {
 };
 
 const getChannelLink = (creator: CreatorProfile): string => {
-  const raw = toText(creator.social_handle).trim();
-  if (!raw) return '';
-  // If already a full URL, return as-is
-  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
-  const handle = encodeURIComponent(raw.replace(/^@/, '').trim());
-  if (!handle) return '';
   const platform = toText(creator.platform).trim().toLowerCase();
-  if (platform === 'tiktok') return `https://www.tiktok.com/@${handle}`;
-  if (platform === 'instagram') return `https://www.instagram.com/${handle}/`;
-  if (platform === 'youtube') return `https://www.youtube.com/@${handle}`;
+  const genericRaw = toText(creator.social_handle).trim();
+
+  // If social_handle is already a full URL, use it directly
+  if (genericRaw.startsWith('http://') || genericRaw.startsWith('https://')) return genericRaw;
+
+  const genericHandle = genericRaw.replace(/^@/, '');
+  // Platform-specific handles from signup form take priority over generic social_handle
+  const tiktokHandle = encodeURIComponent(toText(creator.tiktok_handle).trim().replace(/^@/, '') || genericHandle);
+  const instagramHandle = encodeURIComponent(toText(creator.instagram_handle).trim().replace(/^@/, '') || genericHandle);
+  const youtubeHandle = encodeURIComponent(genericHandle);
+
+  if (platform === 'tiktok') return tiktokHandle ? `https://www.tiktok.com/@${tiktokHandle}` : '';
+  if (platform === 'instagram') return instagramHandle ? `https://www.instagram.com/${instagramHandle}/` : '';
+  if (platform === 'youtube') return youtubeHandle ? `https://www.youtube.com/@${youtubeHandle}` : '';
   return '';
 };
 
@@ -534,6 +541,8 @@ const enrichCreatorsWithSubmittedFields = (
       faculty,
       university_program: universityProgram,
       interested_content_types: interestedContentTypes,
+      tiktok_handle: toText(creator.tiktok_handle).trim() || toText(signup?.tiktok_handle).trim() || null,
+      instagram_handle: toText(creator.instagram_handle).trim() || toText(signup?.instagram_handle).trim() || null,
     };
   });
 
