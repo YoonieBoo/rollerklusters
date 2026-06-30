@@ -223,7 +223,11 @@ const getFirstValue = (creator: CreatorProfile, keys: string[]) => {
 };
 
 const getChannelLink = (creator: CreatorProfile): string => {
-  const handle = toText(creator.social_handle).trim().replace(/^@/, '');
+  const raw = toText(creator.social_handle).trim();
+  if (!raw) return '';
+  // If already a full URL, return as-is
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  const handle = encodeURIComponent(raw.replace(/^@/, '').trim());
   if (!handle) return '';
   const platform = toText(creator.platform).trim().toLowerCase();
   if (platform === 'tiktok') return `https://www.tiktok.com/@${handle}`;
@@ -267,13 +271,10 @@ const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
     pdf.setTextColor(color);
   };
 
-  const drawRow = (
-    y: number,
-    cells: string[],
-    isHeader: boolean,
-    isAlt: boolean,
-    linksByColIndex?: Record<number, string>
-  ) => {
+  // X offset of each column, precomputed for link annotation placement
+  const colOffsets = cols.map((_, i) => cols.slice(0, i).reduce((s, c) => s + c.width, 0));
+
+  const drawRow = (y: number, cells: string[], isHeader: boolean, isAlt: boolean) => {
     const rowHeight = 22;
     if (isHeader) {
       pdf.setFillColor(headerBg);
@@ -284,20 +285,13 @@ const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
     }
     pdf.setDrawColor(border);
     pdf.rect(tableStartX, y, totalTableWidth, rowHeight, 'S');
-    let x = tableStartX;
     cells.forEach((text, i) => {
       const col = cols[i];
+      const x = tableStartX + colOffsets[i];
       const cellText = pdf.splitTextToSize(text || '—', col.width - 8) as string[];
       const display = cellText[0] ?? '';
-      const url = linksByColIndex?.[i];
-      if (!isHeader && url && display !== '—' && display !== 'N/A') {
-        setFont(8, 'normal', link);
-        pdf.textWithLink(display, x + 4, y + 14, { url });
-      } else {
-        setFont(isHeader ? 8.5 : 8, isHeader ? 'bold' : 'normal', isHeader ? black : muted);
-        pdf.text(display, x + 4, y + 14);
-      }
-      x += col.width;
+      setFont(isHeader ? 8.5 : 8, isHeader ? 'bold' : 'normal', isHeader ? black : muted);
+      pdf.text(display, x + 4, y + 14);
     });
   };
 
@@ -335,7 +329,15 @@ const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
       getCreatorInterest(creator),
       formatScholarshipStudent(creator),
       channelUrl ? channelDisplay : 'N/A',
-    ], false, idx % 2 === 1, channelUrl ? { 7: channelUrl } : undefined);
+    ], false, idx % 2 === 1);
+    // Overwrite channel cell in blue + add PDF link annotation
+    if (channelUrl) {
+      const linkColX = tableStartX + colOffsets[7];
+      const clipped = (pdf.splitTextToSize(channelDisplay, cols[7].width - 8) as string[])[0] ?? '';
+      setFont(8, 'normal', link);
+      pdf.text(clipped, linkColX + 4, cursorY + 14);
+      pdf.link(linkColX, cursorY, cols[7].width, 22, { url: channelUrl });
+    }
     cursorY += 22;
   });
 
