@@ -222,6 +222,16 @@ const getFirstValue = (creator: CreatorProfile, keys: string[]) => {
   return null;
 };
 
+const getChannelLink = (creator: CreatorProfile): string => {
+  const handle = toText(creator.social_handle).trim().replace(/^@/, '');
+  if (!handle) return '';
+  const platform = toText(creator.platform).trim().toLowerCase();
+  if (platform === 'tiktok') return `https://www.tiktok.com/@${handle}`;
+  if (platform === 'instagram') return `https://www.instagram.com/${handle}/`;
+  if (platform === 'youtube') return `https://www.youtube.com/@${handle}`;
+  return '';
+};
+
 const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
   const { jsPDF } = await import('jspdf/dist/jspdf.es.min.js');
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
@@ -232,18 +242,20 @@ const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
   const marginBottom = 50;
   const black = '#111827';
   const muted = '#6b7280';
+  const link = '#2563eb';
   const headerBg = '#f3f4f6';
   const rowAlt = '#fafafa';
   const border = '#e5e7eb';
 
   const cols = [
-    { label: 'Name', width: 140 },
-    { label: 'Platform', width: 70 },
-    { label: 'Program', width: 130 },
-    { label: 'Followers', width: 75 },
-    { label: 'Rank', width: 60 },
-    { label: 'Interest', width: 140 },
-    { label: 'Scholarship', width: 65 },
+    { label: 'Name', width: 125 },
+    { label: 'Platform', width: 65 },
+    { label: 'Program', width: 115 },
+    { label: 'Followers', width: 70 },
+    { label: 'Rank', width: 55 },
+    { label: 'Interest', width: 125 },
+    { label: 'Scholarship', width: 60 },
+    { label: 'Channel Link', width: 145 },
   ];
 
   const totalTableWidth = cols.reduce((sum, c) => sum + c.width, 0);
@@ -255,7 +267,13 @@ const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
     pdf.setTextColor(color);
   };
 
-  const drawRow = (y: number, cells: string[], isHeader: boolean, isAlt: boolean) => {
+  const drawRow = (
+    y: number,
+    cells: string[],
+    isHeader: boolean,
+    isAlt: boolean,
+    linksByColIndex?: Record<number, string>
+  ) => {
     const rowHeight = 22;
     if (isHeader) {
       pdf.setFillColor(headerBg);
@@ -270,8 +288,15 @@ const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
     cells.forEach((text, i) => {
       const col = cols[i];
       const cellText = pdf.splitTextToSize(text || '—', col.width - 8) as string[];
-      setFont(isHeader ? 8.5 : 8, isHeader ? 'bold' : 'normal', isHeader ? black : muted);
-      pdf.text(cellText[0] ?? '', x + 4, y + 14);
+      const display = cellText[0] ?? '';
+      const url = linksByColIndex?.[i];
+      if (!isHeader && url && display !== '—' && display !== 'N/A') {
+        setFont(8, 'normal', link);
+        pdf.textWithLink(display, x + 4, y + 14, { url });
+      } else {
+        setFont(isHeader ? 8.5 : 8, isHeader ? 'bold' : 'normal', isHeader ? black : muted);
+        pdf.text(display, x + 4, y + 14);
+      }
       x += col.width;
     });
   };
@@ -298,6 +323,9 @@ const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
       drawRow(cursorY, cols.map((c) => c.label), true, false);
       cursorY += 22;
     }
+    const channelUrl = getChannelLink(creator);
+    const handle = toText(creator.social_handle).trim() || null;
+    const channelDisplay = handle ? (handle.startsWith('@') ? handle : `@${handle}`) : 'N/A';
     drawRow(cursorY, [
       getCreatorName(creator),
       formatLabel(creator.platform),
@@ -306,7 +334,8 @@ const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
       formatLabel(creator.creator_rank),
       getCreatorInterest(creator),
       formatScholarshipStudent(creator),
-    ], false, idx % 2 === 1);
+      channelUrl ? channelDisplay : 'N/A',
+    ], false, idx % 2 === 1, channelUrl ? { 7: channelUrl } : undefined);
     cursorY += 22;
   });
 
