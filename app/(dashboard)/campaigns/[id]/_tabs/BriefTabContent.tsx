@@ -332,6 +332,37 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
 
   const showToast = (next: BriefToast) => setToast(next);
 
+  const briefFieldsComplete = {
+    objective: objective.trim() !== '',
+    targetAudience: targetAudience.trim() !== '',
+    contentDirection: contentDirection.trim() !== '',
+    platforms: platforms.length > 0,
+    keyMessages: cleanTextList(keyMessages).length > 0,
+    brandRulesDo: cleanTextList(brandRulesDo).length > 0,
+    brandRulesDont: cleanTextList(brandRulesDont).length > 0,
+    hashtags: cleanTextList(hashtags).length > 0,
+    mentions: cleanTextList(mentions).length > 0,
+    cta: cta.trim() !== '',
+  };
+  const briefCompletionPct = Math.round(
+    (Object.values(briefFieldsComplete).filter(Boolean).length / Object.values(briefFieldsComplete).length) * 100
+  );
+  const briefFieldLabels: Record<keyof typeof briefFieldsComplete, string> = {
+    objective: 'Campaign Goal',
+    targetAudience: 'Target Audience',
+    contentDirection: 'Content Direction',
+    platforms: 'Platforms',
+    keyMessages: 'Key Messages',
+    brandRulesDo: 'Brand Do Rules',
+    brandRulesDont: "Brand Don't Rules",
+    hashtags: 'Hashtags',
+    mentions: 'Mentions',
+    cta: 'Call to Action',
+  };
+  const missingBriefFields = (Object.keys(briefFieldsComplete) as (keyof typeof briefFieldsComplete)[])
+    .filter((k) => !briefFieldsComplete[k])
+    .map((k) => briefFieldLabels[k]);
+
   const handleSaveFailure = (label: string, error: { message: string; code?: string } | null) => {
     const message = error?.message ?? 'Unable to save brief';
     console.error(label, error);
@@ -831,6 +862,13 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
                   Saved. Type a new description above to regenerate, or download the PDF.
                 </p>
               </div>
+
+              {missingBriefFields.length > 0 && (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3">
+                  <p className="text-sm font-medium text-amber-700">{briefCompletionPct}% complete — some fields need attention</p>
+                  <p className="mt-0.5 text-sm text-amber-700/80">Missing: {missingBriefFields.join(', ')}</p>
+                </div>
+              )}
 
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="space-y-1">

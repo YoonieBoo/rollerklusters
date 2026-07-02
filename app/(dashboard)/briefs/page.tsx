@@ -384,6 +384,22 @@ export default function BriefsPage() {
     (Object.values(aiFilledFieldsComplete).filter(Boolean).length / Object.values(aiFilledFieldsComplete).length) * 100
   );
 
+  const briefFieldLabels: Record<keyof typeof aiFilledFieldsComplete, string> = {
+    objective: 'Campaign Goal',
+    targetAudience: 'Target Audience',
+    contentDirection: 'Content Direction',
+    platforms: 'Platforms',
+    keyMessages: 'Key Messages',
+    brandRulesDo: 'Brand Do Rules',
+    brandRulesDont: "Brand Don't Rules",
+    hashtags: 'Hashtags',
+    mentions: 'Mentions',
+    cta: 'Call to Action',
+  };
+  const missingBriefFields = (Object.keys(aiFilledFieldsComplete) as (keyof typeof aiFilledFieldsComplete)[])
+    .filter((k) => !aiFilledFieldsComplete[k])
+    .map((k) => briefFieldLabels[k]);
+
   const buildCurrentCreatorBriefDocument = (): CreatorBriefDocument => {
     const keyMessageValues = cleanTextList(keyMessages);
     const brandRulesDoValues = cleanTextList(brandRulesDo);
@@ -893,6 +909,13 @@ export default function BriefsPage() {
                       AI-generated brief is saved. Review it below, download the PDF, or regenerate with a new description.
                     </p>
                   </div>
+
+                  {missingBriefFields.length > 0 && (
+                    <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3">
+                      <p className="text-sm font-medium text-amber-700">{completionPercentage}% complete — some fields need attention</p>
+                      <p className="mt-0.5 text-sm text-amber-700/80">Missing: {missingBriefFields.join(', ')}</p>
+                    </div>
+                  )}
 
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div className="space-y-1">
