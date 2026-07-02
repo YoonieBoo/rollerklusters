@@ -224,23 +224,44 @@ const getFirstValue = (creator: CreatorProfile, keys: string[]) => {
   return null;
 };
 
-const sanitizeHandle = (h: string) => h.replace(/^[@\-]+/, '').trim();
+const sanitizeHandle = (h: string): string => {
+  const trimmed = h.replace(/^[@\-]+/, '').trim();
+  if (!trimmed) return '';
+  // Extract handle from a full TikTok URL (e.g. tiktok.com/@handle?params)
+  const tiktokMatch = trimmed.match(/tiktok\.com\/@([^?&/\s]+)/);
+  if (tiktokMatch) return tiktokMatch[1];
+  // Extract handle from a full Instagram URL
+  const igMatch = trimmed.match(/instagram\.com\/([^?&/\s]+)/);
+  if (igMatch) return igMatch[1].replace(/\/$/, '');
+  // Compound entries like "aux_janne and @aux_janne0.2" — take the last token
+  if (trimmed.includes(' ')) {
+    const fillers = new Set(['and', 'or', '&', 'also']);
+    const parts = trimmed.split(/[\s,]+/)
+      .map(w => w.replace(/^[@\-]+/, '').trim())
+      .filter(w => w && !fillers.has(w.toLowerCase()));
+    return parts[parts.length - 1] ?? '';
+  }
+  return trimmed;
+};
 
-const getChannelLink = (creator: CreatorProfile): string => {
-  const platform = toText(creator.platform).trim().toLowerCase();
-  const genericRaw = toText(creator.social_handle).trim();
+const getTikTokUrl = (creator: CreatorProfile): string => {
+  const raw = toText(creator.tiktok_handle).trim()
+    || (toText(creator.platform).trim().toLowerCase() === 'tiktok' ? toText(creator.social_handle).trim() : '');
+  const handle = sanitizeHandle(raw);
+  return handle ? `https://www.tiktok.com/@${encodeURIComponent(handle)}` : '';
+};
 
-  if (genericRaw.startsWith('http://') || genericRaw.startsWith('https://')) return genericRaw;
+const getInstagramUrl = (creator: CreatorProfile): string => {
+  const raw = toText(creator.instagram_handle).trim()
+    || (toText(creator.platform).trim().toLowerCase() === 'instagram' ? toText(creator.social_handle).trim() : '');
+  const handle = sanitizeHandle(raw);
+  return handle ? `https://www.instagram.com/${encodeURIComponent(handle)}/` : '';
+};
 
-  const genericHandle = sanitizeHandle(genericRaw);
-  const tiktokHandle = encodeURIComponent(sanitizeHandle(toText(creator.tiktok_handle).trim()) || genericHandle);
-  const instagramHandle = encodeURIComponent(sanitizeHandle(toText(creator.instagram_handle).trim()) || genericHandle);
-  const youtubeHandle = encodeURIComponent(genericHandle);
-
-  if (platform === 'tiktok') return tiktokHandle ? `https://www.tiktok.com/@${tiktokHandle}` : '';
-  if (platform === 'instagram') return instagramHandle ? `https://www.instagram.com/${instagramHandle}/` : '';
-  if (platform === 'youtube') return youtubeHandle ? `https://www.youtube.com/@${youtubeHandle}` : '';
-  return '';
+const getYouTubeUrl = (creator: CreatorProfile): string => {
+  if (toText(creator.platform).trim().toLowerCase() !== 'youtube') return '';
+  const handle = sanitizeHandle(toText(creator.social_handle).trim());
+  return handle ? `https://www.youtube.com/@${encodeURIComponent(handle)}` : '';
 };
 
 const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
@@ -259,14 +280,15 @@ const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
   const border = '#e5e7eb';
 
   const cols = [
-    { label: 'Name', width: 125 },
-    { label: 'Platform', width: 65 },
-    { label: 'Program', width: 115 },
-    { label: 'Followers', width: 70 },
-    { label: 'Rank', width: 55 },
-    { label: 'Interest', width: 125 },
-    { label: 'Scholarship', width: 60 },
-    { label: 'Channel Link', width: 145 },
+    { label: 'Name', width: 115 },
+    { label: 'Platform', width: 60 },
+    { label: 'Program', width: 100 },
+    { label: 'Followers', width: 65 },
+    { label: 'Rank', width: 50 },
+    { label: 'Interest', width: 110 },
+    { label: 'Scholarship', width: 50 },
+    { label: 'TikTok', width: 100 },
+    { label: 'Instagram', width: 100 },
   ];
 
   const totalTableWidth = cols.reduce((sum, c) => sum + c.width, 0);
@@ -324,9 +346,18 @@ const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
       drawRow(cursorY, cols.map((c) => c.label), true, false);
       cursorY += 22;
     }
-    const channelUrl = getChannelLink(creator);
-    const handle = toText(creator.social_handle).trim() || null;
-    const channelDisplay = handle ? (handle.startsWith('@') ? handle : `@${handle}`) : 'N/A';
+    const tiktokUrl = getTikTokUrl(creator);
+    const igUrl = getInstagramUrl(creator);
+    const ytUrl = getYouTubeUrl(creator);
+    // TikTok column: TikTok link, or YouTube link for YouTube creators
+    const tiktokDisplayUrl = tiktokUrl || ytUrl;
+    const tiktokHandle = sanitizeHandle(toText(creator.tiktok_handle).trim()
+      || (toText(creator.platform).trim().toLowerCase() === 'tiktok' ? toText(creator.social_handle).trim() : '')
+      || (ytUrl ? toText(creator.social_handle).trim() : ''));
+    const igHandle = sanitizeHandle(toText(creator.instagram_handle).trim()
+      || (toText(creator.platform).trim().toLowerCase() === 'instagram' ? toText(creator.social_handle).trim() : ''));
+    const tiktokDisplay = tiktokHandle ? `@${tiktokHandle}` : (ytUrl ? `@${sanitizeHandle(toText(creator.social_handle).trim())}` : 'N/A');
+    const igDisplay = igHandle ? `@${igHandle}` : 'N/A';
     drawRow(cursorY, [
       getCreatorName(creator),
       formatLabel(creator.platform),
@@ -335,15 +366,23 @@ const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
       formatLabel(creator.creator_rank),
       getCreatorInterest(creator),
       formatScholarshipStudent(creator),
-      channelUrl ? channelDisplay : 'N/A',
+      tiktokDisplayUrl ? tiktokDisplay : 'N/A',
+      igUrl ? igDisplay : 'N/A',
     ], false, idx % 2 === 1);
-    // Overwrite channel cell in blue + add PDF link annotation
-    if (channelUrl) {
-      const linkColX = tableStartX + colOffsets[7];
-      const clipped = (pdf.splitTextToSize(channelDisplay, cols[7].width - 8) as string[])[0] ?? '';
+    // Overwrite link cells in blue with PDF annotations
+    if (tiktokDisplayUrl) {
+      const colX = tableStartX + colOffsets[7];
+      const clipped = (pdf.splitTextToSize(tiktokDisplay, cols[7].width - 8) as string[])[0] ?? '';
       setFont(8, 'normal', link);
-      pdf.text(clipped, linkColX + 4, cursorY + 14);
-      pdf.link(linkColX, cursorY, cols[7].width, 22, { url: channelUrl });
+      pdf.text(clipped, colX + 4, cursorY + 14);
+      pdf.link(colX, cursorY, cols[7].width, 22, { url: tiktokDisplayUrl });
+    }
+    if (igUrl) {
+      const colX = tableStartX + colOffsets[8];
+      const clipped = (pdf.splitTextToSize(igDisplay, cols[8].width - 8) as string[])[0] ?? '';
+      setFont(8, 'normal', link);
+      pdf.text(clipped, colX + 4, cursorY + 14);
+      pdf.link(colX, cursorY, cols[8].width, 22, { url: igUrl });
     }
     cursorY += 22;
   });
