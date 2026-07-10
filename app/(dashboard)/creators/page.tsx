@@ -65,6 +65,16 @@ type CreatorSignup = {
   primary_creative_focus?: unknown;
   additional_notes?: unknown;
   created_at?: string | null;
+  signup_type?: string | null;
+  role_label?: string | null;
+};
+
+const isCampaignManagerSignup = (signup: CreatorSignup): boolean => {
+  const text = [signup.signup_type, signup.role_label, signup.primary_creative_focus]
+    .map((v) => toText(v))
+    .join(' ')
+    .toLowerCase();
+  return text.includes('campaign-manager') || text.includes('campaign manager') || text.includes('campaign_manager');
 };
 
 const CREATORS_REFRESH_INTERVAL_MS = 15000;
@@ -359,8 +369,9 @@ const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
       || (toText(creator.platform).trim().toLowerCase() === 'instagram' ? toText(creator.social_handle).trim() : ''));
     const tiktokDisplay = tiktokHandle ? `@${tiktokHandle}` : (ytUrl ? `@${sanitizeHandle(toText(creator.social_handle).trim())}` : 'N/A');
     const igDisplay = igHandle ? `@${igHandle}` : 'N/A';
+    const isPending = creator.verification_status === 'pending_onboarding';
     drawRow(cursorY, [
-      getCreatorName(creator),
+      isPending ? `${getCreatorName(creator)} (Pending)` : getCreatorName(creator),
       formatLabel(creator.platform),
       getCreatorProgram(creator),
       formatFollowers(creator),
@@ -590,6 +601,7 @@ const enrichCreatorsWithSubmittedFields = (
   // Deduplicate by email so repeat submissions only appear once
   const seenSignupEmails = new Set<string>();
   const unmatchedSignups = signups.filter((signup) => {
+    if (isCampaignManagerSignup(signup)) return false;
     const email = normalizeEmail(signup.email);
     if (email && matchedSignupEmails.has(email)) return false;
     const handles = [signup.display_name, signup.instagram_handle, signup.tiktok_handle].map(
