@@ -68,6 +68,7 @@ type CreatorSignup = {
   signup_type?: string | null;
   role_label?: string | null;
   follower_count?: number | string | null;
+  nickname?: string | null;
 };
 
 const isCampaignManagerSignup = (signup: CreatorSignup): boolean => {
@@ -529,13 +530,17 @@ const enrichCreatorsWithSubmittedFields = (
   const signupsByIdentifier = new Map<string, CreatorSignup>();
 
   signups.forEach((signup) => {
-    [
+    // Raw identifiers + sanitized handle variants so full URLs and compound entries match
+    const rawHandles = [signup.instagram_handle, signup.tiktok_handle];
+    const sanitizedHandles = rawHandles.map((h) => sanitizeHandle(toText(h).trim()));
+    const identifiers = [
       signup.display_name,
-      signup.instagram_handle,
-      signup.tiktok_handle,
-    ].forEach((identifier) => {
+      signup.nickname,
+      ...rawHandles,
+      ...sanitizedHandles,
+    ];
+    identifiers.forEach((identifier) => {
       const normalizedIdentifier = normalizeCreatorIdentifier(identifier);
-
       if (normalizedIdentifier && !signupsByIdentifier.has(normalizedIdentifier)) {
         signupsByIdentifier.set(normalizedIdentifier, signup);
       }

@@ -150,9 +150,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
 
     try {
-      const [profilesRes, signupsRes] = await Promise.all([
-        supabase.from('creator_profiles').select('id, email, social_handle'),
-        supabase.from('creator_signups').select('email, tiktok_handle, instagram_handle, signup_type, role_label, primary_creative_focus'),
+      const [profilesRes, signupsRes, cmIdsRes] = await Promise.all([
+        supabase.from('creator_profiles').select('id, email, social_handle, creator_name, display_name, user_id'),
+        supabase.from('creator_signups').select('email, tiktok_handle, instagram_handle, signup_type, role_label, primary_creative_focus, nickname'),
+        fetch('/api/campaign-manager-ids').then((r) => r.json()).catch(() => ({ ids: [] })),
       ]);
 
       if (profilesRes.error) {
@@ -161,17 +162,25 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         return;
       }
 
-      const profiles = (profilesRes.data ?? []) as SupabaseRow[];
+      const campaignManagerIds = new Set<string>(cmIdsRes?.ids ?? []);
+      const allProfiles = (profilesRes.data ?? []) as SupabaseRow[];
+      // Exclude campaign manager profiles (same as the page does)
+      const profiles = allProfiles.filter((p) => !campaignManagerIds.has(String(p.user_id ?? '')));
       const signups = (signupsRes.data ?? []) as SupabaseRow[];
 
-      // Build a set of emails and handles already covered by profiles
+      // Build a set of emails, handles, and names already covered by profiles
       const profileEmails = new Set<string>();
       const profileHandles = new Set<string>();
+      const profileNames = new Set<string>();
       for (const p of profiles) {
         const email = toText(p.email).trim().toLowerCase();
         const handle = toText(p.social_handle).replace(/^[@\-]+/, '').trim().toLowerCase();
+        const creatorName = toText(p.creator_name).trim().toLowerCase();
+        const displayName = toText(p.display_name).trim().toLowerCase();
         if (email) profileEmails.add(email);
         if (handle) profileHandles.add(handle);
+        if (creatorName) profileNames.add(creatorName);
+        if (displayName) profileNames.add(displayName);
       }
 
       // Count signups not already represented in profiles, deduped by email
@@ -183,11 +192,26 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           .map((v) => toText(v)).join(' ').toLowerCase();
         if (roleText.includes('campaign-manager') || roleText.includes('campaign manager') || roleText.includes('campaign_manager')) continue;
         const email = toText(s.email).trim().toLowerCase();
-        const tiktok = toText(s.tiktok_handle).replace(/^[@\-]+/, '').trim().toLowerCase();
-        const ig = toText(s.instagram_handle).replace(/^[@\-]+/, '').trim().toLowerCase();
+        // Sanitize handles: extract from full URLs and compound entries
+        const sanitize = (h: string) => {
+          const t = h.replace(/^[@\-]+/, '').trim();
+          const tt = t.match(/tiktok\.com\/@([^?&/\s]+)/)?.[1];
+          if (tt) return tt.toLowerCase();
+          const ig2 = t.match(/instagram\.com\/([^?&/\s]+)/)?.[1];
+          if (ig2) return ig2.replace(/\/$/, '').toLowerCase();
+          if (t.includes(' ')) {
+            const parts = t.split(/[\s,]+/).filter(w => !['and','or','&'].includes(w));
+            return (parts[parts.length - 1] ?? '').replace(/^[@\-]+/, '').toLowerCase();
+          }
+          return t.toLowerCase();
+        };
+        const tiktok = sanitize(toText(s.tiktok_handle));
+        const ig = sanitize(toText(s.instagram_handle));
+        const nickname = toText(s.nickname).trim().toLowerCase();
         if (email && profileEmails.has(email)) continue;
         if (tiktok && profileHandles.has(tiktok)) continue;
         if (ig && profileHandles.has(ig)) continue;
+        if (nickname && profileNames.has(nickname)) continue;
         if (email && seenSignupEmails.has(email)) continue;
         if (email) seenSignupEmails.add(email);
         unmatchedCount++;
