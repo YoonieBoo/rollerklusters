@@ -608,7 +608,9 @@ const enrichCreatorsWithSubmittedFields = (
     user_id: null,
     email: signup.email,
     display_name: signup.display_name,
-    social_handle: toText(signup.instagram_handle).trim() || toText(signup.tiktok_handle).trim() || null,
+    tiktok_handle: toText(signup.tiktok_handle).trim() || null,
+    instagram_handle: toText(signup.instagram_handle).trim() || null,
+    social_handle: toText(signup.tiktok_handle).trim() || toText(signup.instagram_handle).trim() || null,
     platform: toText(signup.tiktok_handle).trim() ? 'TikTok' : toText(signup.instagram_handle).trim() ? 'Instagram' : null,
     faculty: null,
     university_program: toText(signup.university_program).trim() || null,
@@ -758,7 +760,7 @@ export default function CreatorsPage() {
           onClick={async () => {
             setIsExporting(true);
             // Only include actual creator_profiles (id defined), not unmatched signup stubs
-            try { await downloadCreatorsListPdf(creators.filter((c) => c.id !== undefined)); } finally { setIsExporting(false); }
+            try { await downloadCreatorsListPdf(creators); } finally { setIsExporting(false); }
           }}
         >
           <FileDown size={15} />
