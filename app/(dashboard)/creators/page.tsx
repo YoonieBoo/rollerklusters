@@ -705,13 +705,14 @@ export default function CreatorsPage() {
         const creatorOnly = (data ?? []).filter(
           (p) => !campaignManagerIds.has(String((p as CreatorProfile).user_id ?? ''))
         );
-        setCreators(
-          enrichCreatorsWithSubmittedFields(
-            creatorOnly as CreatorProfile[],
-            users,
-            signups
-          )
+        const enriched = enrichCreatorsWithSubmittedFields(
+          creatorOnly as CreatorProfile[],
+          users,
+          signups
         );
+        setCreators(enriched);
+        // Broadcast the authoritative count so the sidebar badge stays in sync
+        window.dispatchEvent(new CustomEvent('creator-count-update', { detail: enriched.length }));
       }
 
       setIsLoading(false);

@@ -342,6 +342,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     fetchCampaignManagerCount();
   }, [pathname, user]);
 
+  // When the Onboarded Creators page finishes loading its list, it broadcasts
+  // the exact count — use that as the authoritative number for the badge.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      setCreatorCount((e as CustomEvent<number>).detail);
+    };
+    window.addEventListener('creator-count-update', handler);
+    return () => window.removeEventListener('creator-count-update', handler);
+  }, []);
+
   useEffect(() => {
     if (!user) {
       return;
