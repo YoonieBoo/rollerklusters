@@ -150,31 +150,46 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
 
     try {
-      const creators: SupabaseRow[] = [];
+      const [profilesRes, signupsRes] = await Promise.all([
+        supabase.from('creator_profiles').select('id, email, social_handle'),
+        supabase.from('creator_signups').select('email, tiktok_handle, instagram_handle'),
+      ]);
 
-      for (let page = 0; ; page += 1) {
-        const from = page * CREATOR_COUNT_PAGE_SIZE;
-        const to = from + CREATOR_COUNT_PAGE_SIZE - 1;
-        const { data, error } = await supabase
-          .from('creator_profiles')
-          .select('id')
-          .range(from, to);
-
-        if (error) {
-          console.error('Creator count fetch error:', error);
-          setCreatorCount(0);
-          return;
-        }
-
-        const pageRows = (data ?? []) as SupabaseRow[];
-        creators.push(...pageRows);
-
-        if (pageRows.length < CREATOR_COUNT_PAGE_SIZE) {
-          break;
-        }
+      if (profilesRes.error) {
+        console.error('Creator count fetch error:', profilesRes.error);
+        setCreatorCount(0);
+        return;
       }
 
-      setCreatorCount(creators.length);
+      const profiles = (profilesRes.data ?? []) as SupabaseRow[];
+      const signups = (signupsRes.data ?? []) as SupabaseRow[];
+
+      // Build a set of emails and handles already covered by profiles
+      const profileEmails = new Set<string>();
+      const profileHandles = new Set<string>();
+      for (const p of profiles) {
+        const email = toText(p.email).trim().toLowerCase();
+        const handle = toText(p.social_handle).replace(/^[@\-]+/, '').trim().toLowerCase();
+        if (email) profileEmails.add(email);
+        if (handle) profileHandles.add(handle);
+      }
+
+      // Count signups not already represented in profiles, deduped by email
+      const seenSignupEmails = new Set<string>();
+      let unmatchedCount = 0;
+      for (const s of signups) {
+        const email = toText(s.email).trim().toLowerCase();
+        const tiktok = toText(s.tiktok_handle).replace(/^[@\-]+/, '').trim().toLowerCase();
+        const ig = toText(s.instagram_handle).replace(/^[@\-]+/, '').trim().toLowerCase();
+        if (email && profileEmails.has(email)) continue;
+        if (tiktok && profileHandles.has(tiktok)) continue;
+        if (ig && profileHandles.has(ig)) continue;
+        if (email && seenSignupEmails.has(email)) continue;
+        if (email) seenSignupEmails.add(email);
+        unmatchedCount++;
+      }
+
+      setCreatorCount(profiles.length + unmatchedCount);
     } catch (error) {
       console.error('Creator count fetch issue:', error);
       setCreatorCount(0);
@@ -322,9 +337,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'creator_profiles' },
-        () => {
-          fetchCreatorCount();
-        }
+        () => { fetchCreatorCount(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'creator_signups' },
+        () => { fetchCreatorCount(); }
       )
       .subscribe();
 
