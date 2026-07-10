@@ -628,7 +628,14 @@ const enrichCreatorsWithSubmittedFields = (
     created_at: signup.created_at ?? null,
   }));
 
-  return [...enriched, ...signupProfiles];
+  const merged = [...enriched, ...signupProfiles];
+  // Sort newest-first so date groups appear in correct order
+  merged.sort((a, b) => {
+    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return bTime - aTime;
+  });
+  return merged;
 };
 
 export default function CreatorsPage() {
