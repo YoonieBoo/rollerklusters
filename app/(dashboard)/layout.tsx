@@ -152,7 +152,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     try {
       const [profilesRes, signupsRes] = await Promise.all([
         supabase.from('creator_profiles').select('id, email, social_handle'),
-        supabase.from('creator_signups').select('email, tiktok_handle, instagram_handle'),
+        supabase.from('creator_signups').select('email, tiktok_handle, instagram_handle, signup_type, role_label, primary_creative_focus'),
       ]);
 
       if (profilesRes.error) {
@@ -175,9 +175,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       }
 
       // Count signups not already represented in profiles, deduped by email
+      // Exclude campaign managers (same logic as the page itself)
       const seenSignupEmails = new Set<string>();
       let unmatchedCount = 0;
       for (const s of signups) {
+        const roleText = [s.signup_type, s.role_label, s.primary_creative_focus]
+          .map((v) => toText(v)).join(' ').toLowerCase();
+        if (roleText.includes('campaign-manager') || roleText.includes('campaign manager') || roleText.includes('campaign_manager')) continue;
         const email = toText(s.email).trim().toLowerCase();
         const tiktok = toText(s.tiktok_handle).replace(/^[@\-]+/, '').trim().toLowerCase();
         const ig = toText(s.instagram_handle).replace(/^[@\-]+/, '').trim().toLowerCase();

@@ -292,15 +292,15 @@ const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
   const border = '#e5e7eb';
 
   const cols = [
-    { label: 'Name', width: 115 },
+    { label: 'Name', width: 110 },
     { label: 'Platform', width: 60 },
     { label: 'Program', width: 100 },
     { label: 'Followers', width: 65 },
-    { label: 'Rank', width: 50 },
-    { label: 'Interest', width: 110 },
-    { label: 'Scholarship', width: 50 },
-    { label: 'TikTok', width: 100 },
-    { label: 'Instagram', width: 100 },
+    { label: 'Rank', width: 48 },
+    { label: 'Interest', width: 108 },
+    { label: 'Scholarship', width: 68 },
+    { label: 'TikTok', width: 97 },
+    { label: 'Instagram', width: 105 },
   ];
 
   const totalTableWidth = cols.reduce((sum, c) => sum + c.width, 0);
