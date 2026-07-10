@@ -64,6 +64,7 @@ type CreatorSignup = {
   interested_content_types?: unknown;
   primary_creative_focus?: unknown;
   additional_notes?: unknown;
+  created_at?: string | null;
 };
 
 const CREATORS_REFRESH_INTERVAL_MS = 15000;
@@ -586,13 +587,20 @@ const enrichCreatorsWithSubmittedFields = (
   });
 
   // Include signups that have no matching creator_profile yet (pending onboarding)
+  // Deduplicate by email so repeat submissions only appear once
+  const seenSignupEmails = new Set<string>();
   const unmatchedSignups = signups.filter((signup) => {
     const email = normalizeEmail(signup.email);
     if (email && matchedSignupEmails.has(email)) return false;
     const handles = [signup.display_name, signup.instagram_handle, signup.tiktok_handle].map(
       normalizeCreatorIdentifier
     );
-    return !handles.some((h) => h && matchedSignupHandles.has(h));
+    if (handles.some((h) => h && matchedSignupHandles.has(h))) return false;
+    if (email) {
+      if (seenSignupEmails.has(email)) return false;
+      seenSignupEmails.add(email);
+    }
+    return true;
   });
 
   const signupProfiles: CreatorProfile[] = unmatchedSignups.map((signup) => ({
@@ -617,7 +625,7 @@ const enrichCreatorsWithSubmittedFields = (
     interested_content_types: signup.interested_content_types ?? signup.primary_creative_focus ?? null,
     primary_creative_focus: signup.primary_creative_focus ?? null,
     additional_notes: signup.additional_notes,
-    created_at: null,
+    created_at: signup.created_at ?? null,
   }));
 
   return [...enriched, ...signupProfiles];
