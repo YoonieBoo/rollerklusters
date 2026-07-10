@@ -67,6 +67,7 @@ type CreatorSignup = {
   created_at?: string | null;
   signup_type?: string | null;
   role_label?: string | null;
+  follower_count?: number | string | null;
 };
 
 const isCampaignManagerSignup = (signup: CreatorSignup): boolean => {
@@ -626,8 +627,8 @@ const enrichCreatorsWithSubmittedFields = (
     platform: toText(signup.tiktok_handle).trim() ? 'TikTok' : toText(signup.instagram_handle).trim() ? 'Instagram' : null,
     faculty: null,
     university_program: toText(signup.university_program).trim() || null,
-    manual_follower_count: null,
-    follower_count: null,
+    manual_follower_count: signup.follower_count ?? null,
+    follower_count: signup.follower_count ?? null,
     creator_rank: null,
     verification_status: 'pending_onboarding',
     onboarding_completed: false,
