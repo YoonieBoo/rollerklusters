@@ -5,11 +5,26 @@ import { useRouter } from 'next/navigation';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { supabase } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
 
 type AuthMode = 'login' | 'signup';
 type SupabaseRow = Record<string, unknown>;
+
+const UNIVERSITIES = [
+  'Assumption University',
+  'Khon Kaen University',
+  'Chiang Mai University',
+] as const;
+
+const AU_CAMPAIGN_MANAGER_TYPES = ['General', 'DDI'] as const;
 
 const getSupabaseErrorDetails = (error: unknown) => {
   if (!error || typeof error !== 'object') {
@@ -74,6 +89,11 @@ const getAuthUserDisplayName = (user: User, fallbackEmail: string) => {
   return user.email ?? fallbackEmail;
 };
 
+const getAuthUserMetadataString = (user: User, key: string) => {
+  const value = user.user_metadata?.[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+};
+
 const isMissingColumnError = (error: unknown) => {
   if (!error || typeof error !== 'object') {
     return false;
@@ -92,6 +112,8 @@ const createUserProfile = async (profile: {
   email: string;
   name: string;
   role: string;
+  university: string | null;
+  campaign_manager_type: string | null;
 }) => {
   const { data, error } = await supabase
     .from('users')
@@ -153,6 +175,8 @@ const ensureUserProfile = async (user: User, fallbackEmail: string) => {
     email,
     name,
     role: 'admin',
+    university: getAuthUserMetadataString(user, 'university'),
+    campaign_manager_type: getAuthUserMetadataString(user, 'campaign_manager_type'),
   });
 
   console.log('User row created:', { userId: user.id, email, role: 'admin' });
@@ -174,6 +198,8 @@ export default function AuthPage() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [university, setUniversity] = useState('');
+  const [campaignManagerType, setCampaignManagerType] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
@@ -240,6 +266,16 @@ export default function AuthPage() {
       return;
     }
 
+    if (mode === 'signup' && !university) {
+      setErrorMessage('University is required');
+      return;
+    }
+
+    if (mode === 'signup' && university === 'Assumption University' && !campaignManagerType) {
+      setErrorMessage('Campaign manager type is required for Assumption University');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -287,6 +323,9 @@ export default function AuthPage() {
           data: {
             display_name: trimmedName,
             full_name: trimmedName,
+            university,
+            campaign_manager_type:
+              university === 'Assumption University' ? campaignManagerType : null,
           },
           emailRedirectTo:
             typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
@@ -453,6 +492,59 @@ export default function AuthPage() {
                   <p className="text-xs leading-5 text-slate-500">
                     This name appears in your workspace.
                   </p>
+                </div>
+              )}
+
+              {mode === 'signup' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-900" htmlFor="university">
+                    University
+                  </label>
+                  <Select
+                    value={university}
+                    onValueChange={(value) => {
+                      setUniversity(value);
+                      if (value !== 'Assumption University') {
+                        setCampaignManagerType('');
+                      }
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    <SelectTrigger id="university" className="h-12 w-full rounded-xl border-slate-300 px-3.5 text-sm shadow-none">
+                      <SelectValue placeholder="Select your university" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {UNIVERSITIES.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {mode === 'signup' && university === 'Assumption University' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-900" htmlFor="campaignManagerType">
+                    Campaign manager type
+                  </label>
+                  <Select
+                    value={campaignManagerType}
+                    onValueChange={setCampaignManagerType}
+                    disabled={isSubmitting}
+                  >
+                    <SelectTrigger id="campaignManagerType" className="h-12 w-full rounded-xl border-slate-300 px-3.5 text-sm shadow-none">
+                      <SelectValue placeholder="Select campaign manager type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AU_CAMPAIGN_MANAGER_TYPES.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 
