@@ -18,7 +18,7 @@ import type { User } from '@supabase/supabase-js';
 import {
   toText,
 } from '@/lib/workflow-updates';
-import { creatorMatchesManagerScope, getCurrentManagerScope } from '@/lib/creator-scope';
+import { getScopedCreatorCount } from '@/lib/creator-scope';
 import { LoadingDots } from '@/components/ui/loading-dots';
 
 const navItems = [
@@ -151,80 +151,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
 
     try {
-      const [profilesRes, signupsRes, cmIdsRes, managerScope] = await Promise.all([
-        supabase.from('creator_profiles').select('id, email, social_handle, creator_name, display_name, user_id, university, faculty'),
-        supabase.from('creator_signups').select('email, tiktok_handle, instagram_handle, signup_type, role_label, primary_creative_focus, nickname, university_program'),
-        fetch('/api/campaign-manager-ids').then((r) => r.json()).catch(() => ({ ids: [] })),
-        getCurrentManagerScope(),
-      ]);
-
-      if (profilesRes.error) {
-        console.error('Creator count fetch error:', profilesRes.error);
-        setCreatorCount(0);
-        return;
-      }
-
-      const campaignManagerIds = new Set<string>(cmIdsRes?.ids ?? []);
-      const allProfiles = (profilesRes.data ?? []) as SupabaseRow[];
-      // Exclude campaign manager profiles (same as the page does), then apply
-      // the same university/program scope the Onboarded Creators page uses.
-      const profiles = allProfiles
-        .filter((p) => !campaignManagerIds.has(String(p.user_id ?? '')))
-        .filter((p) => creatorMatchesManagerScope(p, managerScope));
-      const signups = ((signupsRes.data ?? []) as SupabaseRow[]).filter((s) =>
-        creatorMatchesManagerScope(s, managerScope)
-      );
-
-      // Build a set of emails, handles, and names already covered by profiles
-      const profileEmails = new Set<string>();
-      const profileHandles = new Set<string>();
-      const profileNames = new Set<string>();
-      for (const p of profiles) {
-        const email = toText(p.email).trim().toLowerCase();
-        const handle = toText(p.social_handle).replace(/^[@\-]+/, '').trim().toLowerCase();
-        const creatorName = toText(p.creator_name).trim().toLowerCase();
-        const displayName = toText(p.display_name).trim().toLowerCase();
-        if (email) profileEmails.add(email);
-        if (handle) profileHandles.add(handle);
-        if (creatorName) profileNames.add(creatorName);
-        if (displayName) profileNames.add(displayName);
-      }
-
-      // Count signups not already represented in profiles, deduped by email
-      // Exclude campaign managers (same logic as the page itself)
-      const seenSignupEmails = new Set<string>();
-      let unmatchedCount = 0;
-      for (const s of signups) {
-        const roleText = [s.signup_type, s.role_label, s.primary_creative_focus]
-          .map((v) => toText(v)).join(' ').toLowerCase();
-        if (roleText.includes('campaign-manager') || roleText.includes('campaign manager') || roleText.includes('campaign_manager')) continue;
-        const email = toText(s.email).trim().toLowerCase();
-        // Sanitize handles: extract from full URLs and compound entries
-        const sanitize = (h: string) => {
-          const t = h.replace(/^[@\-]+/, '').trim();
-          const tt = t.match(/tiktok\.com\/@([^?&/\s]+)/)?.[1];
-          if (tt) return tt.toLowerCase();
-          const ig2 = t.match(/instagram\.com\/([^?&/\s]+)/)?.[1];
-          if (ig2) return ig2.replace(/\/$/, '').toLowerCase();
-          if (t.includes(' ')) {
-            const parts = t.split(/[\s,]+/).filter(w => !['and','or','&'].includes(w));
-            return (parts[parts.length - 1] ?? '').replace(/^[@\-]+/, '').toLowerCase();
-          }
-          return t.toLowerCase();
-        };
-        const tiktok = sanitize(toText(s.tiktok_handle));
-        const ig = sanitize(toText(s.instagram_handle));
-        const nickname = toText(s.nickname).trim().toLowerCase();
-        if (email && profileEmails.has(email)) continue;
-        if (tiktok && profileHandles.has(tiktok)) continue;
-        if (ig && profileHandles.has(ig)) continue;
-        if (nickname && profileNames.has(nickname)) continue;
-        if (email && seenSignupEmails.has(email)) continue;
-        if (email) seenSignupEmails.add(email);
-        unmatchedCount++;
-      }
-
-      setCreatorCount(profiles.length + unmatchedCount);
+      setCreatorCount(await getScopedCreatorCount());
     } catch (error) {
       console.error('Creator count fetch issue:', error);
       setCreatorCount(0);

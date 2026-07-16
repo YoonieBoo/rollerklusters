@@ -12,6 +12,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
+import { getScopedCreatorCount } from '@/lib/creator-scope';
 import { Card } from '@/components/ui/card';
 import { LoadingDots } from '@/components/ui/loading-dots';
 import { Button } from '@/components/ui/button';
@@ -53,7 +54,6 @@ type DashboardData = {
   submissions: SupabaseRow[];
   reviews: SupabaseRow[];
   reports: SupabaseRow[];
-  creatorProfiles: SupabaseRow[];
 };
 
 const StatusBadge = ({ status }: { status: string }) => {
@@ -247,8 +247,8 @@ export default function DashboardPage() {
     submissions: [],
     reviews: [],
     reports: [],
-    creatorProfiles: [],
   });
+  const [onboardedCreatorsCount, setOnboardedCreatorsCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -309,7 +309,6 @@ export default function DashboardPage() {
         submissionsResult,
         reviewsResult,
         reportsResult,
-        creatorProfilesResult,
       ] = await Promise.all([
         supabase.from('campaigns').select('*'),
         supabase.from('briefs').select('*'),
@@ -317,22 +316,19 @@ export default function DashboardPage() {
         supabase.from('submissions').select('*'),
         supabase.from('reviews').select('*'),
         supabase.from('reports').select('*'),
-        supabase.from('creator_profiles').select('*'),
       ]);
 
       const acceptanceCriteriaMissing = isMissingRelationError(acceptanceCriteriaResult.error);
       const submissionsMissing = isMissingRelationError(submissionsResult.error);
       const reviewsMissing = isMissingRelationError(reviewsResult.error);
       const reportsMissing = isMissingRelationError(reportsResult.error);
-      const creatorProfilesMissing = isMissingRelationError(creatorProfilesResult.error);
       const fetchError =
         campaignsResult.error ||
         briefsResult.error ||
         (acceptanceCriteriaMissing ? null : acceptanceCriteriaResult.error) ||
         (submissionsMissing ? null : submissionsResult.error) ||
         (reviewsMissing ? null : reviewsResult.error) ||
-        (reportsMissing ? null : reportsResult.error) ||
-        (creatorProfilesMissing ? null : creatorProfilesResult.error);
+        (reportsMissing ? null : reportsResult.error);
 
       if (fetchError) {
         setErrorMessage(fetchError.message);
@@ -343,7 +339,6 @@ export default function DashboardPage() {
           submissions: [],
           reviews: [],
           reports: [],
-          creatorProfiles: [],
         });
         setIsLoading(false);
         return;
@@ -358,14 +353,18 @@ export default function DashboardPage() {
         submissions: submissionsMissing ? [] : ((submissionsResult.data ?? []) as SupabaseRow[]),
         reviews: reviewsMissing ? [] : ((reviewsResult.data ?? []) as SupabaseRow[]),
         reports: reportsMissing ? [] : ((reportsResult.data ?? []) as SupabaseRow[]),
-        creatorProfiles: creatorProfilesMissing
-          ? []
-          : ((creatorProfilesResult.data ?? []) as SupabaseRow[]),
       });
       setIsLoading(false);
     };
 
     fetchDashboardData();
+
+    getScopedCreatorCount()
+      .then(setOnboardedCreatorsCount)
+      .catch((error) => {
+        console.error('Onboarded creators count fetch issue:', error);
+        setOnboardedCreatorsCount(0);
+      });
   }, []);
 
   const {
@@ -375,7 +374,6 @@ export default function DashboardPage() {
     completedBriefsCount,
     reviewedSubmissionsCount,
     approvedItemsCount,
-    onboardedCreatorsCount,
   } = useMemo(() => {
     const campaignNames = new Map(
       dashboardData.campaigns.map((campaign) => [
@@ -598,7 +596,6 @@ export default function DashboardPage() {
       completedBriefsCount: completedBriefs,
       reviewedSubmissionsCount: reviewedSubmissions,
       approvedItemsCount: approvedSubmissions,
-      onboardedCreatorsCount: dashboardData.creatorProfiles.length,
     };
   }, [dashboardData]);
 
