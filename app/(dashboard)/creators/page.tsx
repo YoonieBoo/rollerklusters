@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase/client';
+import { creatorMatchesManagerScope, getCurrentManagerScope, type ManagerScope } from '@/lib/creator-scope';
 
 type CreatorProfile = {
   id?: string | number | null;
@@ -670,6 +671,7 @@ export default function CreatorsPage() {
 
   useEffect(() => {
     let isMounted = true;
+    let managerScope: ManagerScope = { university: null, campaignManagerType: null };
 
     const fetchCreators = async (showLoading = true) => {
       if (showLoading) {
@@ -710,15 +712,23 @@ export default function CreatorsPage() {
           users,
           signups
         );
-        setCreators(enriched);
+        const scoped = enriched.filter((creator) =>
+          creatorMatchesManagerScope(creator, managerScope)
+        );
+        setCreators(scoped);
         // Broadcast the authoritative count so the sidebar badge stays in sync
-        window.dispatchEvent(new CustomEvent('creator-count-update', { detail: enriched.length }));
+        window.dispatchEvent(new CustomEvent('creator-count-update', { detail: scoped.length }));
       }
 
       setIsLoading(false);
     };
 
-    fetchCreators();
+    const init = async () => {
+      managerScope = await getCurrentManagerScope();
+      await fetchCreators();
+    };
+
+    init();
 
     const refreshVisibleCreators = () => {
       if (document.visibilityState === 'visible') {

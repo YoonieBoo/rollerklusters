@@ -18,6 +18,7 @@ import type { User } from '@supabase/supabase-js';
 import {
   toText,
 } from '@/lib/workflow-updates';
+import { creatorMatchesManagerScope, getCurrentManagerScope } from '@/lib/creator-scope';
 import { LoadingDots } from '@/components/ui/loading-dots';
 
 const navItems = [
@@ -150,10 +151,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
 
     try {
-      const [profilesRes, signupsRes, cmIdsRes] = await Promise.all([
-        supabase.from('creator_profiles').select('id, email, social_handle, creator_name, display_name, user_id'),
-        supabase.from('creator_signups').select('email, tiktok_handle, instagram_handle, signup_type, role_label, primary_creative_focus, nickname'),
+      const [profilesRes, signupsRes, cmIdsRes, managerScope] = await Promise.all([
+        supabase.from('creator_profiles').select('id, email, social_handle, creator_name, display_name, user_id, university, faculty'),
+        supabase.from('creator_signups').select('email, tiktok_handle, instagram_handle, signup_type, role_label, primary_creative_focus, nickname, university_program'),
         fetch('/api/campaign-manager-ids').then((r) => r.json()).catch(() => ({ ids: [] })),
+        getCurrentManagerScope(),
       ]);
 
       if (profilesRes.error) {
@@ -164,9 +166,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       const campaignManagerIds = new Set<string>(cmIdsRes?.ids ?? []);
       const allProfiles = (profilesRes.data ?? []) as SupabaseRow[];
-      // Exclude campaign manager profiles (same as the page does)
-      const profiles = allProfiles.filter((p) => !campaignManagerIds.has(String(p.user_id ?? '')));
-      const signups = (signupsRes.data ?? []) as SupabaseRow[];
+      // Exclude campaign manager profiles (same as the page does), then apply
+      // the same university/program scope the Onboarded Creators page uses.
+      const profiles = allProfiles
+        .filter((p) => !campaignManagerIds.has(String(p.user_id ?? '')))
+        .filter((p) => creatorMatchesManagerScope(p, managerScope));
+      const signups = ((signupsRes.data ?? []) as SupabaseRow[]).filter((s) =>
+        creatorMatchesManagerScope(s, managerScope)
+      );
 
       // Build a set of emails, handles, and names already covered by profiles
       const profileEmails = new Set<string>();

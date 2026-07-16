@@ -11,6 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase/client';
+import { creatorMatchesManagerScope, getCurrentManagerScope, type ManagerScope } from '@/lib/creator-scope';
 
 type CreatorSignup = {
   id?: string | number | null;
@@ -226,6 +227,7 @@ export default function CreatorSignupsPage() {
 
   useEffect(() => {
     let isMounted = true;
+    let managerScope: ManagerScope = { university: null, campaignManagerType: null };
 
     const fetchSignups = async (showLoading = true) => {
       if (showLoading) {
@@ -248,13 +250,21 @@ export default function CreatorSignupsPage() {
           setSignups([]);
         }
       } else {
-        setSignups((data ?? []) as CreatorSignup[]);
+        const scoped = ((data ?? []) as CreatorSignup[]).filter((signup) =>
+          creatorMatchesManagerScope(signup, managerScope)
+        );
+        setSignups(scoped);
       }
 
       setIsLoading(false);
     };
 
-    fetchSignups();
+    const init = async () => {
+      managerScope = await getCurrentManagerScope();
+      await fetchSignups();
+    };
+
+    init();
 
     const refreshVisibleSignups = () => {
       if (document.visibilityState === 'visible') {
