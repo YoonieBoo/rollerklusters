@@ -81,9 +81,14 @@ export const creatorMatchesManagerScope = (
 };
 
 export const getCurrentManagerScope = async (): Promise<ManagerScope> => {
+  // Use getSession() rather than getUser(): getUser() can throw
+  // AuthSessionMissingError on a fresh page load before the client finishes
+  // restoring the session from storage, which would otherwise make every
+  // caller's count silently fall back to 0.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
 
   if (!user) {
     return { university: null, campaignManagerType: null };

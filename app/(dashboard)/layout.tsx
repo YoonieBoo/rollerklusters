@@ -153,8 +153,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     try {
       setCreatorCount(await getScopedCreatorCount());
     } catch (error) {
+      // Keep showing the last known-good count rather than dropping to 0 on
+      // a transient fetch failure — the 15s interval below will retry.
       console.error('Creator count fetch issue:', error);
-      setCreatorCount(0);
     }
   };
 

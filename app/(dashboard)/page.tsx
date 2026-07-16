@@ -237,6 +237,8 @@ const isReviewed = (row: SupabaseRow) => {
 
 const isApproved = (row: SupabaseRow) => getReviewStatus(row) === 'approved';
 
+const ONBOARDED_CREATORS_COUNT_REFRESH_INTERVAL_MS = 15000;
+
 export default function DashboardPage() {
   const router = useRouter();
   const [userName, setUserName] = useState<string | null>(null);
@@ -359,12 +361,25 @@ export default function DashboardPage() {
 
     fetchDashboardData();
 
-    getScopedCreatorCount()
-      .then(setOnboardedCreatorsCount)
-      .catch((error) => {
-        console.error('Onboarded creators count fetch issue:', error);
-        setOnboardedCreatorsCount(0);
-      });
+    const fetchOnboardedCreatorsCount = () => {
+      getScopedCreatorCount()
+        .then(setOnboardedCreatorsCount)
+        .catch((error) => {
+          // Keep the last known-good count rather than dropping to 0 on a
+          // transient fetch failure — the interval below will retry.
+          console.error('Onboarded creators count fetch issue:', error);
+        });
+    };
+
+    fetchOnboardedCreatorsCount();
+    const creatorCountIntervalId = window.setInterval(
+      fetchOnboardedCreatorsCount,
+      ONBOARDED_CREATORS_COUNT_REFRESH_INTERVAL_MS
+    );
+
+    return () => {
+      window.clearInterval(creatorCountIntervalId);
+    };
   }, []);
 
   const {
