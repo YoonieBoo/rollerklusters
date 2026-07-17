@@ -121,20 +121,39 @@ const toText = (value: unknown): string => {
   return '';
 };
 
-const sanitizeSignupHandle = (h: string) => {
-  const t = h.replace(/^[@-]+/, '').trim();
-  const tiktokMatch = t.match(/tiktok\.com\/@([^?&/\s]+)/)?.[1];
-  if (tiktokMatch) return tiktokMatch.toLowerCase();
-  const igMatch = t.match(/instagram\.com\/([^?&/\s]+)/)?.[1];
-  if (igMatch) return igMatch.replace(/\/$/, '').toLowerCase();
-  if (t.includes(' ')) {
-    const parts = t.split(/[\s,]+/).filter((w) => !['and', 'or', '&'].includes(w));
-    return (parts[parts.length - 1] ?? '').replace(/^[@-]+/, '').toLowerCase();
+const sanitizeHandle = (h: string): string => {
+  const trimmed = h.replace(/^[@-]+/, '').trim();
+  if (!trimmed) return '';
+  const tiktokMatch = trimmed.match(/tiktok\.com\/@([^?&/\s]+)/);
+  if (tiktokMatch) return tiktokMatch[1];
+  const igMatch = trimmed.match(/instagram\.com\/([^?&/\s]+)/);
+  if (igMatch) return igMatch[1].replace(/\/$/, '');
+  if (trimmed.includes(' ')) {
+    const fillers = new Set(['and', 'or', '&', 'also']);
+    const parts = trimmed
+      .split(/[\s,]+/)
+      .map((w) => w.replace(/^[@-]+/, '').trim())
+      .filter((w) => w && !fillers.has(w.toLowerCase()));
+    return parts[parts.length - 1] ?? '';
   }
-  return t.toLowerCase();
+  return trimmed;
 };
 
-const isCampaignManagerSignupRow = (signup: SupabaseRow): boolean => {
+// Signup forms are full of literal placeholder text ("-", "n/a", "none")
+// for handles/names the creator left blank. Treating those as real
+// identifiers caused unrelated creators who both left a field blank to
+// falsely "match" each other and silently disappear from the list/count —
+// this guard is the fix.
+const PLACEHOLDER_IDENTIFIER_VALUES = new Set(['-', '--', 'n/a', 'na', 'none', 'null', 'nil', '.', '']);
+
+const normalizeCreatorIdentifier = (value: unknown): string => {
+  const normalized = toText(value).trim().toLowerCase().replace(/^@/, '');
+  return PLACEHOLDER_IDENTIFIER_VALUES.has(normalized) ? '' : normalized;
+};
+
+const normalizeEmail = (value: unknown): string => toText(value).trim().toLowerCase();
+
+const isCampaignManagerSignup = (signup: SupabaseRow): boolean => {
   const roleText = [signup.signup_type, signup.role_label, signup.primary_creative_focus]
     .map(toText)
     .join(' ')
@@ -146,68 +165,216 @@ const isCampaignManagerSignupRow = (signup: SupabaseRow): boolean => {
   );
 };
 
-// Single source of truth for "how many creators can this manager see" — used
-// by the sidebar badge, the dashboard stat card, and (by construction) the
-// Onboarded Creators page, so the three numbers can't drift apart again.
-export const getScopedCreatorCount = async (): Promise<number> => {
-  const [profilesRes, signupsRes, cmIdsRes, managerScope] = await Promise.all([
-    supabase
-      .from('creator_profiles')
-      .select('id, email, social_handle, creator_name, display_name, user_id, university, faculty'),
-    supabase
-      .from('creator_signups')
-      .select(
-        'email, tiktok_handle, instagram_handle, signup_type, role_label, primary_creative_focus, nickname, university_program'
-      ),
+const getScholarshipStudentValue = (signup: SupabaseRow): boolean | null => {
+  if (typeof signup.scholarship_student === 'boolean') return signup.scholarship_student;
+  const text = toText(signup.scholarship_student).trim().toLowerCase();
+  if (['true', 'yes', 'y'].includes(text)) return true;
+  if (['false', 'no', 'n'].includes(text)) return false;
+  const notes = toText(signup.additional_notes);
+  const notesMatch = notes.match(/scholarship\s+student\s*:\s*(yes|no)\b/i);
+  if (notesMatch) return notesMatch[1].toLowerCase() === 'yes';
+  return null;
+};
+
+const getSignupMatch = (
+  creator: SupabaseRow,
+  usersById: Map<string, SupabaseRow>,
+  signupsByEmail: Map<string, SupabaseRow>,
+  signupsByIdentifier: Map<string, SupabaseRow>
+): SupabaseRow | null => {
+  const profileUser = usersById.get(toText(creator.user_id));
+  const email = normalizeEmail(creator.email) || normalizeEmail(profileUser?.email);
+
+  if (email) {
+    const emailMatch = signupsByEmail.get(email);
+    if (emailMatch) return emailMatch;
+  }
+
+  const identifiers = [
+    creator.display_name,
+    creator.creator_name,
+    creator.social_handle,
+    profileUser?.name,
+    profileUser?.full_name,
+  ];
+
+  for (const identifier of identifiers) {
+    const normalized = normalizeCreatorIdentifier(identifier);
+    if (!normalized) continue;
+    const match = signupsByIdentifier.get(normalized);
+    if (match) return match;
+  }
+
+  return null;
+};
+
+// The single canonical merge of onboarded creator_profiles + pending
+// creator_signups into one deduped, scope-filtered list. Every UI surface
+// that shows creators or a creator count (sidebar badge, dashboard stat,
+// Onboarded Creators list, PDF export) must derive from this — two
+// independently written versions of this logic drifted apart before and
+// produced different numbers for the same manager.
+const mergeCreatorsWithSignups = (
+  profiles: SupabaseRow[],
+  users: SupabaseRow[],
+  signups: SupabaseRow[]
+): SupabaseRow[] => {
+  const usersById = new Map(
+    users.map((user) => [toText(user.id), user] as const).filter(([id]) => id)
+  );
+  const signupsByEmail = new Map(
+    signups.map((signup) => [normalizeEmail(signup.email), signup] as const).filter(([email]) => email)
+  );
+  const signupsByIdentifier = new Map<string, SupabaseRow>();
+
+  signups.forEach((signup) => {
+    const rawHandles = [signup.instagram_handle, signup.tiktok_handle];
+    const sanitizedHandles = rawHandles.map((h) => sanitizeHandle(toText(h).trim()));
+    const identifiers = [signup.display_name, signup.nickname, ...rawHandles, ...sanitizedHandles];
+    identifiers.forEach((identifier) => {
+      const normalized = normalizeCreatorIdentifier(identifier);
+      if (normalized && !signupsByIdentifier.has(normalized)) {
+        signupsByIdentifier.set(normalized, signup);
+      }
+    });
+  });
+
+  const matchedSignupEmails = new Set<string>();
+  const matchedSignupHandles = new Set<string>();
+
+  const enriched: SupabaseRow[] = profiles.map((creator) => {
+    const signup = getSignupMatch(creator, usersById, signupsByEmail, signupsByIdentifier);
+
+    if (signup) {
+      if (signup.email) matchedSignupEmails.add(normalizeEmail(signup.email));
+      [signup.display_name, signup.instagram_handle, signup.tiktok_handle].forEach((id) => {
+        const n = normalizeCreatorIdentifier(id);
+        if (n) matchedSignupHandles.add(n);
+      });
+    }
+
+    const scholarshipStudent =
+      creator.scholarship_student ??
+      creator.is_scholarship_student ??
+      (signup ? getScholarshipStudentValue(signup) : null);
+    const universityProgram =
+      toText(signup?.university_program).trim() || toText(creator.university_program).trim() || null;
+    const faculty = toText(creator.faculty).trim() || null;
+    const interestedContentTypes =
+      creator.content_categories ??
+      creator.content_types ??
+      creator.interested_content_types ??
+      signup?.interested_content_types ??
+      signup?.primary_creative_focus ??
+      null;
+
+    return {
+      ...creator,
+      scholarship_student: scholarshipStudent,
+      faculty,
+      university_program: universityProgram,
+      interested_content_types: interestedContentTypes,
+      tiktok_handle: toText(creator.tiktok_handle).trim() || toText(signup?.tiktok_handle).trim() || null,
+      instagram_handle:
+        toText(creator.instagram_handle).trim() || toText(signup?.instagram_handle).trim() || null,
+    };
+  });
+
+  const seenSignupEmails = new Set<string>();
+  const unmatchedSignups = signups.filter((signup) => {
+    if (isCampaignManagerSignup(signup)) return false;
+    const email = normalizeEmail(signup.email);
+    if (email && matchedSignupEmails.has(email)) return false;
+    const handles = [signup.display_name, signup.instagram_handle, signup.tiktok_handle].map(
+      normalizeCreatorIdentifier
+    );
+    if (handles.some((h) => h && matchedSignupHandles.has(h))) return false;
+    if (email) {
+      if (seenSignupEmails.has(email)) return false;
+      seenSignupEmails.add(email);
+    }
+    return true;
+  });
+
+  const signupProfiles: SupabaseRow[] = unmatchedSignups.map((signup) => ({
+    id: undefined,
+    user_id: null,
+    email: signup.email,
+    display_name: signup.display_name,
+    tiktok_handle: toText(signup.tiktok_handle).trim() || null,
+    instagram_handle: toText(signup.instagram_handle).trim() || null,
+    social_handle: toText(signup.tiktok_handle).trim() || toText(signup.instagram_handle).trim() || null,
+    platform: toText(signup.tiktok_handle).trim()
+      ? 'TikTok'
+      : toText(signup.instagram_handle).trim()
+      ? 'Instagram'
+      : null,
+    faculty: null,
+    university_program: toText(signup.university_program).trim() || null,
+    manual_follower_count: signup.follower_count ?? null,
+    follower_count: signup.follower_count ?? null,
+    creator_rank: null,
+    verification_status: 'pending_onboarding',
+    onboarding_completed: false,
+    scholarship_student: getScholarshipStudentValue(signup),
+    is_scholarship_student: null,
+    line_id: signup.line_id,
+    content_categories: null,
+    content_types: null,
+    interested_content_types: signup.interested_content_types ?? signup.primary_creative_focus ?? null,
+    primary_creative_focus: signup.primary_creative_focus ?? null,
+    additional_notes: signup.additional_notes,
+    created_at: signup.created_at ?? null,
+  }));
+
+  const merged = [...enriched, ...signupProfiles];
+  merged.sort((a, b) => {
+    const aTime = a.created_at ? new Date(a.created_at as string).getTime() : 0;
+    const bTime = b.created_at ? new Date(b.created_at as string).getTime() : 0;
+    return bTime - aTime;
+  });
+  return merged;
+};
+
+const fetchAllRows = async (tableName: string, orderColumn?: string): Promise<SupabaseRow[]> => {
+  let query = supabase.from(tableName).select('*');
+  if (orderColumn) {
+    query = query.order(orderColumn, { ascending: false });
+  }
+  const { data, error } = await query;
+  if (error) {
+    console.warn(`Optional ${tableName} fetch skipped:`, error.message);
+    return [];
+  }
+  return (data ?? []) as SupabaseRow[];
+};
+
+// Single source of truth for "which creators can this manager see" — used
+// by the Onboarded Creators list, its PDF export, the sidebar badge, and
+// the dashboard stat card, so the numbers can't drift apart again.
+export const getScopedCreators = async (): Promise<SupabaseRow[]> => {
+  const [profilesResult, users, signups, cmIdsRes, managerScope] = await Promise.all([
+    supabase.from('creator_profiles').select('*').order('created_at', { ascending: false }),
+    fetchAllRows('users'),
+    fetchAllRows('creator_signups', 'created_at'),
     fetch('/api/campaign-manager-ids')
       .then((r) => r.json())
       .catch(() => ({ ids: [] })),
     getCurrentManagerScope(),
   ]);
 
-  if (profilesRes.error) {
-    console.error('Creator count fetch error:', profilesRes.error);
-    return 0;
+  if (profilesResult.error) {
+    console.error('Creator profiles fetch error:', profilesResult.error);
+    return [];
   }
 
   const campaignManagerIds = new Set<string>(cmIdsRes?.ids ?? []);
-  const profiles = ((profilesRes.data ?? []) as SupabaseRow[])
-    .filter((p) => !campaignManagerIds.has(String(p.user_id ?? '')))
-    .filter((p) => creatorMatchesManagerScope(p, managerScope));
-  const signups = ((signupsRes.data ?? []) as SupabaseRow[]).filter((s) =>
-    creatorMatchesManagerScope(s, managerScope)
+  const creatorOnly = ((profilesResult.data ?? []) as SupabaseRow[]).filter(
+    (p) => !campaignManagerIds.has(String(p.user_id ?? ''))
   );
 
-  const profileEmails = new Set<string>();
-  const profileHandles = new Set<string>();
-  const profileNames = new Set<string>();
-  for (const p of profiles) {
-    const email = toText(p.email).trim().toLowerCase();
-    const handle = toText(p.social_handle).replace(/^[@-]+/, '').trim().toLowerCase();
-    const creatorName = toText(p.creator_name).trim().toLowerCase();
-    const displayName = toText(p.display_name).trim().toLowerCase();
-    if (email) profileEmails.add(email);
-    if (handle) profileHandles.add(handle);
-    if (creatorName) profileNames.add(creatorName);
-    if (displayName) profileNames.add(displayName);
-  }
-
-  const seenSignupEmails = new Set<string>();
-  let unmatchedCount = 0;
-  for (const s of signups) {
-    if (isCampaignManagerSignupRow(s)) continue;
-    const email = toText(s.email).trim().toLowerCase();
-    const tiktok = sanitizeSignupHandle(toText(s.tiktok_handle));
-    const ig = sanitizeSignupHandle(toText(s.instagram_handle));
-    const nickname = toText(s.nickname).trim().toLowerCase();
-    if (email && profileEmails.has(email)) continue;
-    if (tiktok && profileHandles.has(tiktok)) continue;
-    if (ig && profileHandles.has(ig)) continue;
-    if (nickname && profileNames.has(nickname)) continue;
-    if (email && seenSignupEmails.has(email)) continue;
-    if (email) seenSignupEmails.add(email);
-    unmatchedCount++;
-  }
-
-  return profiles.length + unmatchedCount;
+  const merged = mergeCreatorsWithSignups(creatorOnly, users, signups);
+  return merged.filter((creator) => creatorMatchesManagerScope(creator, managerScope));
 };
+
+export const getScopedCreatorCount = async (): Promise<number> => (await getScopedCreators()).length;

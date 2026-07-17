@@ -15,7 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase/client';
-import { creatorMatchesManagerScope, getCurrentManagerScope, type ManagerScope } from '@/lib/creator-scope';
+import { getScopedCreators } from '@/lib/creator-scope';
 
 type CreatorProfile = {
   id?: string | number | null;
@@ -44,40 +44,6 @@ type CreatorProfile = {
   additional_notes?: unknown;
   created_at?: string | null;
   [key: string]: unknown;
-};
-
-type UserProfile = {
-  id?: string | null;
-  email?: string | null;
-  name?: string | null;
-  full_name?: string | null;
-  role?: string | null;
-};
-
-type CreatorSignup = {
-  email?: string | null;
-  display_name?: string | null;
-  university_program?: string | null;
-  instagram_handle?: string | null;
-  tiktok_handle?: string | null;
-  scholarship_student?: boolean | string | null;
-  line_id?: string | null;
-  interested_content_types?: unknown;
-  primary_creative_focus?: unknown;
-  additional_notes?: unknown;
-  created_at?: string | null;
-  signup_type?: string | null;
-  role_label?: string | null;
-  follower_count?: number | string | null;
-  nickname?: string | null;
-};
-
-const isCampaignManagerSignup = (signup: CreatorSignup): boolean => {
-  const text = [signup.signup_type, signup.role_label, signup.primary_creative_focus]
-    .map((v) => toText(v))
-    .join(' ')
-    .toLowerCase();
-  return text.includes('campaign-manager') || text.includes('campaign manager') || text.includes('campaign_manager');
 };
 
 const CREATORS_REFRESH_INTERVAL_MS = 15000;
@@ -155,31 +121,6 @@ const formatScholarshipStudent = (creator: CreatorProfile) => {
   }
 
   return 'N/A';
-};
-
-const getScholarshipStudentValue = (signup: CreatorSignup) => {
-  if (typeof signup.scholarship_student === 'boolean') {
-    return signup.scholarship_student;
-  }
-
-  const text = toText(signup.scholarship_student).trim().toLowerCase();
-
-  if (['true', 'yes', 'y'].includes(text)) {
-    return true;
-  }
-
-  if (['false', 'no', 'n'].includes(text)) {
-    return false;
-  }
-
-  const notes = toText(signup.additional_notes);
-  const notesMatch = notes.match(/scholarship\s+student\s*:\s*(yes|no)\b/i);
-
-  if (notesMatch) {
-    return notesMatch[1].toLowerCase() === 'yes';
-  }
-
-  return null;
 };
 
 const formatDate = (date: string | null | undefined) => {
@@ -452,212 +393,6 @@ const CreatorMetric = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
-const normalizeCreatorIdentifier = (value: unknown) =>
-  toText(value).trim().toLowerCase().replace(/^@/, '');
-
-const normalizeEmail = (value: unknown) => toText(value).trim().toLowerCase();
-
-const fetchOptionalRows = async <T extends Record<string, unknown>>(
-  tableName: string,
-  orderColumn?: string
-) => {
-  let query = supabase.from(tableName).select('*');
-
-  if (orderColumn) {
-    query = query.order(orderColumn, { ascending: false });
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.warn(`Optional ${tableName} fetch skipped:`, error.message);
-    return [] as T[];
-  }
-
-  return (data ?? []) as T[];
-};
-
-const getSignupMatch = (
-  creator: CreatorProfile,
-  usersById: Map<string, UserProfile>,
-  signupsByEmail: Map<string, CreatorSignup>,
-  signupsByIdentifier: Map<string, CreatorSignup>
-) => {
-  const profileUser = usersById.get(toText(creator.user_id));
-  const email = normalizeEmail(creator.email) || normalizeEmail(profileUser?.email);
-
-  if (email) {
-    const emailMatch = signupsByEmail.get(email);
-
-    if (emailMatch) {
-      return emailMatch;
-    }
-  }
-
-  const identifiers = [
-    creator.display_name,
-    creator.creator_name,
-    creator.social_handle,
-    profileUser?.name,
-    profileUser?.full_name,
-  ];
-
-  for (const identifier of identifiers) {
-    const match = signupsByIdentifier.get(normalizeCreatorIdentifier(identifier));
-
-    if (match) {
-      return match;
-    }
-  }
-
-  return null;
-};
-
-const enrichCreatorsWithSubmittedFields = (
-  creators: CreatorProfile[],
-  users: UserProfile[],
-  signups: CreatorSignup[]
-) => {
-  const usersById = new Map(
-    users
-      .map((user) => [toText(user.id), user] as const)
-      .filter(([id]) => id)
-  );
-  const signupsByEmail = new Map(
-    signups
-      .map((signup) => [normalizeEmail(signup.email), signup] as const)
-      .filter(([email]) => email)
-  );
-  const signupsByIdentifier = new Map<string, CreatorSignup>();
-
-  signups.forEach((signup) => {
-    // Raw identifiers + sanitized handle variants so full URLs and compound entries match
-    const rawHandles = [signup.instagram_handle, signup.tiktok_handle];
-    const sanitizedHandles = rawHandles.map((h) => sanitizeHandle(toText(h).trim()));
-    const identifiers = [
-      signup.display_name,
-      signup.nickname,
-      ...rawHandles,
-      ...sanitizedHandles,
-    ];
-    identifiers.forEach((identifier) => {
-      const normalizedIdentifier = normalizeCreatorIdentifier(identifier);
-      if (normalizedIdentifier && !signupsByIdentifier.has(normalizedIdentifier)) {
-        signupsByIdentifier.set(normalizedIdentifier, signup);
-      }
-    });
-  });
-
-  // Track which signups were matched to a profile (to find unmatched ones below)
-  const matchedSignupEmails = new Set<string>();
-  const matchedSignupHandles = new Set<string>();
-
-  const enriched = creators.map((creator) => {
-    const signup = getSignupMatch(
-      creator,
-      usersById,
-      signupsByEmail,
-      signupsByIdentifier
-    );
-
-    if (signup) {
-      if (signup.email) matchedSignupEmails.add(normalizeEmail(signup.email));
-      [signup.display_name, signup.instagram_handle, signup.tiktok_handle].forEach((id) => {
-        const n = normalizeCreatorIdentifier(id);
-        if (n) matchedSignupHandles.add(n);
-      });
-    }
-
-    const scholarshipStudent =
-      creator.scholarship_student ??
-      creator.is_scholarship_student ??
-      (signup ? getScholarshipStudentValue(signup) : null);
-    const universityProgram =
-      toText(signup?.university_program).trim() ||
-      toText(creator.university_program).trim() ||
-      toText(creator.universityProgram).trim() ||
-      toText(creator.program).trim() ||
-      null;
-    const faculty =
-      toText(creator.faculty).trim() ||
-      toText(creator.facultyName).trim() ||
-      null;
-    const interestedContentTypes =
-      creator.content_categories ??
-      creator.contentCategories ??
-      creator.content_types ??
-      creator.contentTypes ??
-      creator.interested_content_types ??
-      creator.interestedContentTypes ??
-      signup?.interested_content_types ??
-      signup?.primary_creative_focus ??
-      null;
-
-    return {
-      ...creator,
-      scholarship_student: scholarshipStudent,
-      faculty,
-      university_program: universityProgram,
-      interested_content_types: interestedContentTypes,
-      tiktok_handle: toText(creator.tiktok_handle).trim() || toText(signup?.tiktok_handle).trim() || null,
-      instagram_handle: toText(creator.instagram_handle).trim() || toText(signup?.instagram_handle).trim() || null,
-    };
-  });
-
-  // Include signups that have no matching creator_profile yet (pending onboarding)
-  // Deduplicate by email so repeat submissions only appear once
-  const seenSignupEmails = new Set<string>();
-  const unmatchedSignups = signups.filter((signup) => {
-    if (isCampaignManagerSignup(signup)) return false;
-    const email = normalizeEmail(signup.email);
-    if (email && matchedSignupEmails.has(email)) return false;
-    const handles = [signup.display_name, signup.instagram_handle, signup.tiktok_handle].map(
-      normalizeCreatorIdentifier
-    );
-    if (handles.some((h) => h && matchedSignupHandles.has(h))) return false;
-    if (email) {
-      if (seenSignupEmails.has(email)) return false;
-      seenSignupEmails.add(email);
-    }
-    return true;
-  });
-
-  const signupProfiles: CreatorProfile[] = unmatchedSignups.map((signup) => ({
-    id: undefined,
-    user_id: null,
-    email: signup.email,
-    display_name: signup.display_name,
-    tiktok_handle: toText(signup.tiktok_handle).trim() || null,
-    instagram_handle: toText(signup.instagram_handle).trim() || null,
-    social_handle: toText(signup.tiktok_handle).trim() || toText(signup.instagram_handle).trim() || null,
-    platform: toText(signup.tiktok_handle).trim() ? 'TikTok' : toText(signup.instagram_handle).trim() ? 'Instagram' : null,
-    faculty: null,
-    university_program: toText(signup.university_program).trim() || null,
-    manual_follower_count: signup.follower_count ?? null,
-    follower_count: signup.follower_count ?? null,
-    creator_rank: null,
-    verification_status: 'pending_onboarding',
-    onboarding_completed: false,
-    scholarship_student: getScholarshipStudentValue(signup),
-    is_scholarship_student: null,
-    line_id: signup.line_id,
-    content_categories: null,
-    content_types: null,
-    interested_content_types: signup.interested_content_types ?? signup.primary_creative_focus ?? null,
-    primary_creative_focus: signup.primary_creative_focus ?? null,
-    additional_notes: signup.additional_notes,
-    created_at: signup.created_at ?? null,
-  }));
-
-  const merged = [...enriched, ...signupProfiles];
-  // Sort newest-first so date groups appear in correct order
-  merged.sort((a, b) => {
-    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-    return bTime - aTime;
-  });
-  return merged;
-};
 
 export default function CreatorsPage() {
   const router = useRouter();
@@ -671,7 +406,6 @@ export default function CreatorsPage() {
 
   useEffect(() => {
     let isMounted = true;
-    let managerScope: ManagerScope = { university: null, campaignManagerType: null };
 
     const fetchCreators = async (showLoading = true) => {
       if (showLoading) {
@@ -680,55 +414,31 @@ export default function CreatorsPage() {
 
       setErrorMessage(null);
 
-      const { data, error } = await supabase
-        .from('creator_profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      try {
+        const scoped = await getScopedCreators();
 
-      const [users, signups, cmIdsRes] = await Promise.all([
-        fetchOptionalRows<UserProfile>('users'),
-        fetchOptionalRows<CreatorSignup>('creator_signups', 'created_at'),
-        fetch('/api/campaign-manager-ids').then((r) => r.json()).catch(() => ({ ids: [] })),
-      ]);
+        if (!isMounted) {
+          return;
+        }
 
-      if (!isMounted) {
-        return;
-      }
-
-      if (error) {
-        console.error('Supabase creator profiles fetch error:', error);
-        setErrorMessage(error.message);
-
+        setCreators(scoped as CreatorProfile[]);
+        // Broadcast the authoritative count so the sidebar badge stays in sync
+        window.dispatchEvent(new CustomEvent('creator-count-update', { detail: scoped.length }));
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+        console.error('Creators fetch error:', error);
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to load creators');
         if (showLoading) {
           setCreators([]);
         }
-      } else {
-        const campaignManagerIds = new Set<string>(cmIdsRes?.ids ?? []);
-        const creatorOnly = (data ?? []).filter(
-          (p) => !campaignManagerIds.has(String((p as CreatorProfile).user_id ?? ''))
-        );
-        const enriched = enrichCreatorsWithSubmittedFields(
-          creatorOnly as CreatorProfile[],
-          users,
-          signups
-        );
-        const scoped = enriched.filter((creator) =>
-          creatorMatchesManagerScope(creator, managerScope)
-        );
-        setCreators(scoped);
-        // Broadcast the authoritative count so the sidebar badge stays in sync
-        window.dispatchEvent(new CustomEvent('creator-count-update', { detail: scoped.length }));
       }
 
       setIsLoading(false);
     };
 
-    const init = async () => {
-      managerScope = await getCurrentManagerScope();
-      await fetchCreators();
-    };
-
-    init();
+    fetchCreators();
 
     const refreshVisibleCreators = () => {
       if (document.visibilityState === 'visible') {
