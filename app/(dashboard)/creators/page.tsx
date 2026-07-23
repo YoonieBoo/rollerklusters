@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { LoadingDots } from '@/components/ui/loading-dots';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -384,6 +391,43 @@ const getCreatorProgram = (creator: CreatorProfile) =>
     ])
   ).trim() || 'N/A';
 
+// Real faculty data is messy free text with multiple spellings for the same
+// program (e.g. "BBA" / "bba" / "Bachelor of Business Administration"), so
+// the filter groups them into clean categories by keyword rather than
+// showing every raw variant as a separate option.
+const FACULTY_CATEGORIES: { label: string; keywords: string[] }[] = [
+  {
+    label: 'DDI / MSME',
+    keywords: [
+      'ddi',
+      'msme',
+      'design and digital innovation',
+      'digital design and innovation',
+      'martin de tours',
+    ],
+  },
+  {
+    label: 'BBA / Business Administration',
+    keywords: ['bba', 'bachelor of business administration', 'business administration', 'sustainable business management'],
+  },
+  { label: 'Communication Arts', keywords: ['communication art'] },
+  { label: 'Architecture', keywords: ['architecture'] },
+  { label: 'Engineering', keywords: ['engineering'] },
+  { label: 'Music', keywords: ['music'] },
+];
+
+const categorizeFaculty = (rawFaculty: unknown): string => {
+  const text = toText(rawFaculty).trim().toLowerCase();
+  if (!text) return 'Unspecified';
+  if (text === 'bie') return 'Engineering';
+  for (const category of FACULTY_CATEGORIES) {
+    if (category.keywords.some((keyword) => text.includes(keyword))) {
+      return category.label;
+    }
+  }
+  return 'Other';
+};
+
 const CreatorMetric = ({ label, value }: { label: string; value: string }) => (
   <div className="min-w-0">
     <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">
@@ -394,13 +438,44 @@ const CreatorMetric = ({ label, value }: { label: string; value: string }) => (
 );
 
 
+const getCreatorFacultyCategory = (creator: CreatorProfile): string =>
+  categorizeFaculty(
+    getFirstValue(creator, [
+      'faculty',
+      'facultyName',
+      'university_program',
+      'universityProgram',
+      'program',
+      'major',
+    ])
+  );
+
+const FACULTY_FILTER_SORT_ORDER = ['Unspecified', 'Other'];
+
 export default function CreatorsPage() {
   const router = useRouter();
   const [creators, setCreators] = useState<CreatorProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const creatorGroups = groupCreatorsBySignupDate(creators).filter(
+  const [facultyFilter, setFacultyFilter] = useState('all');
+
+  const facultyOptions = Array.from(new Set(creators.map(getCreatorFacultyCategory))).sort((a, b) => {
+    const aRank = FACULTY_FILTER_SORT_ORDER.indexOf(a);
+    const bRank = FACULTY_FILTER_SORT_ORDER.indexOf(b);
+    if (aRank !== -1 || bRank !== -1) {
+      return (aRank === -1 ? FACULTY_FILTER_SORT_ORDER.length : aRank) -
+        (bRank === -1 ? FACULTY_FILTER_SORT_ORDER.length : bRank);
+    }
+    return a.localeCompare(b);
+  });
+
+  const visibleCreators =
+    facultyFilter === 'all'
+      ? creators
+      : creators.filter((creator) => getCreatorFacultyCategory(creator) === facultyFilter);
+
+  const creatorGroups = groupCreatorsBySignupDate(visibleCreators).filter(
     (g) => g.label !== 'Unknown signup date'
   );
 
@@ -489,22 +564,37 @@ export default function CreatorsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-foreground">Onboarded Creators</h1>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5 shrink-0"
-          disabled={isExporting || creators.length === 0}
-          onClick={async () => {
-            setIsExporting(true);
-            // Only include actual creator_profiles (id defined), not unmatched signup stubs
-            try { await downloadCreatorsListPdf(creators); } finally { setIsExporting(false); }
-          }}
-        >
-          <FileDown size={15} />
-          {isExporting ? 'Generating...' : 'Download PDF'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select value={facultyFilter} onValueChange={setFacultyFilter}>
+            <SelectTrigger className="h-9 w-[200px]">
+              <SelectValue placeholder="All faculties" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All faculties</SelectItem>
+              {facultyOptions.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 shrink-0"
+            disabled={isExporting || visibleCreators.length === 0}
+            onClick={async () => {
+              setIsExporting(true);
+              // Only include actual creator_profiles (id defined), not unmatched signup stubs
+              try { await downloadCreatorsListPdf(visibleCreators); } finally { setIsExporting(false); }
+            }}
+          >
+            <FileDown size={15} />
+            {isExporting ? 'Generating...' : 'Download PDF'}
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
