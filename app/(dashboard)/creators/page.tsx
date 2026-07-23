@@ -464,6 +464,13 @@ const getCreatorFacultyCategory = (creator: CreatorProfile): string =>
 
 const FACULTY_FILTER_SORT_ORDER = ['Unspecified', 'Other'];
 
+const SCHOLARSHIP_FILTER_ORDER = ['Yes', 'No', 'N/A'];
+const SCHOLARSHIP_FILTER_LABELS: Record<string, string> = {
+  Yes: 'Scholarship',
+  No: 'Non-scholarship',
+  'N/A': 'Unspecified',
+};
+
 export default function CreatorsPage() {
   const router = useRouter();
   const [creators, setCreators] = useState<CreatorProfile[]>([]);
@@ -471,6 +478,7 @@ export default function CreatorsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [facultyFilter, setFacultyFilter] = useState('all');
+  const [scholarshipFilter, setScholarshipFilter] = useState('all');
 
   const facultyOptions = Array.from(new Set(creators.map(getCreatorFacultyCategory))).sort((a, b) => {
     const aRank = FACULTY_FILTER_SORT_ORDER.indexOf(a);
@@ -482,10 +490,15 @@ export default function CreatorsPage() {
     return a.localeCompare(b);
   });
 
-  const visibleCreators =
-    facultyFilter === 'all'
-      ? creators
-      : creators.filter((creator) => getCreatorFacultyCategory(creator) === facultyFilter);
+  const scholarshipOptions = SCHOLARSHIP_FILTER_ORDER.filter((value) =>
+    creators.some((creator) => formatScholarshipStudent(creator) === value)
+  );
+
+  const visibleCreators = creators
+    .filter((creator) => facultyFilter === 'all' || getCreatorFacultyCategory(creator) === facultyFilter)
+    .filter(
+      (creator) => scholarshipFilter === 'all' || formatScholarshipStudent(creator) === scholarshipFilter
+    );
 
   const creatorGroups = groupCreatorsBySignupDate(visibleCreators).filter(
     (g) => g.label !== 'Unknown signup date'
@@ -588,6 +601,19 @@ export default function CreatorsPage() {
               {facultyOptions.map((option) => (
                 <SelectItem key={option} value={option}>
                   {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={scholarshipFilter} onValueChange={setScholarshipFilter}>
+            <SelectTrigger className="h-9 w-[170px]">
+              <SelectValue placeholder="All creators" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All creators</SelectItem>
+              {scholarshipOptions.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {SCHOLARSHIP_FILTER_LABELS[option] ?? option}
                 </SelectItem>
               ))}
             </SelectContent>
