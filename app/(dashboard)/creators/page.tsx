@@ -437,18 +437,6 @@ const CreatorMetric = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
-const ScholarshipBadge = ({ creator }: { creator: CreatorProfile }) => {
-  const value = formatScholarshipStudent(creator);
-  if (value !== 'Yes') {
-    return <span className="text-muted-foreground">–</span>;
-  }
-  return (
-    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-100">
-      Scholarship
-    </span>
-  );
-};
-
 
 const getCreatorFacultyCategory = (creator: CreatorProfile): string =>
   categorizeFaculty(
@@ -696,7 +684,6 @@ export default function CreatorsPage() {
                             value={getCreatorProgram(creator)}
                           />
                         </div>
-                        <ScholarshipBadge creator={creator} />
                       </div>
                     ))}
                   </div>
@@ -711,7 +698,6 @@ export default function CreatorsPage() {
                         <TableHead className="py-2">Program</TableHead>
                         <TableHead className="py-2">Followers</TableHead>
                         <TableHead className="py-2">Rank</TableHead>
-                        <TableHead className="py-2">Scholarship</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -745,9 +731,6 @@ export default function CreatorsPage() {
                             </TableCell>
                             <TableCell className="py-2 text-muted-foreground">
                               {formatLabel(creator.creator_rank)}
-                            </TableCell>
-                            <TableCell className="py-2">
-                              <ScholarshipBadge creator={creator} />
                             </TableCell>
                           </TableRow>
                         ))}
