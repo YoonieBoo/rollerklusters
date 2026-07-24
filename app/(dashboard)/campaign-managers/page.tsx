@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase/client';
+import { getCampaignManagerSignups } from '@/lib/campaign-manager-signups';
 
 type CampaignManagerSignup = {
   id?: string | number | null;
@@ -33,7 +34,6 @@ type CampaignManagerSignup = {
   created_at?: string | null;
 };
 
-const CAMPAIGN_MANAGERS_PAGE_SIZE = 1000;
 const CAMPAIGN_MANAGERS_REFRESH_INTERVAL_MS = 15000;
 
 const toText = (value: unknown): string => {
@@ -95,23 +95,6 @@ const getDateClusterLabel = (date: string | null | undefined) => {
   return formattedDate === 'N/A' ? 'Unknown signup date' : formattedDate;
 };
 
-const isCampaignManagerSignup = (signup: CampaignManagerSignup) => {
-  const roleText = [
-    signup.signup_type,
-    signup.role_label,
-    signup.primary_creative_focus,
-  ]
-    .map(toText)
-    .join(' ')
-    .toLowerCase();
-
-  return (
-    roleText.includes('campaign-manager') ||
-    roleText.includes('campaign manager') ||
-    roleText.includes('campaign_manager')
-  );
-};
-
 const groupSignupsByDate = (signups: CampaignManagerSignup[]) => {
   const groups: { label: string; rows: CampaignManagerSignup[] }[] = [];
 
@@ -139,71 +122,6 @@ const SignupDetail = ({ label, value }: { label: string; value: unknown }) => (
   </div>
 );
 
-const sortSignups = (
-  firstSignup: CampaignManagerSignup,
-  secondSignup: CampaignManagerSignup
-) => {
-  const firstCreatedAt = Date.parse(toText(firstSignup.created_at));
-  const secondCreatedAt = Date.parse(toText(secondSignup.created_at));
-
-  if (!Number.isNaN(firstCreatedAt) && !Number.isNaN(secondCreatedAt)) {
-    return secondCreatedAt - firstCreatedAt;
-  }
-
-  return toText(secondSignup.created_at).localeCompare(toText(firstSignup.created_at));
-};
-
-const fetchAllCampaignManagerSignups = async () => {
-  const signups: CampaignManagerSignup[] = [];
-  const seenEmails = new Set<string>();
-
-  for (let page = 0; ; page += 1) {
-    const from = page * CAMPAIGN_MANAGERS_PAGE_SIZE;
-    const to = from + CAMPAIGN_MANAGERS_PAGE_SIZE - 1;
-    const { data, error } = await supabase
-      .from('creator_signups')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .range(from, to);
-
-    if (error) {
-      return { data: null, error };
-    }
-
-    const pageRows = (data ?? []) as CampaignManagerSignup[];
-    for (const row of pageRows.filter(isCampaignManagerSignup)) {
-      const email = (row.email ?? '').trim().toLowerCase();
-      if (email) seenEmails.add(email);
-      signups.push(row);
-    }
-
-    if (pageRows.length < CAMPAIGN_MANAGERS_PAGE_SIZE) {
-      break;
-    }
-  }
-
-  // Also check creator_signup_profile_sources for auth-based signups not in creator_signups
-  const { data: sourceRows, error: sourceError } = await supabase
-    .from('creator_signup_profile_sources')
-    .select('*');
-
-  if (sourceError) {
-    return { data: null, error: sourceError };
-  }
-
-  for (const row of ((sourceRows ?? []) as CampaignManagerSignup[]).filter(isCampaignManagerSignup)) {
-    const email = (row.email ?? '').trim().toLowerCase();
-    if (!email || seenEmails.has(email)) continue;
-    seenEmails.add(email);
-    signups.push(row);
-  }
-
-  return {
-    data: signups.sort(sortSignups),
-    error: null,
-  };
-};
-
 export default function CampaignManagersPage() {
   const [signups, setSignups] = useState<CampaignManagerSignup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -220,21 +138,23 @@ export default function CampaignManagersPage() {
 
       setErrorMessage(null);
 
-      const { data, error } = await fetchAllCampaignManagerSignups();
+      try {
+        const data = await getCampaignManagerSignups();
 
-      if (!isMounted) {
-        return;
-      }
+        if (!isMounted) {
+          return;
+        }
 
-      if (error) {
-        console.error('Supabase campaign manager signups fetch error:', error);
-        setErrorMessage(error.message);
-
+        setSignups(data as CampaignManagerSignup[]);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+        console.error('Campaign manager signups fetch error:', error);
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to load campaign managers');
         if (showLoading) {
           setSignups([]);
         }
-      } else {
-        setSignups((data ?? []) as CampaignManagerSignup[]);
       }
 
       setIsLoading(false);
