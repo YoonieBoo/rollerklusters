@@ -31,7 +31,21 @@ export async function GET() {
     (publicUsers ?? []).map((row: { id: string }) => String(row.id))
   );
 
-  // Source 2: creator_signups where role_label indicates campaign manager
+  // Source 2: public.users who signed up via this app's own /auth form
+  // (university + campaign manager type) — university is only ever set by
+  // that flow, so it's the reliable signal here. These accounts never get
+  // role = 'campaign_manager' (the shared auth trigger defaults them to
+  // 'brand'), so Source 1 alone misses them.
+  const { data: authSignupUsers } = await admin
+    .from('users')
+    .select('id')
+    .not('university', 'is', null);
+
+  for (const row of authSignupUsers ?? []) {
+    ids.add(String(row.id));
+  }
+
+  // Source 3: creator_signups where role_label indicates campaign manager
   const { data: signups } = await admin
     .from('creator_signups')
     .select('email, role_label');
