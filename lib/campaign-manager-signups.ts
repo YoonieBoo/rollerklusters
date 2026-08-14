@@ -109,6 +109,38 @@ export const getCampaignManagerSignups = async (): Promise<SupabaseRow[]> => {
     }
   }
 
+  // Campaign managers who registered through this app's own /auth signup
+  // form (university + campaign manager type) never land in
+  // creator_signups at all — that table only holds the older Typeform
+  // submissions. `university` is only ever set by that /auth flow, so it's
+  // the reliable signal for "this is a campaign manager account."
+  const { data: userRows, error: userError } = await supabase
+    .from('users')
+    .select('id, name, full_name, email, university, campaign_manager_type, role, created_at')
+    .not('university', 'is', null);
+
+  if (!userError) {
+    for (const row of (userRows ?? []) as SupabaseRow[]) {
+      const displayName = toText(row.name).trim() || toText(row.full_name).trim() || toText(row.email);
+      const mapped: SupabaseRow = {
+        id: row.id,
+        display_name: displayName,
+        email: row.email,
+        signup_type: 'campaign-manager',
+        role_label: 'Campaign Manager (Operational sign-up)',
+        university: row.university,
+        university_program:
+          row.university === 'Assumption University' && row.campaign_manager_type
+            ? `Assumption University — ${row.campaign_manager_type} campaign manager`
+            : row.university,
+        created_at: row.created_at,
+      };
+      if (keep(mapped)) {
+        signups.push(mapped);
+      }
+    }
+  }
+
   return signups.sort(sortSignups);
 };
 
