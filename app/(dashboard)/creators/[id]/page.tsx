@@ -141,6 +141,7 @@ export default function CreatorDetailPage() {
   const router = useRouter();
 
   const [profile, setProfile] = useState<SupabaseRow | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [engagements, setEngagements] = useState<SupabaseRow[]>([]);
   const [campaigns, setCampaigns] = useState<Map<string, SupabaseRow>>(new Map());
   const [submissions, setSubmissions] = useState<SupabaseRow[]>([]);
@@ -169,12 +170,17 @@ export default function CreatorDetailPage() {
 
       const userId = toText(prof.user_id);
 
-      const [engRes, subRes] = await Promise.all([
+      const [engRes, subRes, userRes] = await Promise.all([
         userId
           ? supabase.from('engagements').select('*').eq('creator_id', userId).order('created_at', { ascending: false })
           : Promise.resolve({ data: [], error: null }),
         supabase.from('submissions').select('*').order('submitted_at', { ascending: false }),
+        userId
+          ? supabase.from('users').select('avatar_url').eq('id', userId).maybeSingle()
+          : Promise.resolve({ data: null }),
       ]);
+
+      setAvatarUrl((userRes.data as { avatar_url?: string } | null)?.avatar_url ?? null);
 
       const engRows = (engRes.data ?? []) as SupabaseRow[];
       setEngagements(engRows);
@@ -261,9 +267,18 @@ export default function CreatorDetailPage() {
       <div className="rounded-xl border border-border bg-card p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-6">
           {/* Avatar */}
-          <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white ${color}`}>
-            {initials}
-          </div>
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarUrl}
+              alt={name}
+              className="h-16 w-16 shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white ${color}`}>
+              {initials}
+            </div>
+          )}
 
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
