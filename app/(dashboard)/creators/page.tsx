@@ -884,7 +884,6 @@ export default function CreatorsPage() {
                     <TableHeader className="bg-muted/60">
                       <TableRow className="h-10 hover:bg-muted/60">
                         <TableHead className="py-2">Creator</TableHead>
-                        <TableHead className="py-2">Platform</TableHead>
                         <TableHead className="py-2">Program</TableHead>
                         <TableHead className="py-2">Followers</TableHead>
                         <TableHead className="py-2">Rank</TableHead>
@@ -910,9 +909,6 @@ export default function CreatorsPage() {
                                   </span>
                                 )}
                               </div>
-                            </TableCell>
-                            <TableCell className="py-2 text-muted-foreground">
-                              {formatLabel(creator.platform)}
                             </TableCell>
                             <TableCell className="max-w-56 whitespace-normal break-words py-2 text-muted-foreground">
                               {getCreatorProgram(creator)}
