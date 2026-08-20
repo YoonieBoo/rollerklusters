@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import {
   CalendarDays,
   CheckCircle2,
-  ChevronRight,
-  ExternalLink,
   FileDown,
   FileText,
   Flag,
@@ -1344,8 +1342,7 @@ export default function CreatorsPage() {
                 </div>
 
                 <Button
-                  variant="outline"
-                  className="mt-4 h-10 w-full rounded-lg border-2 border-indigo-500 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 hover:text-indigo-700"
+                  className="mt-4 h-10 w-full rounded-lg text-sm font-semibold"
                   onClick={() => {
                     const id = selectedCreator.id;
                     setSelectedCreator(null);
@@ -1353,11 +1350,7 @@ export default function CreatorsPage() {
                     router.push(`/creators/${id}`);
                   }}
                 >
-                  <span className="flex flex-1 items-center justify-center gap-1.5">
-                    <ExternalLink className="size-4" />
-                    View full profile
-                  </span>
-                  <ChevronRight className="size-4" />
+                  View full profile
                 </Button>
               </div>
             </>
