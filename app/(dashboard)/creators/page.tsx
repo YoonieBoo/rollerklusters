@@ -880,13 +880,13 @@ export default function CreatorsPage() {
                 </div>
 
                 <div className="hidden overflow-x-auto md:block">
-                  <Table className="min-w-[860px]">
+                  <Table className="min-w-[860px] table-fixed">
                     <TableHeader className="bg-muted/60">
                       <TableRow className="h-10 hover:bg-muted/60">
-                        <TableHead className="py-2">Creator</TableHead>
-                        <TableHead className="py-2">Program</TableHead>
-                        <TableHead className="py-2">Followers</TableHead>
-                        <TableHead className="py-2">Rank</TableHead>
+                        <TableHead className="w-[32%] py-2">Creator</TableHead>
+                        <TableHead className="w-[34%] py-2">Program</TableHead>
+                        <TableHead className="w-[16%] py-2">Followers</TableHead>
+                        <TableHead className="w-[18%] py-2">Rank</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -899,18 +899,18 @@ export default function CreatorsPage() {
                             className="h-11 border-border hover:bg-muted/40 cursor-pointer"
                             onClick={() => openCreatorCard(creator)}
                           >
-                            <TableCell className="py-2 font-medium text-foreground">
+                            <TableCell className="whitespace-normal py-2 font-medium text-foreground">
                               <div className="flex items-center gap-2.5">
                                 <CreatorAvatar name={getCreatorName(creator)} avatarUrl={creator.avatar_url} size={28} />
-                                {getCreatorName(creator)}
+                                <span className="break-words">{getCreatorName(creator)}</span>
                                 {creator.verification_status === 'pending_onboarding' && (
-                                  <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700">
+                                  <span className="shrink-0 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700">
                                     Pending
                                   </span>
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell className="max-w-56 whitespace-normal break-words py-2 text-muted-foreground">
+                            <TableCell className="whitespace-normal break-words py-2 text-muted-foreground">
                               {getCreatorProgram(creator)}
                             </TableCell>
                             <TableCell className="py-2 text-muted-foreground">
