@@ -12,12 +12,14 @@ import {
   Flag,
   GraduationCap,
   Instagram,
+  Music2,
   Send,
   ShieldCheck,
   Sparkles,
   Star,
   UserPlus,
   Users,
+  Youtube,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -252,6 +254,18 @@ const getYouTubeUrl = (creator: CreatorProfile): string => {
   if (toText(creator.platform).trim().toLowerCase() !== 'youtube') return '';
   const handle = sanitizeHandle(toText(creator.social_handle).trim());
   return handle ? `https://www.youtube.com/@${encodeURIComponent(handle)}` : '';
+};
+
+const PlatformIcon = ({ platform, className }: { platform?: string | null; className?: string }) => {
+  switch (toText(platform).trim().toLowerCase()) {
+    case 'tiktok':
+      return <Music2 className={className} />;
+    case 'youtube':
+      return <Youtube className={className} />;
+    case 'instagram':
+    default:
+      return <Instagram className={className} />;
+  }
 };
 
 const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
@@ -1234,7 +1248,7 @@ export default function CreatorsPage() {
                     </h2>
                     {toText(selectedCreator.social_handle).trim() && (
                       <p className="mt-1 flex items-center justify-center gap-1.5 text-xs text-slate-500 sm:justify-start">
-                        <Instagram className="size-3.5 text-slate-800" />
+                        <PlatformIcon platform={selectedCreator.platform} className="size-3.5 text-slate-800" />
                         {toText(selectedCreator.social_handle).trim().replace(/^@/, '')} ·{' '}
                         {formatLabel(selectedCreator.platform)}
                       </p>
