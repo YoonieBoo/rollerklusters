@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase/client';
 import { getScopedCreators, UNIVERSITIES } from '@/lib/creator-scope';
+import { getInitials, getAvatarColorForName, getRankBadgeClasses } from '@/lib/creator-visuals';
 
 type CreatorProfile = {
   id?: string | number | null;
@@ -184,16 +185,6 @@ const getCreatorName = (creator: CreatorProfile) =>
   toText(creator.creator_name).trim() ||
   toText(creator.social_handle).trim() ||
   'Unnamed creator';
-
-const getInitials = (name: string) =>
-  name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('') || '?';
-
-const AVATAR_COLORS = [
-  'bg-blue-500', 'bg-purple-500', 'bg-emerald-500',
-  'bg-rose-500', 'bg-amber-500', 'bg-indigo-500',
-];
-const avatarColor = (id: string) =>
-  AVATAR_COLORS[Math.abs([...id].reduce((a, c) => a + c.charCodeAt(0), 0)) % AVATAR_COLORS.length];
 
 const getFirstValue = (creator: CreatorProfile, keys: string[]) => {
   for (const key of keys) {
@@ -455,6 +446,33 @@ const CreatorMetric = ({ label, value }: { label: string; value: string }) => (
       {label}
     </p>
     <p className="mt-1 break-words text-sm font-medium text-foreground">{value}</p>
+  </div>
+);
+
+const RankBadge = ({ rank }: { rank: unknown }) => {
+  const label = formatLabel(rank);
+  if (label === 'N/A') {
+    return <span className="text-muted-foreground">N/A</span>;
+  }
+  return (
+    <span
+      className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium ${getRankBadgeClasses(
+        label
+      )}`}
+    >
+      {label}
+    </span>
+  );
+};
+
+const CreatorAvatar = ({ name, size = 32 }: { name: string; size?: number }) => (
+  <div
+    className={`flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${getAvatarColorForName(
+      name
+    )}`}
+    style={{ width: size, height: size, fontSize: Math.max(11, size * 0.4) }}
+  >
+    {getInitials(name)}
   </div>
 );
 
@@ -802,31 +820,38 @@ export default function CreatorsPage() {
                         className="space-y-4 px-4 py-4 cursor-pointer hover:bg-muted/40 active:bg-muted/60 transition-colors"
                         onClick={() => openCreatorCard(creator)}
                       >
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="break-words font-medium text-foreground">
-                              {getCreatorName(creator)}
+                        <div className="flex min-w-0 items-start gap-3">
+                          <CreatorAvatar name={getCreatorName(creator)} size={36} />
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="break-words font-medium text-foreground">
+                                {getCreatorName(creator)}
+                              </p>
+                              {creator.verification_status === 'pending_onboarding' && (
+                                <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700">
+                                  Pending
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 break-words text-sm text-muted-foreground">
+                              {toText(creator.social_handle).trim() || 'N/A'} ·{' '}
+                              {formatLabel(creator.platform)}
                             </p>
-                            {creator.verification_status === 'pending_onboarding' && (
-                              <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700">
-                                Pending
-                              </span>
-                            )}
                           </div>
-                          <p className="mt-1 break-words text-sm text-muted-foreground">
-                            {toText(creator.social_handle).trim() || 'N/A'} ·{' '}
-                            {formatLabel(creator.platform)}
-                          </p>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                           <CreatorMetric
                             label="Followers"
                             value={formatFollowers(creator)}
                           />
-                          <CreatorMetric
-                            label="Rank"
-                            value={formatLabel(creator.creator_rank)}
-                          />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">
+                              Rank
+                            </p>
+                            <p className="mt-1">
+                              <RankBadge rank={creator.creator_rank} />
+                            </p>
+                          </div>
                           <CreatorMetric
                             label="Program"
                             value={getCreatorProgram(creator)}
@@ -859,7 +884,8 @@ export default function CreatorsPage() {
                             onClick={() => openCreatorCard(creator)}
                           >
                             <TableCell className="py-2 font-medium text-foreground">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2.5">
+                                <CreatorAvatar name={getCreatorName(creator)} size={28} />
                                 {getCreatorName(creator)}
                                 {creator.verification_status === 'pending_onboarding' && (
                                   <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700">
@@ -878,7 +904,7 @@ export default function CreatorsPage() {
                               {formatFollowers(creator)}
                             </TableCell>
                             <TableCell className="py-2 text-muted-foreground">
-                              {formatLabel(creator.creator_rank)}
+                              <RankBadge rank={creator.creator_rank} />
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1125,8 +1151,8 @@ export default function CreatorsPage() {
                   />
                 ) : (
                   <div
-                    className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white ${avatarColor(
-                      toText(selectedCreator.id)
+                    className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white ${getAvatarColorForName(
+                      getCreatorName(selectedCreator)
                     )}`}
                   >
                     {getInitials(getCreatorName(selectedCreator))}
@@ -1174,11 +1200,8 @@ export default function CreatorsPage() {
                         {formatFollowers(selectedCreator)}
                       </span>
                     </span>
-                    <span className="text-muted-foreground">
-                      Rank{' '}
-                      <span className="font-medium text-foreground">
-                        {formatLabel(selectedCreator.creator_rank)}
-                      </span>
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      Rank <RankBadge rank={selectedCreator.creator_rank} />
                     </span>
                     <span className="text-muted-foreground">
                       Scholarship{' '}

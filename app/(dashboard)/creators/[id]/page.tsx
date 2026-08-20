@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { LoadingDots } from '@/components/ui/loading-dots';
+import { getInitials, getAvatarColorForName, getRankBadgeClasses } from '@/lib/creator-visuals';
 
 const ActivityChart = dynamic(() => import('./ActivityChart'), { ssr: false });
 
@@ -38,15 +39,6 @@ const formatArray = (v: unknown): string => {
 
 const getCreatorName = (p: SupabaseRow) =>
   toText(p.display_name).trim() || toText(p.creator_name).trim() || toText(p.social_handle).trim() || 'Unnamed Creator';
-
-const getInitials = (name: string) =>
-  name.split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('') || '?';
-
-const AVATAR_COLORS = [
-  'bg-blue-500', 'bg-purple-500', 'bg-emerald-500',
-  'bg-rose-500', 'bg-amber-500', 'bg-indigo-500',
-];
-const avatarColor = (id: string) => AVATAR_COLORS[Math.abs([...id].reduce((a, c) => a + c.charCodeAt(0), 0)) % AVATAR_COLORS.length];
 
 const engagementStatusLabels: Record<string, string> = {
   matched: 'Invite sent',
@@ -230,7 +222,7 @@ export default function CreatorDetailPage() {
 
   const name = getCreatorName(profile);
   const initials = getInitials(name);
-  const color = avatarColor(toText(profile.id));
+  const color = getAvatarColorForName(name);
 
   const invited = engagements.length;
   const accepted = engagements.filter(e => ['accepted', 'active', 'completed'].includes(toText(e.status))).length;
@@ -304,7 +296,16 @@ export default function CreatorDetailPage() {
 
             <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
               <span className="text-muted-foreground">Followers <span className="font-medium text-foreground">{followers}</span></span>
-              <span className="text-muted-foreground">Rank <span className="font-medium text-foreground">{rank}</span></span>
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                Rank
+                {rank === 'N/A' ? (
+                  <span className="font-medium text-foreground">N/A</span>
+                ) : (
+                  <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium ${getRankBadgeClasses(rank)}`}>
+                    {rank}
+                  </span>
+                )}
+              </span>
               <span className="text-muted-foreground">Scholarship <span className="font-medium text-foreground">{scholarship}</span></span>
               <span className="text-muted-foreground">Joined <span className="font-medium text-foreground">{formatDate(toText(profile.created_at) || null)}</span></span>
             </div>
