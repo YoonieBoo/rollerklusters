@@ -696,7 +696,10 @@ export default function CreatorsPage() {
       (creator) => scholarshipFilter === 'all' || formatScholarshipStudent(creator) === scholarshipFilter
     )
     .filter((creator) => {
+      const isPending = creator.verification_status === 'pending_onboarding';
       if (statusFilter === 'all') return true;
+      if (statusFilter === 'pending') return isPending;
+      if (isPending) return false;
       return statusFilter === 'active' ? Boolean(creator.is_active) : !creator.is_active;
     });
 
@@ -832,6 +835,7 @@ export default function CreatorsPage() {
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="new">New</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -897,16 +901,9 @@ export default function CreatorsPage() {
                         <div className="flex min-w-0 items-start gap-3">
                           <CreatorAvatar name={getCreatorName(creator)} avatarUrl={creator.avatar_url} size={36} />
                           <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="break-words font-medium text-foreground">
-                                {getCreatorName(creator)}
-                              </p>
-                              {creator.verification_status === 'pending_onboarding' && (
-                                <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700">
-                                  Pending
-                                </span>
-                              )}
-                            </div>
+                            <p className="break-words font-medium text-foreground">
+                              {getCreatorName(creator)}
+                            </p>
                             <p className="mt-1 break-words text-sm text-muted-foreground">
                               {toText(creator.social_handle).trim() || 'N/A'} ·{' '}
                               {formatLabel(creator.platform)}
@@ -960,11 +957,6 @@ export default function CreatorsPage() {
                               <div className="flex items-center gap-2.5">
                                 <CreatorAvatar name={getCreatorName(creator)} avatarUrl={creator.avatar_url} size={28} />
                                 <span className="break-words">{getCreatorName(creator)}</span>
-                                {creator.verification_status === 'pending_onboarding' && (
-                                  <span className="shrink-0 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700">
-                                    Pending
-                                  </span>
-                                )}
                               </div>
                             </TableCell>
                             <TableCell className="whitespace-normal break-words py-2 text-muted-foreground">
@@ -1218,16 +1210,9 @@ export default function CreatorsPage() {
                 />
 
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-xl font-bold text-foreground">
-                      {getCreatorName(selectedCreator)}
-                    </h2>
-                    {selectedCreator.verification_status === 'pending_onboarding' && (
-                      <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-700">
-                        Pending
-                      </span>
-                    )}
-                  </div>
+                  <h2 className="text-xl font-bold text-foreground">
+                    {getCreatorName(selectedCreator)}
+                  </h2>
                   {toText(selectedCreator.social_handle).trim() && (
                     <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
                       <Instagram size={13} />
