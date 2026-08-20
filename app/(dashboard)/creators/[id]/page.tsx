@@ -201,6 +201,14 @@ export default function CreatorDetailPage() {
     load();
   }, [id]);
 
+  useEffect(() => {
+    if (isLoading) return;
+    const hash = window.location.hash.replace('#', '');
+    if (!hash) return;
+    const target = document.getElementById(hash);
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [isLoading]);
+
   if (isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -353,7 +361,7 @@ export default function CreatorDetailPage() {
       </div>
 
       {/* Campaign history */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div id="campaign-history" className="scroll-mt-6 rounded-xl border border-border bg-card overflow-hidden">
         <div className="border-b border-border px-5 py-4">
           <h2 className="font-semibold text-foreground">Campaign History</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">All campaigns this creator has been invited to</p>
@@ -392,7 +400,7 @@ export default function CreatorDetailPage() {
 
       {/* Submissions */}
       {submissions.length > 0 && (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div id="content-submissions" className="scroll-mt-6 rounded-xl border border-border bg-card overflow-hidden">
           <div className="border-b border-border px-5 py-4">
             <h2 className="font-semibold text-foreground">Content Submissions</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">Content submitted by this creator</p>

@@ -1298,12 +1298,22 @@ export default function CreatorsPage() {
                 <h3 className="text-sm font-semibold text-slate-900">Activity Overview</h3>
                 <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {[
-                    { icon: <Send className="size-4 text-indigo-600" />, iconBg: 'bg-violet-50', label: 'Invited', value: selectedCreatorStats?.invited, unit: 'campaign' },
-                    { icon: <CheckCircle2 className="size-4 text-emerald-500" />, iconBg: 'bg-emerald-50', label: 'Accepted', value: selectedCreatorStats?.accepted, unit: 'campaign' },
-                    { icon: <FileText className="size-4 text-blue-600" />, iconBg: 'bg-blue-50', label: 'Submitted', value: selectedCreatorStats?.submitted, unit: 'contents' },
-                    { icon: <Flag className="size-4 text-orange-500" />, iconBg: 'bg-orange-50', label: 'Completed', value: selectedCreatorStats?.completed, unit: 'campaign' },
+                    { icon: <Send className="size-4 text-indigo-600" />, iconBg: 'bg-violet-50', label: 'Invited', value: selectedCreatorStats?.invited, unit: 'campaign', anchor: 'campaign-history' },
+                    { icon: <CheckCircle2 className="size-4 text-emerald-500" />, iconBg: 'bg-emerald-50', label: 'Accepted', value: selectedCreatorStats?.accepted, unit: 'campaign', anchor: 'campaign-history' },
+                    { icon: <FileText className="size-4 text-blue-600" />, iconBg: 'bg-blue-50', label: 'Submitted', value: selectedCreatorStats?.submitted, unit: 'contents', anchor: 'content-submissions' },
+                    { icon: <Flag className="size-4 text-orange-500" />, iconBg: 'bg-orange-50', label: 'Completed', value: selectedCreatorStats?.completed, unit: 'campaign', anchor: 'campaign-history' },
                   ].map((stat) => (
-                    <div key={stat.label} className="flex flex-col items-center rounded-xl border border-slate-200 px-2 py-3 text-center shadow-sm">
+                    <button
+                      key={stat.label}
+                      type="button"
+                      onClick={() => {
+                        const id = selectedCreator.id;
+                        setSelectedCreator(null);
+                        setSelectedCreatorStats(null);
+                        router.push(`/creators/${id}#${stat.anchor}`);
+                      }}
+                      className="flex flex-col items-center rounded-xl border border-slate-200 px-2 py-3 text-center shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                    >
                       <div className={`flex size-8 items-center justify-center rounded-full ${stat.iconBg}`}>
                         {stat.icon}
                       </div>
@@ -1312,7 +1322,7 @@ export default function CreatorsPage() {
                         {selectedCreatorStats ? stat.value ?? 0 : '—'}
                       </p>
                       <p className="text-[10px] text-slate-700">{stat.unit}</p>
-                    </div>
+                    </button>
                   ))}
                 </div>
 
