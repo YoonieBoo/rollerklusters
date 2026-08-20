@@ -2,7 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileDown, UserPlus, Instagram, Send, CheckCircle2, FileText, Users, ExternalLink } from 'lucide-react';
+import {
+  BadgeCheck,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  ExternalLink,
+  FileDown,
+  FileText,
+  Flag,
+  GraduationCap,
+  Instagram,
+  Send,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  UserPlus,
+  Users,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { LoadingDots } from '@/components/ui/loading-dots';
@@ -1196,110 +1213,133 @@ export default function CreatorsPage() {
           }
         }}
       >
-        <DialogContent className="bg-card border-border max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] gap-0 overflow-y-auto rounded-[24px] border border-slate-200 bg-white p-0 shadow-2xl sm:max-h-[92vh] sm:max-w-[710px] [&>button]:right-5 [&>button]:top-5 [&>button]:flex [&>button]:size-11 [&>button]:items-center [&>button]:justify-center [&>button]:rounded-full [&>button]:bg-slate-50 [&>button]:text-slate-700 [&>button]:opacity-100 [&>button]:hover:bg-slate-100">
           {selectedCreator && (
             <>
               <DialogTitle className="sr-only">{getCreatorName(selectedCreator)}</DialogTitle>
               <DialogDescription className="sr-only">Creator profile summary</DialogDescription>
 
-              <div className="flex flex-col gap-5 pt-1 sm:flex-row sm:items-start sm:gap-5">
-                <CreatorAvatar
-                  name={getCreatorName(selectedCreator)}
-                  avatarUrl={selectedCreator.avatar_url}
-                  size={64}
-                />
-
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-xl font-bold text-foreground">
-                    {getCreatorName(selectedCreator)}
-                  </h2>
-                  {toText(selectedCreator.social_handle).trim() && (
-                    <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <Instagram size={13} />
-                      {toText(selectedCreator.social_handle).trim().replace(/^@/, '')} ·{' '}
-                      {formatLabel(selectedCreator.platform)}
-                    </p>
-                  )}
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span className="text-sm text-muted-foreground">
-                      {getCreatorProgram(selectedCreator)}
-                    </span>
-                    {getCreatorInterest(selectedCreator) !== 'N/A' &&
-                      getCreatorInterest(selectedCreator)
-                        .split(', ')
-                        .map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700"
-                          >
-                            {tag}
-                          </span>
-                        ))}
+              <div className="px-5 pb-6 pt-16 sm:px-8 sm:pb-7 sm:pt-11">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-7">
+                  <div className="mx-auto shrink-0 sm:mx-0 [&>div]:ring-4 [&>div]:ring-slate-50 [&>img]:ring-4 [&>img]:ring-slate-50">
+                    <CreatorAvatar
+                      name={getCreatorName(selectedCreator)}
+                      avatarUrl={selectedCreator.avatar_url}
+                      size={144}
+                    />
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-                    <span className="text-muted-foreground">
-                      Followers{' '}
-                      <span className="font-medium text-foreground">
-                        {formatFollowers(selectedCreator)}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-1.5 text-muted-foreground">
-                      Rank <RankBadge rank={selectedCreator.creator_rank} />
-                    </span>
-                    <span className="text-muted-foreground">
-                      Scholarship{' '}
-                      <span className="font-medium text-foreground">
-                        {formatScholarshipStudent(selectedCreator)}
-                      </span>
-                    </span>
-                    <span className="text-muted-foreground">
-                      Joined{' '}
-                      <span className="font-medium text-foreground">
-                        {formatDate(toText(selectedCreator.created_at) || null)}
-                      </span>
-                    </span>
+
+                  <div className="min-w-0 flex-1 pt-1 text-center sm:text-left">
+                    <div className="flex items-center justify-center gap-2 sm:justify-start">
+                      <h2 className="truncate text-[30px] font-bold tracking-tight text-slate-950">
+                        {getCreatorName(selectedCreator)}
+                      </h2>
+                      <BadgeCheck className="size-6 shrink-0 fill-indigo-500 text-white" aria-label="Verified creator" />
+                    </div>
+                    {toText(selectedCreator.social_handle).trim() && (
+                      <p className="mt-1.5 flex items-center justify-center gap-2 text-sm text-slate-500 sm:justify-start">
+                        <Instagram className="size-4 text-slate-800" />
+                        {toText(selectedCreator.social_handle).trim().replace(/^@/, '')} ·{' '}
+                        {formatLabel(selectedCreator.platform)}
+                      </p>
+                    )}
+                    <div className="mt-5 flex flex-wrap justify-center gap-2 sm:justify-start">
+                      {getCreatorProgram(selectedCreator) !== 'N/A' && (
+                        <span className="rounded-full border border-indigo-100 bg-indigo-50/70 px-3 py-1 text-xs font-medium text-indigo-700">
+                          {getCreatorProgram(selectedCreator)}
+                        </span>
+                      )}
+                      {getCreatorInterest(selectedCreator) !== 'N/A' &&
+                        getCreatorInterest(selectedCreator)
+                          .split(', ')
+                          .map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded-full border border-indigo-100 bg-indigo-50/70 px-3 py-1 text-xs font-medium text-indigo-700"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {[
-                  { icon: <Send size={14} />, label: 'Invited', value: selectedCreatorStats?.invited },
-                  { icon: <CheckCircle2 size={14} />, label: 'Accepted', value: selectedCreatorStats?.accepted },
-                  { icon: <FileText size={14} />, label: 'Submitted', value: selectedCreatorStats?.submitted },
-                  { icon: <Users size={14} />, label: 'Completed', value: selectedCreatorStats?.completed },
-                ].map((stat) => (
-                  <div key={stat.label} className="rounded-xl border border-border bg-muted/30 px-3 py-3">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      {stat.icon}
-                      {stat.label}
+                <div className="my-7 h-px bg-slate-200" />
+
+                <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-4">
+                  {[
+                    { icon: <Users className="size-5" />, label: 'Followers', value: formatFollowers(selectedCreator) },
+                    { icon: <ShieldCheck className="size-5" />, label: 'Rank', value: <RankBadge rank={selectedCreator.creator_rank} /> },
+                    { icon: <GraduationCap className="size-5" />, label: 'Scholarship', value: formatScholarshipStudent(selectedCreator) },
+                    { icon: <CalendarDays className="size-5" />, label: 'Joined', value: formatDate(toText(selectedCreator.created_at) || null) },
+                  ].map((item) => (
+                    <div key={item.label} className="min-w-0 text-center sm:text-left">
+                      <div className="flex items-center justify-center gap-2 text-sm text-slate-600 sm:justify-start">
+                        {item.icon}
+                        {item.label}
+                      </div>
+                      <div className="mt-2 text-lg font-bold text-slate-950 sm:pl-7">{item.value}</div>
                     </div>
-                    <p className="mt-1.5 text-lg font-bold text-foreground">
-                      {selectedCreatorStats ? stat.value ?? 0 : '—'}
+                  ))}
+                </div>
+
+                <div className="my-7 h-px bg-slate-200" />
+
+                <h3 className="text-base font-semibold text-slate-900">Activity Overview</h3>
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {[
+                    { icon: <Send className="size-7 text-indigo-600" />, iconBg: 'bg-violet-50', label: 'Invited', value: selectedCreatorStats?.invited, unit: 'campaign' },
+                    { icon: <CheckCircle2 className="size-7 text-emerald-500" />, iconBg: 'bg-emerald-50', label: 'Accepted', value: selectedCreatorStats?.accepted, unit: 'campaign' },
+                    { icon: <FileText className="size-7 text-blue-600" />, iconBg: 'bg-blue-50', label: 'Submitted', value: selectedCreatorStats?.submitted, unit: 'contents' },
+                    { icon: <Flag className="size-7 text-orange-500" />, iconBg: 'bg-orange-50', label: 'Completed', value: selectedCreatorStats?.completed, unit: 'campaign' },
+                  ].map((stat) => (
+                    <div key={stat.label} className="flex min-h-44 flex-col items-center rounded-2xl border border-slate-200 px-3 py-4 text-center shadow-sm">
+                      <div className={`flex size-14 items-center justify-center rounded-full ${stat.iconBg}`}>
+                        {stat.icon}
+                      </div>
+                      <p className="mt-3 text-sm text-slate-600">{stat.label}</p>
+                      <p className="mt-1 text-2xl font-bold text-slate-950">
+                        {selectedCreatorStats ? stat.value ?? 0 : '—'}
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-700">{stat.unit}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 flex gap-3 rounded-2xl border border-violet-200 bg-violet-50/70 p-4">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                    {toText(selectedCreator.bio).trim() ? <Star className="size-5" /> : <Sparkles className="size-5" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-violet-700">
+                      {getCreatorInterest(selectedCreator) !== 'N/A'
+                        ? `${getCreatorInterest(selectedCreator).split(', ')[0]} Creator`
+                        : 'Creator Profile'}
+                    </p>
+                    <p className="mt-1 text-sm leading-5 text-slate-700">
+                      {toText(selectedCreator.bio).trim() ||
+                        `${getCreatorName(selectedCreator)} creates content for an engaged online audience.`}
                     </p>
                   </div>
-                ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  className="mt-6 h-14 w-full rounded-xl border-2 border-indigo-500 text-base font-semibold text-indigo-700 hover:bg-indigo-50 hover:text-indigo-700"
+                  onClick={() => {
+                    const id = selectedCreator.id;
+                    setSelectedCreator(null);
+                    setSelectedCreatorStats(null);
+                    router.push(`/creators/${id}`);
+                  }}
+                >
+                  <span className="flex flex-1 items-center justify-center gap-2">
+                    <ExternalLink className="size-5" />
+                    View full profile
+                  </span>
+                  <ChevronRight className="size-5" />
+                </Button>
               </div>
-
-              {toText(selectedCreator.bio).trim() && (
-                <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                  {toText(selectedCreator.bio).trim()}
-                </p>
-              )}
-
-              <Button
-                variant="outline"
-                className="mt-5 w-full gap-1.5"
-                onClick={() => {
-                  const id = selectedCreator.id;
-                  setSelectedCreator(null);
-                  setSelectedCreatorStats(null);
-                  router.push(`/creators/${id}`);
-                }}
-              >
-                <ExternalLink size={14} />
-                View full profile
-              </Button>
             </>
           )}
         </DialogContent>
