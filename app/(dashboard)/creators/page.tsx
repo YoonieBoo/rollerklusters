@@ -172,30 +172,6 @@ const formatDate = (date: string | null | undefined) => {
   return parsedDate.getDate() + '/' + (parsedDate.getMonth() + 1) + '/' + parsedDate.getFullYear();
 };
 
-const getDateClusterLabel = (date: string | null | undefined) => {
-  const formattedDate = formatDate(date);
-
-  return formattedDate === 'N/A' ? 'Unknown signup date' : formattedDate;
-};
-
-const groupCreatorsBySignupDate = (creators: CreatorProfile[]) => {
-  const groups: { label: string; rows: CreatorProfile[] }[] = [];
-
-  creators.forEach((creator) => {
-    const label = getDateClusterLabel(creator.created_at);
-    const existingGroup = groups.find((group) => group.label === label);
-
-    if (existingGroup) {
-      existingGroup.rows.push(creator);
-      return;
-    }
-
-    groups.push({ label, rows: [creator] });
-  });
-
-  return groups;
-};
-
 const getCreatorName = (creator: CreatorProfile) =>
   toText(creator.display_name).trim() ||
   toText(creator.creator_name).trim() ||
@@ -731,10 +707,6 @@ export default function CreatorsPage() {
       return statusFilter === 'active' ? Boolean(creator.is_active) : !creator.is_active;
     });
 
-  const creatorGroups = groupCreatorsBySignupDate(visibleCreators).filter(
-    (g) => g.label !== 'Unknown signup date'
-  );
-
   useEffect(() => {
     let isMounted = true;
 
@@ -907,104 +879,88 @@ export default function CreatorsPage() {
           </div>
         </Card>
       ) : creators.length > 0 ? (
-        <div className="space-y-6">
-          {creatorGroups.map((group) => (
-            <section key={group.label} className="space-y-2">
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 className="text-sm font-semibold text-foreground">{group.label}</h2>
-              </div>
-
-              <Card className="gap-0 overflow-hidden border-border bg-card py-0">
-                <div className="md:hidden">
-                  <div className="divide-y divide-border">
-                    {group.rows.map((creator, index) => (
-                      <div
-                        key={
-                          toText(creator.id) ||
-                          `${creator.social_handle ?? 'creator'}-${group.label}-${index}`
-                        }
-                        className="space-y-4 px-4 py-4 cursor-pointer hover:bg-muted/40 active:bg-muted/60 transition-colors"
-                        onClick={() => openCreatorCard(creator)}
-                      >
-                        <div className="flex min-w-0 items-start gap-3">
-                          <CreatorAvatar name={getCreatorName(creator)} avatarUrl={creator.avatar_url} size={36} />
-                          <div className="min-w-0">
-                            <p className="break-words font-medium text-foreground">
-                              {getCreatorName(creator)}
-                            </p>
-                            <p className="mt-1 break-words text-sm text-muted-foreground">
-                              {toText(creator.social_handle).trim() || 'N/A'} ·{' '}
-                              {formatLabel(creator.platform)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <CreatorMetric
-                            label="Followers"
-                            value={formatFollowers(creator)}
-                          />
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">
-                              Rank
-                            </p>
-                            <p className="mt-1">
-                              <RankBadge rank={creator.creator_rank} />
-                            </p>
-                          </div>
-                          <CreatorMetric
-                            label="Program"
-                            value={getCreatorProgram(creator)}
-                          />
-                        </div>
-                      </div>
-                    ))}
+        <Card className="gap-0 overflow-hidden border-border bg-card py-0">
+          <div className="md:hidden">
+            <div className="divide-y divide-border">
+              {visibleCreators.map((creator, index) => (
+                <div
+                  key={toText(creator.id) || `${creator.social_handle ?? 'creator'}-${index}`}
+                  className="space-y-4 px-4 py-4 cursor-pointer hover:bg-muted/40 active:bg-muted/60 transition-colors"
+                  onClick={() => openCreatorCard(creator)}
+                >
+                  <div className="flex min-w-0 items-start gap-3">
+                    <CreatorAvatar name={getCreatorName(creator)} avatarUrl={creator.avatar_url} size={36} />
+                    <div className="min-w-0">
+                      <p className="break-words font-medium text-foreground">
+                        {getCreatorName(creator)}
+                      </p>
+                      <p className="mt-1 break-words text-sm text-muted-foreground">
+                        {toText(creator.social_handle).trim() || 'N/A'} ·{' '}
+                        {formatLabel(creator.platform)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <CreatorMetric
+                      label="Followers"
+                      value={formatFollowers(creator)}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">
+                        Rank
+                      </p>
+                      <p className="mt-1">
+                        <RankBadge rank={creator.creator_rank} />
+                      </p>
+                    </div>
+                    <CreatorMetric
+                      label="Program"
+                      value={getCreatorProgram(creator)}
+                    />
                   </div>
                 </div>
+              ))}
+            </div>
+          </div>
 
-                <div className="hidden overflow-x-auto md:block">
-                  <Table className="min-w-[860px] table-fixed">
-                    <TableHeader className="bg-muted/60">
-                      <TableRow className="h-10 hover:bg-muted/60">
-                        <TableHead className="w-[32%] py-2">Creator</TableHead>
-                        <TableHead className="w-[34%] py-2">Program</TableHead>
-                        <TableHead className="w-[16%] py-2">Followers</TableHead>
-                        <TableHead className="w-[18%] py-2">Rank</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {group.rows.map((creator, index) => (
-                          <TableRow
-                            key={
-                              toText(creator.id) ||
-                              `${creator.social_handle ?? 'creator'}-${group.label}-${index}`
-                            }
-                            className="h-11 border-border hover:bg-muted/40 cursor-pointer"
-                            onClick={() => openCreatorCard(creator)}
-                          >
-                            <TableCell className="whitespace-normal py-2 font-medium text-foreground">
-                              <div className="flex items-center gap-2.5">
-                                <CreatorAvatar name={getCreatorName(creator)} avatarUrl={creator.avatar_url} size={28} />
-                                <span className="break-words">{getCreatorName(creator)}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="whitespace-normal break-words py-2 text-muted-foreground">
-                              {getCreatorProgram(creator)}
-                            </TableCell>
-                            <TableCell className="py-2 text-muted-foreground">
-                              {formatFollowers(creator)}
-                            </TableCell>
-                            <TableCell className="py-2 text-muted-foreground">
-                              <RankBadge rank={creator.creator_rank} />
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </Card>
-            </section>
-          ))}
-        </div>
+          <div className="hidden overflow-x-auto md:block">
+            <Table className="min-w-[860px] table-fixed">
+              <TableHeader className="bg-muted/60">
+                <TableRow className="h-10 hover:bg-muted/60">
+                  <TableHead className="w-[32%] py-2">Creator</TableHead>
+                  <TableHead className="w-[34%] py-2">Program</TableHead>
+                  <TableHead className="w-[16%] py-2">Followers</TableHead>
+                  <TableHead className="w-[18%] py-2">Rank</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visibleCreators.map((creator, index) => (
+                    <TableRow
+                      key={toText(creator.id) || `${creator.social_handle ?? 'creator'}-${index}`}
+                      className="h-11 border-border hover:bg-muted/40 cursor-pointer"
+                      onClick={() => openCreatorCard(creator)}
+                    >
+                      <TableCell className="whitespace-normal py-2 font-medium text-foreground">
+                        <div className="flex items-center gap-2.5">
+                          <CreatorAvatar name={getCreatorName(creator)} avatarUrl={creator.avatar_url} size={28} />
+                          <span className="break-words">{getCreatorName(creator)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="whitespace-normal break-words py-2 text-muted-foreground">
+                        {getCreatorProgram(creator)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        {formatFollowers(creator)}
+                      </TableCell>
+                      <TableCell className="py-2 text-muted-foreground">
+                        <RankBadge rank={creator.creator_rank} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
       ) : (
         <Card className="gap-0 overflow-hidden border-border bg-card py-0">
           <div className="p-6 text-center">
