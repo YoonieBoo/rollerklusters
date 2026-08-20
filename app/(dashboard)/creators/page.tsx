@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileDown, UserPlus } from 'lucide-react';
+import { FileDown, UserPlus, Instagram, Send, CheckCircle2, FileText, Users, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { LoadingDots } from '@/components/ui/loading-dots';
@@ -184,6 +184,16 @@ const getCreatorName = (creator: CreatorProfile) =>
   toText(creator.creator_name).trim() ||
   toText(creator.social_handle).trim() ||
   'Unnamed creator';
+
+const getInitials = (name: string) =>
+  name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('') || '?';
+
+const AVATAR_COLORS = [
+  'bg-blue-500', 'bg-purple-500', 'bg-emerald-500',
+  'bg-rose-500', 'bg-amber-500', 'bg-indigo-500',
+];
+const avatarColor = (id: string) =>
+  AVATAR_COLORS[Math.abs([...id].reduce((a, c) => a + c.charCodeAt(0), 0)) % AVATAR_COLORS.length];
 
 const getFirstValue = (creator: CreatorProfile, keys: string[]) => {
   for (const key of keys) {
@@ -500,6 +510,50 @@ export default function CreatorsPage() {
   const [isAddingCreator, setIsAddingCreator] = useState(false);
   const [addCreatorError, setAddCreatorError] = useState<string | null>(null);
   const [newCreatorForm, setNewCreatorForm] = useState(initialNewCreatorForm);
+  const [selectedCreator, setSelectedCreator] = useState<CreatorProfile | null>(null);
+  const [selectedCreatorAvatar, setSelectedCreatorAvatar] = useState<string | null>(null);
+  const [selectedCreatorStats, setSelectedCreatorStats] = useState<{
+    invited: number;
+    accepted: number;
+    submitted: number;
+    completed: number;
+  } | null>(null);
+
+  const openCreatorCard = async (creator: CreatorProfile) => {
+    if (!creator.id) return;
+    setSelectedCreator(creator);
+    setSelectedCreatorAvatar(null);
+    setSelectedCreatorStats(null);
+
+    const userId = toText(creator.user_id);
+
+    const [userRes, engRes, subRes] = await Promise.all([
+      userId
+        ? supabase.from('users').select('avatar_url').eq('id', userId).maybeSingle()
+        : Promise.resolve({ data: null }),
+      userId
+        ? supabase.from('engagements').select('status').eq('creator_id', userId)
+        : Promise.resolve({ data: [] }),
+      supabase.from('submissions').select('creator_ref'),
+    ]);
+
+    setSelectedCreatorAvatar((userRes.data as { avatar_url?: string } | null)?.avatar_url ?? null);
+
+    const engagementRows = (engRes.data ?? []) as { status?: string }[];
+    const creatorSocial = toText(creator.social_handle).trim().toLowerCase().replace(/^@/, '');
+    const submissionRows = ((subRes.data ?? []) as { creator_ref?: string }[]).filter((s) => {
+      const ref = toText(s.creator_ref).toLowerCase().replace(/^@/, '');
+      return (userId && ref === userId) || (creatorSocial && ref === creatorSocial);
+    });
+
+    setSelectedCreatorStats({
+      invited: engagementRows.length,
+      accepted: engagementRows.filter((e) => ['accepted', 'active', 'completed'].includes(toText(e.status)))
+        .length,
+      submitted: submissionRows.length,
+      completed: engagementRows.filter((e) => toText(e.status) === 'completed').length,
+    });
+  };
 
   const refreshCreators = async () => {
     try {
@@ -746,7 +800,7 @@ export default function CreatorsPage() {
                           `${creator.social_handle ?? 'creator'}-${group.label}-${index}`
                         }
                         className="space-y-4 px-4 py-4 cursor-pointer hover:bg-muted/40 active:bg-muted/60 transition-colors"
-                        onClick={() => creator.id && router.push(`/creators/${creator.id}`)}
+                        onClick={() => openCreatorCard(creator)}
                       >
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -802,7 +856,7 @@ export default function CreatorsPage() {
                               `${creator.social_handle ?? 'creator'}-${group.label}-${index}`
                             }
                             className="h-11 border-border hover:bg-muted/40 cursor-pointer"
-                            onClick={() => creator.id && router.push(`/creators/${creator.id}`)}
+                            onClick={() => openCreatorCard(creator)}
                           >
                             <TableCell className="py-2 font-medium text-foreground">
                               <div className="flex items-center gap-2">
@@ -1042,6 +1096,147 @@ export default function CreatorsPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(selectedCreator)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedCreator(null);
+            setSelectedCreatorAvatar(null);
+            setSelectedCreatorStats(null);
+          }
+        }}
+      >
+        <DialogContent className="bg-card border-border max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          {selectedCreator && (
+            <>
+              <DialogTitle className="sr-only">{getCreatorName(selectedCreator)}</DialogTitle>
+              <DialogDescription className="sr-only">Creator profile summary</DialogDescription>
+
+              <div className="flex flex-col gap-5 pt-1 sm:flex-row sm:items-start sm:gap-5">
+                {selectedCreatorAvatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={selectedCreatorAvatar}
+                    alt={getCreatorName(selectedCreator)}
+                    className="h-16 w-16 shrink-0 rounded-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white ${avatarColor(
+                      toText(selectedCreator.id)
+                    )}`}
+                  >
+                    {getInitials(getCreatorName(selectedCreator))}
+                  </div>
+                )}
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-xl font-bold text-foreground">
+                      {getCreatorName(selectedCreator)}
+                    </h2>
+                    {selectedCreator.verification_status === 'pending_onboarding' && (
+                      <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-700">
+                        Pending
+                      </span>
+                    )}
+                  </div>
+                  {toText(selectedCreator.social_handle).trim() && (
+                    <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Instagram size={13} />
+                      {toText(selectedCreator.social_handle).trim().replace(/^@/, '')} ·{' '}
+                      {formatLabel(selectedCreator.platform)}
+                    </p>
+                  )}
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <span className="text-sm text-muted-foreground">
+                      {getCreatorProgram(selectedCreator)}
+                    </span>
+                    {getCreatorInterest(selectedCreator) !== 'N/A' &&
+                      getCreatorInterest(selectedCreator)
+                        .split(', ')
+                        .map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                    <span className="text-muted-foreground">
+                      Followers{' '}
+                      <span className="font-medium text-foreground">
+                        {formatFollowers(selectedCreator)}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      Rank{' '}
+                      <span className="font-medium text-foreground">
+                        {formatLabel(selectedCreator.creator_rank)}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      Scholarship{' '}
+                      <span className="font-medium text-foreground">
+                        {formatScholarshipStudent(selectedCreator)}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      Joined{' '}
+                      <span className="font-medium text-foreground">
+                        {formatDate(toText(selectedCreator.created_at) || null)}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  { icon: <Send size={14} />, label: 'Invited', value: selectedCreatorStats?.invited },
+                  { icon: <CheckCircle2 size={14} />, label: 'Accepted', value: selectedCreatorStats?.accepted },
+                  { icon: <FileText size={14} />, label: 'Submitted', value: selectedCreatorStats?.submitted },
+                  { icon: <Users size={14} />, label: 'Completed', value: selectedCreatorStats?.completed },
+                ].map((stat) => (
+                  <div key={stat.label} className="rounded-xl border border-border bg-muted/30 px-3 py-3">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      {stat.icon}
+                      {stat.label}
+                    </div>
+                    <p className="mt-1.5 text-lg font-bold text-foreground">
+                      {selectedCreatorStats ? stat.value ?? 0 : '—'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {toText(selectedCreator.bio).trim() && (
+                <p className="mt-4 text-sm leading-6 text-muted-foreground">
+                  {toText(selectedCreator.bio).trim()}
+                </p>
+              )}
+
+              <Button
+                variant="outline"
+                className="mt-5 w-full gap-1.5"
+                onClick={() => {
+                  const id = selectedCreator.id;
+                  setSelectedCreator(null);
+                  setSelectedCreatorAvatar(null);
+                  setSelectedCreatorStats(null);
+                  router.push(`/creators/${id}`);
+                }}
+              >
+                <ExternalLink size={14} />
+                View full profile
+              </Button>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
