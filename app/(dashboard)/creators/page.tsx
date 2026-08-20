@@ -465,6 +465,51 @@ const RankBadge = ({ rank }: { rank: unknown }) => {
   );
 };
 
+const ActiveStatusBadge = ({ isActive }: { isActive: boolean }) => (
+  <span
+    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+      isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+    }`}
+  >
+    {isActive ? 'Active' : 'New'}
+  </span>
+);
+
+const ACTIVE_ENGAGEMENT_STATUSES = ['accepted', 'active', 'completed'];
+
+// Bulk activity lookup so the whole list can show/filter by status in one
+// pass, instead of the per-creator fetch the popup card does on open.
+const enrichWithActivityStatus = async (creatorsList: CreatorProfile[]): Promise<CreatorProfile[]> => {
+  const [engRes, subRes] = await Promise.all([
+    supabase.from('engagements').select('creator_id, status'),
+    supabase.from('submissions').select('creator_ref'),
+  ]);
+
+  const activeUserIds = new Set<string>();
+  for (const e of (engRes.data ?? []) as { creator_id?: string; status?: string }[]) {
+    const creatorId = toText(e.creator_id);
+    if (creatorId && ACTIVE_ENGAGEMENT_STATUSES.includes(toText(e.status))) {
+      activeUserIds.add(creatorId);
+    }
+  }
+
+  const submittedRefs = new Set<string>();
+  for (const s of (subRes.data ?? []) as { creator_ref?: string }[]) {
+    const ref = toText(s.creator_ref).trim().toLowerCase().replace(/^@/, '');
+    if (ref) submittedRefs.add(ref);
+  }
+
+  return creatorsList.map((creator) => {
+    const userId = toText(creator.user_id);
+    const social = toText(creator.social_handle).trim().toLowerCase().replace(/^@/, '');
+    const isActive =
+      (Boolean(userId) && activeUserIds.has(userId)) ||
+      (Boolean(userId) && submittedRefs.has(userId)) ||
+      (Boolean(social) && submittedRefs.has(social));
+    return { ...creator, is_active: isActive };
+  });
+};
+
 const CreatorAvatar = ({
   name,
   avatarUrl,
@@ -548,6 +593,7 @@ export default function CreatorsPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [facultyFilter, setFacultyFilter] = useState('all');
   const [scholarshipFilter, setScholarshipFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [isAddingCreator, setIsAddingCreator] = useState(false);
   const [addCreatorError, setAddCreatorError] = useState<string | null>(null);
@@ -593,7 +639,8 @@ export default function CreatorsPage() {
   const refreshCreators = async () => {
     try {
       const scoped = await getScopedCreators();
-      setCreators(scoped as CreatorProfile[]);
+      const enriched = await enrichWithActivityStatus(scoped as CreatorProfile[]);
+      setCreators(enriched);
       window.dispatchEvent(new CustomEvent('creator-count-update', { detail: scoped.length }));
     } catch (error) {
       console.error('Creators refresh error:', error);
@@ -657,7 +704,11 @@ export default function CreatorsPage() {
     .filter((creator) => facultyFilter === 'all' || getCreatorFacultyCategory(creator) === facultyFilter)
     .filter(
       (creator) => scholarshipFilter === 'all' || formatScholarshipStudent(creator) === scholarshipFilter
-    );
+    )
+    .filter((creator) => {
+      if (statusFilter === 'all') return true;
+      return statusFilter === 'active' ? Boolean(creator.is_active) : !creator.is_active;
+    });
 
   const creatorGroups = groupCreatorsBySignupDate(visibleCreators).filter(
     (g) => g.label !== 'Unknown signup date'
@@ -680,7 +731,13 @@ export default function CreatorsPage() {
           return;
         }
 
-        setCreators(scoped as CreatorProfile[]);
+        const enriched = await enrichWithActivityStatus(scoped as CreatorProfile[]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setCreators(enriched);
         // Broadcast the authoritative count so the sidebar badge stays in sync
         window.dispatchEvent(new CustomEvent('creator-count-update', { detail: scoped.length }));
       } catch (error) {
@@ -777,6 +834,16 @@ export default function CreatorsPage() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-9 w-[150px]">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="new">New</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             size="sm"
             className="gap-1.5 shrink-0"
@@ -844,10 +911,12 @@ export default function CreatorsPage() {
                               <p className="break-words font-medium text-foreground">
                                 {getCreatorName(creator)}
                               </p>
-                              {creator.verification_status === 'pending_onboarding' && (
+                              {creator.verification_status === 'pending_onboarding' ? (
                                 <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700">
                                   Pending
                                 </span>
+                              ) : (
+                                <ActiveStatusBadge isActive={Boolean(creator.is_active)} />
                               )}
                             </div>
                             <p className="mt-1 break-words text-sm text-muted-foreground">
@@ -903,10 +972,12 @@ export default function CreatorsPage() {
                               <div className="flex items-center gap-2.5">
                                 <CreatorAvatar name={getCreatorName(creator)} avatarUrl={creator.avatar_url} size={28} />
                                 <span className="break-words">{getCreatorName(creator)}</span>
-                                {creator.verification_status === 'pending_onboarding' && (
+                                {creator.verification_status === 'pending_onboarding' ? (
                                   <span className="shrink-0 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700">
                                     Pending
                                   </span>
+                                ) : (
+                                  <ActiveStatusBadge isActive={Boolean(creator.is_active)} />
                                 )}
                               </div>
                             </TableCell>
@@ -1165,10 +1236,12 @@ export default function CreatorsPage() {
                     <h2 className="text-xl font-bold text-foreground">
                       {getCreatorName(selectedCreator)}
                     </h2>
-                    {selectedCreator.verification_status === 'pending_onboarding' && (
+                    {selectedCreator.verification_status === 'pending_onboarding' ? (
                       <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-700">
                         Pending
                       </span>
+                    ) : (
+                      <ActiveStatusBadge isActive={Boolean(selectedCreator.is_active)} />
                     )}
                   </div>
                   {toText(selectedCreator.social_handle).trim() && (
