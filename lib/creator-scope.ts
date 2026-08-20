@@ -267,6 +267,7 @@ const mergeCreatorsWithSignups = (
       signup?.interested_content_types ??
       signup?.primary_creative_focus ??
       null;
+    const profileUser = usersById.get(toText(creator.user_id));
 
     return {
       ...creator,
@@ -277,6 +278,7 @@ const mergeCreatorsWithSignups = (
       tiktok_handle: toText(creator.tiktok_handle).trim() || toText(signup?.tiktok_handle).trim() || null,
       instagram_handle:
         toText(creator.instagram_handle).trim() || toText(signup?.instagram_handle).trim() || null,
+      avatar_url: profileUser?.avatar_url ?? null,
     };
   });
 
