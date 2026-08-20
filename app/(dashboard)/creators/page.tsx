@@ -2,10 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileDown } from 'lucide-react';
+import { FileDown, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { LoadingDots } from '@/components/ui/loading-dots';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -22,7 +33,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase/client';
-import { getScopedCreators } from '@/lib/creator-scope';
+import { getScopedCreators, UNIVERSITIES } from '@/lib/creator-scope';
 
 type CreatorProfile = {
   id?: string | number | null;
@@ -459,6 +470,24 @@ const SCHOLARSHIP_FILTER_LABELS: Record<string, string> = {
   'N/A': 'Unspecified',
 };
 
+const initialNewCreatorForm = {
+  creatorName: '',
+  email: '',
+  platform: '',
+  socialHandle: '',
+  followerCount: '',
+  university: '',
+  faculty: '',
+  contentCategories: '',
+  scholarshipStudent: false,
+  bio: '',
+  phoneNumber: '',
+  lineId: '',
+  location: '',
+};
+
+const PLATFORM_OPTIONS = ['TikTok', 'Instagram', 'YouTube'] as const;
+
 export default function CreatorsPage() {
   const router = useRouter();
   const [creators, setCreators] = useState<CreatorProfile[]>([]);
@@ -467,6 +496,59 @@ export default function CreatorsPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [facultyFilter, setFacultyFilter] = useState('all');
   const [scholarshipFilter, setScholarshipFilter] = useState('all');
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [isAddingCreator, setIsAddingCreator] = useState(false);
+  const [addCreatorError, setAddCreatorError] = useState<string | null>(null);
+  const [newCreatorForm, setNewCreatorForm] = useState(initialNewCreatorForm);
+
+  const refreshCreators = async () => {
+    try {
+      const scoped = await getScopedCreators();
+      setCreators(scoped as CreatorProfile[]);
+      window.dispatchEvent(new CustomEvent('creator-count-update', { detail: scoped.length }));
+    } catch (error) {
+      console.error('Creators refresh error:', error);
+    }
+  };
+
+  const handleAddCreator = async () => {
+    setAddCreatorError(null);
+
+    if (
+      !newCreatorForm.creatorName.trim() ||
+      !newCreatorForm.email.trim() ||
+      !newCreatorForm.platform ||
+      !newCreatorForm.socialHandle.trim()
+    ) {
+      setAddCreatorError('Creator name, email, platform, and social handle are required.');
+      return;
+    }
+
+    setIsAddingCreator(true);
+
+    try {
+      const res = await fetch('/api/creators/manual-add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCreatorForm),
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setAddCreatorError(json?.error ?? 'Could not add this creator.');
+        setIsAddingCreator(false);
+        return;
+      }
+
+      setShowAddDialog(false);
+      setNewCreatorForm(initialNewCreatorForm);
+      await refreshCreators();
+    } catch (error) {
+      setAddCreatorError(error instanceof Error ? error.message : 'Could not add this creator.');
+    } finally {
+      setIsAddingCreator(false);
+    }
+  };
 
   const facultyOptions = Array.from(new Set(creators.map(getCreatorFacultyCategory))).sort((a, b) => {
     const aRank = FACULTY_FILTER_SORT_ORDER.indexOf(a);
@@ -606,6 +688,18 @@ export default function CreatorsPage() {
               ))}
             </SelectContent>
           </Select>
+          <Button
+            size="sm"
+            className="gap-1.5 shrink-0"
+            onClick={() => {
+              setAddCreatorError(null);
+              setNewCreatorForm(initialNewCreatorForm);
+              setShowAddDialog(true);
+            }}
+          >
+            <UserPlus size={15} />
+            Add Creator
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -748,6 +842,208 @@ export default function CreatorsPage() {
           </div>
         </Card>
       )}
+
+      <Dialog
+        open={showAddDialog}
+        onOpenChange={(open) => {
+          if (!isAddingCreator) {
+            setShowAddDialog(open);
+            if (!open) {
+              setNewCreatorForm(initialNewCreatorForm);
+              setAddCreatorError(null);
+            }
+          }
+        }}
+      >
+        <DialogContent className="bg-card border-border max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Creator</DialogTitle>
+            <DialogDescription>
+              Add someone directly as an onboarded creator, without waiting for them to fill out
+              the signup form. This creates their account and profile right away.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="new-creator-name">Creator name *</Label>
+                <Input
+                  id="new-creator-name"
+                  placeholder="Jane Doe"
+                  value={newCreatorForm.creatorName}
+                  onChange={(e) => setNewCreatorForm((f) => ({ ...f, creatorName: e.target.value }))}
+                  disabled={isAddingCreator}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="new-creator-email">Email *</Label>
+                <Input
+                  id="new-creator-email"
+                  type="email"
+                  placeholder="jane@example.com"
+                  value={newCreatorForm.email}
+                  onChange={(e) => setNewCreatorForm((f) => ({ ...f, email: e.target.value }))}
+                  disabled={isAddingCreator}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Platform *</Label>
+                <Select
+                  value={newCreatorForm.platform}
+                  onValueChange={(v) => setNewCreatorForm((f) => ({ ...f, platform: v }))}
+                  disabled={isAddingCreator}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select platform" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PLATFORM_OPTIONS.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="new-creator-handle">Social handle *</Label>
+                <Input
+                  id="new-creator-handle"
+                  placeholder="@janedoe"
+                  value={newCreatorForm.socialHandle}
+                  onChange={(e) => setNewCreatorForm((f) => ({ ...f, socialHandle: e.target.value }))}
+                  disabled={isAddingCreator}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="new-creator-followers">Follower count</Label>
+                <Input
+                  id="new-creator-followers"
+                  type="number"
+                  min="0"
+                  placeholder="1000"
+                  value={newCreatorForm.followerCount}
+                  onChange={(e) => setNewCreatorForm((f) => ({ ...f, followerCount: e.target.value }))}
+                  disabled={isAddingCreator}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>University</Label>
+                <Select
+                  value={newCreatorForm.university}
+                  onValueChange={(v) => setNewCreatorForm((f) => ({ ...f, university: v }))}
+                  disabled={isAddingCreator}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select university" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIVERSITIES.map((u) => (
+                      <SelectItem key={u} value={u}>
+                        {u}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="new-creator-faculty">Faculty / program</Label>
+                <Input
+                  id="new-creator-faculty"
+                  placeholder="e.g. DDI, BBA, Communication Arts"
+                  value={newCreatorForm.faculty}
+                  onChange={(e) => setNewCreatorForm((f) => ({ ...f, faculty: e.target.value }))}
+                  disabled={isAddingCreator}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="new-creator-categories">Content categories</Label>
+                <Input
+                  id="new-creator-categories"
+                  placeholder="Beauty, Fashion, Campus Life"
+                  value={newCreatorForm.contentCategories}
+                  onChange={(e) => setNewCreatorForm((f) => ({ ...f, contentCategories: e.target.value }))}
+                  disabled={isAddingCreator}
+                />
+                <p className="text-xs text-muted-foreground">Comma-separated</p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="new-creator-phone">Phone number</Label>
+                <Input
+                  id="new-creator-phone"
+                  placeholder="+66..."
+                  value={newCreatorForm.phoneNumber}
+                  onChange={(e) => setNewCreatorForm((f) => ({ ...f, phoneNumber: e.target.value }))}
+                  disabled={isAddingCreator}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="new-creator-line">LINE ID</Label>
+                <Input
+                  id="new-creator-line"
+                  value={newCreatorForm.lineId}
+                  onChange={(e) => setNewCreatorForm((f) => ({ ...f, lineId: e.target.value }))}
+                  disabled={isAddingCreator}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="new-creator-bio">Bio</Label>
+              <Textarea
+                id="new-creator-bio"
+                placeholder="Short description of this creator's content"
+                value={newCreatorForm.bio}
+                onChange={(e) => setNewCreatorForm((f) => ({ ...f, bio: e.target.value }))}
+                disabled={isAddingCreator}
+                className="min-h-20"
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
+              <Label htmlFor="new-creator-scholarship" className="cursor-pointer">
+                Scholarship student
+              </Label>
+              <Switch
+                id="new-creator-scholarship"
+                checked={newCreatorForm.scholarshipStudent}
+                onCheckedChange={(checked) =>
+                  setNewCreatorForm((f) => ({ ...f, scholarshipStudent: checked }))
+                }
+                disabled={isAddingCreator}
+              />
+            </div>
+
+            {addCreatorError && <p className="text-sm text-red-500">{addCreatorError}</p>}
+
+            <div className="flex gap-2 justify-end pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowAddDialog(false)}
+                disabled={isAddingCreator}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleAddCreator} disabled={isAddingCreator}>
+                {isAddingCreator ? 'Adding...' : 'Add Creator'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
