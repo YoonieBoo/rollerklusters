@@ -465,16 +465,6 @@ const RankBadge = ({ rank }: { rank: unknown }) => {
   );
 };
 
-const ActiveStatusBadge = ({ isActive }: { isActive: boolean }) => (
-  <span
-    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-      isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-    }`}
-  >
-    {isActive ? 'Active' : 'New'}
-  </span>
-);
-
 const ACTIVE_ENGAGEMENT_STATUSES = ['accepted', 'active', 'completed'];
 
 // Bulk activity lookup so the whole list can show/filter by status in one
@@ -911,12 +901,10 @@ export default function CreatorsPage() {
                               <p className="break-words font-medium text-foreground">
                                 {getCreatorName(creator)}
                               </p>
-                              {creator.verification_status === 'pending_onboarding' ? (
+                              {creator.verification_status === 'pending_onboarding' && (
                                 <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700">
                                   Pending
                                 </span>
-                              ) : (
-                                <ActiveStatusBadge isActive={Boolean(creator.is_active)} />
                               )}
                             </div>
                             <p className="mt-1 break-words text-sm text-muted-foreground">
@@ -972,12 +960,10 @@ export default function CreatorsPage() {
                               <div className="flex items-center gap-2.5">
                                 <CreatorAvatar name={getCreatorName(creator)} avatarUrl={creator.avatar_url} size={28} />
                                 <span className="break-words">{getCreatorName(creator)}</span>
-                                {creator.verification_status === 'pending_onboarding' ? (
+                                {creator.verification_status === 'pending_onboarding' && (
                                   <span className="shrink-0 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700">
                                     Pending
                                   </span>
-                                ) : (
-                                  <ActiveStatusBadge isActive={Boolean(creator.is_active)} />
                                 )}
                               </div>
                             </TableCell>
@@ -1236,12 +1222,10 @@ export default function CreatorsPage() {
                     <h2 className="text-xl font-bold text-foreground">
                       {getCreatorName(selectedCreator)}
                     </h2>
-                    {selectedCreator.verification_status === 'pending_onboarding' ? (
+                    {selectedCreator.verification_status === 'pending_onboarding' && (
                       <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-700">
                         Pending
                       </span>
-                    ) : (
-                      <ActiveStatusBadge isActive={Boolean(selectedCreator.is_active)} />
                     )}
                   </div>
                   {toText(selectedCreator.social_handle).trim() && (
