@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  BadgeCheck,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
@@ -1230,12 +1229,9 @@ export default function CreatorsPage() {
                   </div>
 
                   <div className="min-w-0 flex-1 pt-1 text-center sm:text-left">
-                    <div className="flex items-center justify-center gap-2 sm:justify-start">
-                      <h2 className="truncate text-[30px] font-bold tracking-tight text-slate-950">
-                        {getCreatorName(selectedCreator)}
-                      </h2>
-                      <BadgeCheck className="size-6 shrink-0 fill-indigo-500 text-white" aria-label="Verified creator" />
-                    </div>
+                    <h2 className="truncate text-[30px] font-bold tracking-tight text-slate-950">
+                      {getCreatorName(selectedCreator)}
+                    </h2>
                     {toText(selectedCreator.social_handle).trim() && (
                       <p className="mt-1.5 flex items-center justify-center gap-2 text-sm text-slate-500 sm:justify-start">
                         <Instagram className="size-4 text-slate-800" />
