@@ -355,6 +355,15 @@ const fetchAllRows = async (tableName: string, orderColumn?: string): Promise<Su
 // by the Onboarded Creators list, its PDF export, the sidebar badge, and
 // the dashboard stat card, so the numbers can't drift apart again.
 export const getScopedCreators = async (): Promise<SupabaseRow[]> => {
+  // On a cold page load the Supabase client can still be restoring the
+  // session from storage when this fires. Querying before that finishes
+  // sends the request as anon, which RLS answers with a legitimate, non-error
+  // empty array — not a catchable failure — silently zeroing every count
+  // derived from this function. Awaiting the session first (getSession()
+  // blocks until restoration completes) makes sure the queries below always
+  // carry the real auth token.
+  await supabase.auth.getSession();
+
   const [profilesResult, users, signups, cmIdsRes, managerScope] = await Promise.all([
     supabase.from('creator_profiles').select('*').order('created_at', { ascending: false }),
     fetchAllRows('users'),

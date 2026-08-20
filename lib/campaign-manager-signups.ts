@@ -47,6 +47,11 @@ const sortSignups = (a: SupabaseRow, b: SupabaseRow): number => {
 // LINE ID is treated as the same manager and only their most recent
 // submission is kept.
 export const getCampaignManagerSignups = async (): Promise<SupabaseRow[]> => {
+  // See the matching comment in lib/creator-scope.ts: querying before the
+  // client finishes restoring its session races RLS into returning a valid,
+  // non-error empty result under the anon role, silently zeroing this count.
+  await supabase.auth.getSession();
+
   const signups: SupabaseRow[] = [];
   const seenEmails = new Set<string>();
   const seenPhones = new Set<string>();

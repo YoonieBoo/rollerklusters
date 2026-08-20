@@ -80,7 +80,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 interface MetricCardProps {
   icon: ReactNode;
   label: [string, string];
-  value: number;
+  value: number | null;
   href: string;
 }
 
@@ -97,7 +97,7 @@ const MetricCard = ({ icon, label, value, href }: MetricCardProps) => (
           {icon}
         </div>
       </div>
-      <p className="text-3xl font-semibold leading-none text-foreground">{value}</p>
+      <p className="text-3xl font-semibold leading-none text-foreground">{value ?? '—'}</p>
     </div>
     </Card>
   </Link>
@@ -250,7 +250,7 @@ export default function DashboardPage() {
     reviews: [],
     reports: [],
   });
-  const [onboardedCreatorsCount, setOnboardedCreatorsCount] = useState(0);
+  const [onboardedCreatorsCount, setOnboardedCreatorsCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
