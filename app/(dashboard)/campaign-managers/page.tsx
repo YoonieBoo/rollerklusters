@@ -275,23 +275,23 @@ export default function CampaignManagersPage() {
                 </div>
 
                 <div className="hidden overflow-x-auto md:block">
-                  <Table className="min-w-[1200px] table-fixed">
+                  <Table className="min-w-[1400px] table-fixed">
                     <TableHeader className="bg-muted/60">
-                      <TableRow className="h-10 hover:bg-muted/60">
-                        <TableHead className="w-[8%] py-2">Name</TableHead>
-                        <TableHead className="w-[9%] py-2">Email</TableHead>
-                        <TableHead className="w-[8%] py-2">Role</TableHead>
-                        <TableHead className="w-[5%] py-2">Location</TableHead>
-                        <TableHead className="w-[8%] py-2">Program</TableHead>
-                        <TableHead className="w-[4%] py-2">Year</TableHead>
-                        <TableHead className="w-[7%] py-2">Phone</TableHead>
-                        <TableHead className="w-[6%] py-2">Line ID</TableHead>
-                        <TableHead className="w-[8%] py-2">Management Focus</TableHead>
-                        <TableHead className="w-[8%] py-2">Management Experience</TableHead>
-                        <TableHead className="w-[8%] py-2">Contribution</TableHead>
-                        <TableHead className="w-[8%] py-2">Tools / Content Types</TableHead>
-                        <TableHead className="w-[5%] py-2">Status</TableHead>
-                        <TableHead className="w-[8%] py-2">Notes</TableHead>
+                      <TableRow className="hover:bg-muted/60">
+                        <TableHead className="w-[8%] whitespace-normal break-words py-2 align-bottom">Name</TableHead>
+                        <TableHead className="w-[10%] whitespace-normal break-words py-2 align-bottom">Email</TableHead>
+                        <TableHead className="w-[9%] whitespace-normal break-words py-2 align-bottom">Role</TableHead>
+                        <TableHead className="w-[6%] whitespace-normal break-words py-2 align-bottom">Location</TableHead>
+                        <TableHead className="w-[9%] whitespace-normal break-words py-2 align-bottom">Program</TableHead>
+                        <TableHead className="w-[4%] whitespace-normal break-words py-2 align-bottom">Year</TableHead>
+                        <TableHead className="w-[7%] whitespace-normal break-words py-2 align-bottom">Phone</TableHead>
+                        <TableHead className="w-[6%] whitespace-normal break-words py-2 align-bottom">Line ID</TableHead>
+                        <TableHead className="w-[8%] whitespace-normal break-words py-2 align-bottom">Management Focus</TableHead>
+                        <TableHead className="w-[8%] whitespace-normal break-words py-2 align-bottom">Management Experience</TableHead>
+                        <TableHead className="w-[8%] whitespace-normal break-words py-2 align-bottom">Contribution</TableHead>
+                        <TableHead className="w-[8%] whitespace-normal break-words py-2 align-bottom">Tools / Content Types</TableHead>
+                        <TableHead className="w-[5%] whitespace-normal break-words py-2 align-bottom">Status</TableHead>
+                        <TableHead className="w-[8%] whitespace-normal break-words py-2 align-bottom">Notes</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -303,28 +303,28 @@ export default function CampaignManagersPage() {
                           }
                           className="border-border align-top hover:bg-muted/40"
                         >
-                          <TableCell className="py-2 font-medium text-foreground">
+                          <TableCell className="whitespace-normal break-words py-2 font-medium text-foreground">
                             {formatValue(signup.display_name)}
                           </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
+                          <TableCell className="whitespace-normal break-words py-2 text-muted-foreground">
                             {formatValue(signup.email)}
                           </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
+                          <TableCell className="whitespace-normal break-words py-2 text-muted-foreground">
                             {formatValue(signup.role_label)}
                           </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
+                          <TableCell className="whitespace-normal break-words py-2 text-muted-foreground">
                             {formatValue(signup.location)}
                           </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
+                          <TableCell className="whitespace-normal break-words py-2 text-muted-foreground">
                             {formatValue(signup.university_program)}
                           </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
+                          <TableCell className="whitespace-normal break-words py-2 text-muted-foreground">
                             {formatValue(signup.year)}
                           </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
+                          <TableCell className="whitespace-normal break-words py-2 text-muted-foreground">
                             {formatValue(signup.phone_number)}
                           </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
+                          <TableCell className="whitespace-normal break-words py-2 text-muted-foreground">
                             {formatValue(signup.line_id)}
                           </TableCell>
                           <TableCell className="whitespace-normal break-words py-2 text-muted-foreground">
@@ -339,7 +339,7 @@ export default function CampaignManagersPage() {
                           <TableCell className="whitespace-normal break-words py-2 text-muted-foreground">
                             {formatValue(signup.interested_content_types)}
                           </TableCell>
-                          <TableCell className="py-2 text-muted-foreground">
+                          <TableCell className="whitespace-normal break-words py-2 text-muted-foreground">
                             {formatLabel(signup.status)}
                           </TableCell>
                           <TableCell className="whitespace-normal break-words py-2 text-muted-foreground">
