@@ -35,7 +35,7 @@ export const getAvatarColorForName = (name: string): string => {
 // Soft pastel tones — light tint background, gentle mid-tone text, no
 // heavy border — rather than the more saturated default Tailwind chips.
 const RANK_TIER_STYLES: { match: RegExp; classes: string }[] = [
-  { match: /bronze/i, classes: 'bg-orange-50 text-orange-500 border-orange-100' },
+  { match: /bronze/i, classes: 'bg-[#f3e8de] text-[#8b5e34] border-[#e6d3bf]' },
   { match: /silver/i, classes: 'bg-slate-100 text-slate-500 border-slate-200' },
   { match: /gold/i, classes: 'bg-yellow-50 text-yellow-600 border-yellow-100' },
   { match: /platinum/i, classes: 'bg-teal-50 text-teal-600 border-teal-100' },
