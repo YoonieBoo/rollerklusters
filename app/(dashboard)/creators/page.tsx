@@ -816,10 +816,10 @@ export default function CreatorsPage() {
           </Select>
           <Select value={scholarshipFilter} onValueChange={setScholarshipFilter}>
             <SelectTrigger className="h-9 w-[170px]">
-              <SelectValue placeholder="All creators" />
+              <SelectValue placeholder="All scholarship status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All creators</SelectItem>
+              <SelectItem value="all">All scholarship status</SelectItem>
               {scholarshipOptions.map((option) => (
                 <SelectItem key={option} value={option}>
                   {SCHOLARSHIP_FILTER_LABELS[option] ?? option}
