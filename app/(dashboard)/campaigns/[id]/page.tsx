@@ -46,6 +46,7 @@ type CampaignDetail = {
   status: string;
   createdAt: string | null;
   updatedAt: string | null;
+  createdByName: string | null;
 };
 
 const StatusBadge = ({ status, label }: { status: string; label?: string }) => {
@@ -148,7 +149,7 @@ export default function CampaignDetailPage() {
       await Promise.all([
         supabase
           .from('campaigns')
-          .select('id, name, client_name, status, created_at, updated_at')
+          .select('id, name, client_name, status, created_at, updated_at, created_by_name')
           .eq('id', campaignId)
           .maybeSingle(),
         supabase.from('briefs').select('*').eq('campaign_id', campaignId).maybeSingle(),
@@ -201,6 +202,7 @@ export default function CampaignDetailPage() {
       status: toText(campaignRow.status) || 'draft',
       createdAt: toText(campaignRow.created_at) || null,
       updatedAt: toText(campaignRow.updated_at) || null,
+      createdByName: toText(campaignRow.created_by_name) || null,
     });
     setBrief((briefResult.data ?? null) as SupabaseRow | null);
     setSubmissions((submissionsResult.data ?? []) as SupabaseRow[]);
@@ -317,6 +319,9 @@ export default function CampaignDetailPage() {
             <h1 className="mt-1 text-3xl font-semibold text-foreground">
               {campaign.name}
             </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Created by {campaign.createdByName || 'Unknown'}
+            </p>
           </div>
           <StatusBadge status={campaign.status} />
         </div>

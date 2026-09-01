@@ -52,6 +52,29 @@ type CampaignRow = {
   status: string | null;
   created_at: string | null;
   updated_at: string | null;
+  created_by_name?: string | null;
+};
+
+const getCurrentManagerIdentity = async (): Promise<{ name: string | null; email: string | null }> => {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const user = sessionData.session?.user;
+  if (!user) return { name: null, email: null };
+
+  const { data } = await supabase
+    .from('users')
+    .select('name, full_name')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const profile = data as { name?: string | null; full_name?: string | null } | null;
+  const name =
+    profile?.name?.trim() ||
+    profile?.full_name?.trim() ||
+    (typeof user.user_metadata?.display_name === 'string' ? user.user_metadata.display_name : null) ||
+    (typeof user.user_metadata?.full_name === 'string' ? user.user_metadata.full_name : null) ||
+    null;
+
+  return { name, email: user.email ?? null };
 };
 
 
@@ -237,6 +260,8 @@ export default function CampaignsPage() {
       return;
     }
 
+    const creatorIdentity = await getCurrentManagerIdentity();
+
     const { data, error } = await supabase
       .from('campaigns')
       .insert({
@@ -246,6 +271,8 @@ export default function CampaignsPage() {
         status: 'active',
         created_at: now,
         updated_at: now,
+        created_by_name: creatorIdentity.name,
+        created_by_email: creatorIdentity.email,
       })
       .select('id')
       .single();
@@ -564,6 +591,7 @@ export default function CampaignsPage() {
               <TableRow className="h-10 hover:bg-muted/60">
                 <TableHead className="py-2">Name</TableHead>
                 <TableHead className="py-2">Client</TableHead>
+                <TableHead className="py-2">Created by</TableHead>
                 <TableHead className="py-2">Status</TableHead>
                 <TableHead className="py-2">Created</TableHead>
                 <TableHead className="py-2">Updated</TableHead>
@@ -591,6 +619,9 @@ export default function CampaignsPage() {
                   </TableCell>
                   <TableCell className="py-2 text-muted-foreground">
                     {campaign.client_name || 'N/A'}
+                  </TableCell>
+                  <TableCell className="py-2 text-muted-foreground">
+                    {campaign.created_by_name || 'Unknown'}
                   </TableCell>
                   <TableCell className="py-2">
                     <StatusBadge status={campaign.status || 'draft'} />
