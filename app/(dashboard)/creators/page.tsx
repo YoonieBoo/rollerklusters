@@ -51,6 +51,7 @@ import {
 import { supabase } from '@/lib/supabase/client';
 import { getScopedCreators, UNIVERSITIES } from '@/lib/creator-scope';
 import { getInitials, getAvatarColorForName, getRankBadgeClasses } from '@/lib/creator-visuals';
+import { registerThaiFont } from '@/lib/pdf-fonts';
 
 type CreatorProfile = {
   id?: string | number | null;
@@ -245,6 +246,7 @@ const PlatformIcon = ({ platform, className }: { platform?: string | null; class
 const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
   const { jsPDF } = await import('jspdf/dist/jspdf.es.min.js');
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+  const fontFamily = await registerThaiFont(pdf);
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const marginX = 40;
@@ -273,7 +275,7 @@ const downloadCreatorsListPdf = async (creators: CreatorProfile[]) => {
   const tableStartX = marginX;
 
   const setFont = (size: number, style: 'normal' | 'bold' = 'normal', color = black) => {
-    pdf.setFont('helvetica', style);
+    pdf.setFont(fontFamily, style);
     pdf.setFontSize(size);
     pdf.setTextColor(color);
   };

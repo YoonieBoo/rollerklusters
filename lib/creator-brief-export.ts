@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
+import { registerThaiFont } from '@/lib/pdf-fonts';
 
 type SupabaseRow = Record<string, unknown>;
 
@@ -400,6 +401,7 @@ const loadPosterImageForPdf = async (url: string): Promise<LoadedPosterImage | n
 export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
   const { jsPDF } = await import('jspdf/dist/jspdf.es.min.js');
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+  const fontFamily = await registerThaiFont(pdf);
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const marginX = 46;
@@ -427,7 +429,7 @@ export const createCreatorBriefPdf = async (brief: CreatorBriefDocument) => {
   let cursorY = topMargin;
 
   const setFont = (size: number, style: 'normal' | 'bold' = 'normal', color = black) => {
-    pdf.setFont('helvetica', style);
+    pdf.setFont(fontFamily, style);
     pdf.setFontSize(size);
     pdf.setTextColor(color);
   };
