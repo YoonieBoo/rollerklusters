@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Search } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -223,7 +225,25 @@ export default function CreatorSignupsPage() {
   const [signups, setSignups] = useState<CreatorSignup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const signupGroups = groupSignupsByDate(signups);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const visibleSignups = signups.filter((signup) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+
+    return [
+      signup.display_name,
+      signup.nickname,
+      signup.email,
+      signup.instagram_handle,
+      signup.tiktok_handle,
+      signup.university_program,
+    ]
+      .map((value) => toText(value).toLowerCase())
+      .some((value) => value.includes(query));
+  });
+
+  const signupGroups = groupSignupsByDate(visibleSignups);
 
   useEffect(() => {
     let isMounted = true;
@@ -301,13 +321,25 @@ export default function CreatorSignupsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold text-foreground">Creator Signups</h1>
-        {!isLoading && !errorMessage && (
-          <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-blue-700 px-2.5 text-sm font-semibold leading-none text-white tabular-nums">
-            {signups.length.toLocaleString()}
-          </span>
-        )}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold text-foreground">Creator Signups</h1>
+          {!isLoading && !errorMessage && (
+            <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-blue-700 px-2.5 text-sm font-semibold leading-none text-white tabular-nums">
+              {signups.length.toLocaleString()}
+            </span>
+          )}
+        </div>
+        <div className="relative w-full sm:w-72">
+          <Search size={16} className="absolute left-3 top-2.5 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search by name, email, or handle..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-9 bg-card pl-9"
+          />
+        </div>
       </div>
 
       {isLoading ? (
@@ -323,7 +355,7 @@ export default function CreatorSignupsPage() {
             <p className="mt-1 text-sm text-muted-foreground">{errorMessage}</p>
           </div>
         </Card>
-      ) : signups.length > 0 ? (
+      ) : visibleSignups.length > 0 ? (
         <div className="space-y-6">
           {signupGroups.map((group) => (
             <section key={group.label} className="space-y-2">
@@ -496,7 +528,9 @@ export default function CreatorSignupsPage() {
       ) : (
         <Card className="gap-0 overflow-hidden border-border bg-card py-0">
           <div className="p-6 text-center">
-            <p className="text-muted-foreground">No creator signups yet.</p>
+            <p className="text-muted-foreground">
+              {searchQuery.trim() ? 'No signups match your search.' : 'No creator signups yet.'}
+            </p>
           </div>
         </Card>
       )}
