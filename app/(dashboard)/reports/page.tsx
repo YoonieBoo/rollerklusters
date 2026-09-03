@@ -776,6 +776,40 @@ export default function ReportsPage() {
       element.click();
       document.body.removeChild(element);
       URL.revokeObjectURL(pdfUrl);
+
+      // Record that a report actually happened for this campaign. Until
+      // now, exporting never wrote anything back to the reports table, so
+      // "Reports: Not created" stayed stuck on every campaign forever even
+      // after someone downloaded one — this is the fix.
+      try {
+        const reportPayload = {
+          campaign_id: selectedReport.campaignId,
+          campaign_summary: selectedReport.summary,
+          delivered_content: selectedReport.deliveredContent,
+          pending_issues: selectedReport.pendingIssues,
+          key_notes: selectedReport.keyNotes,
+          final_text: selectedReport.finalText,
+          approved_count: selectedReport.approvedCount,
+          updated_at: new Date().toISOString(),
+        };
+
+        if (selectedReport.raw?.id) {
+          await supabase
+            .from('reports')
+            .update(reportPayload)
+            .eq('id', toText(selectedReport.raw.id));
+        } else {
+          await supabase
+            .from('reports')
+            .insert({ ...reportPayload, created_at: new Date().toISOString() });
+        }
+
+        await fetchReports();
+      } catch (saveError) {
+        // The PDF already downloaded successfully — don't block or alarm
+        // the user over the tracking write failing.
+        console.error('Report tracking save failed:', saveError);
+      }
     } catch (error) {
       console.error('PDF export error:', error);
       setExportError('Unable to export PDF. Please try again.');
