@@ -20,6 +20,30 @@ type InviteCreator = {
   tags: string[];
 };
 
+type EngagementRow = {
+  id: string;
+  creatorId: string;
+  status: string;
+};
+
+const ENGAGEMENT_STATUS_OPTIONS = [
+  { value: 'matched', label: 'Pending creator response' },
+  { value: 'accepted', label: 'Accepted by creator' },
+  { value: 'in_discussion', label: 'In discussion' },
+  { value: 'active', label: 'Active' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'declined', label: 'Declined by creator' },
+];
+
+const engagementStatusBadgeClasses: Record<string, string> = {
+  matched: 'bg-amber-100 text-amber-700',
+  accepted: 'bg-blue-100 text-blue-700',
+  in_discussion: 'bg-purple-100 text-purple-700',
+  active: 'bg-green-100 text-green-700',
+  completed: 'bg-emerald-100 text-emerald-700',
+  declined: 'bg-red-100 text-red-700',
+};
+
 const addArrayTags = (value: unknown, tags: Set<string>) => {
   if (!value) return;
   if (Array.isArray(value)) {
@@ -54,6 +78,35 @@ export default function InvitesTabContent({ campaignId }: { campaignId: string }
   const [isSending, setIsSending] = useState(false);
   const [result, setResult] = useState<{ success?: string; error?: string } | null>(null);
   const [confirmResend, setConfirmResend] = useState<number | null>(null);
+  const [engagements, setEngagements] = useState<EngagementRow[]>([]);
+  const [updatingEngagementId, setUpdatingEngagementId] = useState<string | null>(null);
+
+  const fetchEngagements = () => {
+    supabase
+      .from('engagements')
+      .select('id, creator_id, status')
+      .eq('campaign_id', campaignId)
+      .then(({ data }) => {
+        const rows = (data ?? []) as { id: string; creator_id: string; status: string }[];
+        setEngagements(rows.map((row) => ({ id: row.id, creatorId: String(row.creator_id), status: row.status })));
+        setInvitedUserIds(new Set(rows.map((row) => String(row.creator_id))));
+      });
+  };
+
+  const handleStatusChange = async (engagementId: string, nextStatus: string) => {
+    setUpdatingEngagementId(engagementId);
+    const { error } = await supabase
+      .from('engagements')
+      .update({ status: nextStatus })
+      .eq('id', engagementId);
+
+    if (!error) {
+      setEngagements((current) =>
+        current.map((row) => (row.id === engagementId ? { ...row, status: nextStatus } : row))
+      );
+    }
+    setUpdatingEngagementId(null);
+  };
 
   const campaignIdRef = useRef(campaignId);
   useEffect(() => { campaignIdRef.current = campaignId; }, [campaignId]);
@@ -91,9 +144,7 @@ export default function InvitesTabContent({ campaignId }: { campaignId: string }
       setCampaign(data as Campaign | null);
     });
     fetchCreators(true);
-    supabase.from('engagements').select('creator_id').eq('campaign_id', campaignId).then(({ data }) => {
-      setInvitedUserIds(new Set((data ?? []).map((e) => String(e.creator_id))));
-    });
+    fetchEngagements();
   }, [campaignId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Realtime + polling so new onboarded creators appear automatically
@@ -119,6 +170,12 @@ export default function InvitesTabContent({ campaignId }: { campaignId: string }
     const tags = new Set<string>();
     creators.forEach((c) => c.tags.forEach((t) => tags.add(t)));
     return Array.from(tags).sort();
+  }, [creators]);
+
+  const creatorByUserId = useMemo(() => {
+    const map = new Map<string, InviteCreator>();
+    creators.forEach((c) => { if (c.userId) map.set(c.userId, c); });
+    return map;
   }, [creators]);
 
   const filteredCreators = useMemo(() => {
@@ -166,9 +223,7 @@ export default function InvitesTabContent({ campaignId }: { campaignId: string }
         setResult({ success: `Invite sent to ${emailList.length} creator${emailList.length === 1 ? '' : 's'}.` });
         setSelectedEmails(new Set());
         setManualEmails('');
-        supabase.from('engagements').select('creator_id').eq('campaign_id', campaignId).then(({ data }) => {
-          setInvitedUserIds(new Set((data ?? []).map((e) => String(e.creator_id))));
-        });
+        fetchEngagements();
       }
     } catch {
       setResult({ error: 'Network error. Please try again.' });
@@ -293,6 +348,57 @@ export default function InvitesTabContent({ campaignId }: { campaignId: string }
               <textarea placeholder={"creator@example.com\nanother@example.com"} value={manualEmails} onChange={(e) => setManualEmails(e.target.value)} disabled={isSending} rows={6}
                 className="w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none disabled:opacity-50" />
               <p className="text-xs text-muted-foreground">One email per line, or comma-separated.</p>
+            </div>
+          )}
+
+          {engagements.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">
+                Invited creators ({engagements.length})
+              </p>
+              <div className="rounded-md border border-border overflow-hidden">
+                <div className="max-h-72 overflow-y-auto divide-y divide-border">
+                  {engagements.map((engagement) => {
+                    const creator = creatorByUserId.get(engagement.creatorId);
+                    return (
+                      <div
+                        key={engagement.id}
+                        className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {creator?.name ?? 'Unknown creator'}
+                          </p>
+                          {creator?.handle && (
+                            <p className="text-xs text-muted-foreground truncate">@{creator.handle.replace(/^@/, '')}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                              engagementStatusBadgeClasses[engagement.status] ?? 'bg-muted text-muted-foreground'
+                            }`}
+                          >
+                            {ENGAGEMENT_STATUS_OPTIONS.find((o) => o.value === engagement.status)?.label ?? engagement.status}
+                          </span>
+                          <select
+                            value={engagement.status}
+                            disabled={updatingEngagementId === engagement.id}
+                            onChange={(e) => void handleStatusChange(engagement.id, e.target.value)}
+                            className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                          >
+                            {ENGAGEMENT_STATUS_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
 
