@@ -475,6 +475,16 @@ const ACTIVE_ENGAGEMENT_STATUSES = ['accepted', 'active', 'completed'];
 
 // Bulk activity lookup so the whole list can show/filter by status in one
 // pass, instead of the per-creator fetch the popup card does on open.
+//
+// Four real statuses, not three: a creator who was previously engaged in a
+// campaign but has nothing current is genuinely different from one who has
+// never been invited to anything yet — lumping both into a single "New"
+// bucket mislabels lapsed creators as brand-new ones. So this tracks both
+// "currently active" and "has any engagement history at all" separately:
+//   - Active: current engagement (accepted/active/completed) or a submission
+//   - Inactive: has engagement history, but none of it is current
+//   - Campaign-ready: fully onboarded, never engaged in any campaign yet
+//   - Pending: not yet onboarded (checked separately by the caller)
 const enrichWithActivityStatus = async (creatorsList: CreatorProfile[]): Promise<CreatorProfile[]> => {
   const [engRes, subRes] = await Promise.all([
     supabase.from('engagements').select('creator_id, status'),
@@ -482,9 +492,12 @@ const enrichWithActivityStatus = async (creatorsList: CreatorProfile[]): Promise
   ]);
 
   const activeUserIds = new Set<string>();
+  const engagedUserIds = new Set<string>();
   for (const e of (engRes.data ?? []) as { creator_id?: string; status?: string }[]) {
     const creatorId = toText(e.creator_id);
-    if (creatorId && ACTIVE_ENGAGEMENT_STATUSES.includes(toText(e.status))) {
+    if (!creatorId) continue;
+    engagedUserIds.add(creatorId);
+    if (ACTIVE_ENGAGEMENT_STATUSES.includes(toText(e.status))) {
       activeUserIds.add(creatorId);
     }
   }
@@ -498,11 +511,11 @@ const enrichWithActivityStatus = async (creatorsList: CreatorProfile[]): Promise
   return creatorsList.map((creator) => {
     const userId = toText(creator.user_id);
     const social = toText(creator.social_handle).trim().toLowerCase().replace(/^@/, '');
-    const isActive =
-      (Boolean(userId) && activeUserIds.has(userId)) ||
-      (Boolean(userId) && submittedRefs.has(userId)) ||
-      (Boolean(social) && submittedRefs.has(social));
-    return { ...creator, is_active: isActive };
+    const hasSubmission =
+      (Boolean(userId) && submittedRefs.has(userId)) || (Boolean(social) && submittedRefs.has(social));
+    const isActive = (Boolean(userId) && activeUserIds.has(userId)) || hasSubmission;
+    const hasEngagementHistory = (Boolean(userId) && engagedUserIds.has(userId)) || hasSubmission;
+    return { ...creator, is_active: isActive, has_engagement_history: hasEngagementHistory };
   });
 };
 
@@ -706,7 +719,10 @@ export default function CreatorsPage() {
       if (statusFilter === 'all') return true;
       if (statusFilter === 'pending') return isPending;
       if (isPending) return false;
-      return statusFilter === 'active' ? Boolean(creator.is_active) : !creator.is_active;
+      if (statusFilter === 'active') return Boolean(creator.is_active);
+      if (statusFilter === 'inactive') return !creator.is_active && Boolean(creator.has_engagement_history);
+      if (statusFilter === 'campaign_ready') return !creator.is_active && !creator.has_engagement_history;
+      return true;
     });
 
   useEffect(() => {
@@ -830,13 +846,14 @@ export default function CreatorsPage() {
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-9 w-[150px]">
+            <SelectTrigger className="h-9 w-[160px]">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="new">New</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+              <SelectItem value="campaign_ready">Campaign-ready</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
             </SelectContent>
           </Select>
