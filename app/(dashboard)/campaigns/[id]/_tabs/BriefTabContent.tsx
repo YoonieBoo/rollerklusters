@@ -943,7 +943,16 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 border-t border-border/60 pt-5">
+              <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-5">
+                {selectedBrief.status === 'published' ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-3 py-1.5 text-sm font-medium text-green-700">
+                    Published — visible to creators
+                  </span>
+                ) : (
+                  <Button type="button" disabled={isSaving} onClick={() => saveBrief('published')}>
+                    {isSaving ? 'Publishing…' : 'Publish Brief'}
+                  </Button>
+                )}
                 <Button type="button" onClick={() => router.push(`?tab=invites`)}>
                   Invite Onboarded Creators
                 </Button>
@@ -954,6 +963,11 @@ export default function BriefTabContent({ campaignId }: { campaignId: string }) 
                   Edit Brief
                 </Button>
               </div>
+              {selectedBrief.status !== 'published' && (
+                <p className="-mt-3 text-xs text-amber-700">
+                  This brief is still a draft — creators won’t see it until you publish.
+                </p>
+              )}
 
               {/* Module B — Content Evaluation Design */}
               <div className="mt-2 border-t border-border/40 pt-6 space-y-4">
