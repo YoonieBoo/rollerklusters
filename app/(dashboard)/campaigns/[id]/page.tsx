@@ -23,6 +23,8 @@ import {
 } from '@/components/ui/tabs';
 import {
   toText,
+  getCampaignReportExportData,
+  downloadCampaignReportPdf,
 } from '@/lib/report-export';
 import BriefTabContent from './_tabs/BriefTabContent';
 import ReviewsTabContent from './_tabs/ReviewsTabContent';
@@ -140,6 +142,7 @@ export default function CampaignDetailPage() {
   const [creatorNameById, setCreatorNameById] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isCompleting, setIsCompleting] = useState(false);
 
   const fetchCampaignDetail = async () => {
     setIsLoading(true);
@@ -234,6 +237,62 @@ export default function CampaignDetailPage() {
     setIsLoading(false);
   };
 
+  const handleCompleteCampaign = async () => {
+    if (!campaign) return;
+    const confirmed = window.confirm(
+      `Mark "${campaign.name}" as completed? This generates and downloads the final campaign report — how many creators were invited, accepted, and submitted content.`
+    );
+    if (!confirmed) return;
+
+    setIsCompleting(true);
+    setErrorMessage(null);
+
+    try {
+      const { error: statusError } = await supabase
+        .from('campaigns')
+        .update({ status: 'completed', updated_at: new Date().toISOString() })
+        .eq('id', campaign.id);
+      if (statusError) throw statusError;
+
+      const exportData = await getCampaignReportExportData(campaign.id);
+
+      // Persist the report so it's recorded as existing, same as a manual
+      // export from the Reports page — otherwise "completed" campaigns would
+      // still show "Reports: Not created" despite one having just been made.
+      const reportPayload = {
+        campaign_id: campaign.id,
+        campaign_summary: exportData.report.summary,
+        delivered_content: exportData.report.deliveredContent,
+        pending_issues: exportData.report.pendingIssues,
+        key_notes: exportData.report.keyNotes,
+        final_text: exportData.report.finalText,
+        approved_count: exportData.report.approvedCount,
+        updated_at: new Date().toISOString(),
+      };
+      if (exportData.report.raw?.id) {
+        await supabase
+          .from('reports')
+          .update(reportPayload)
+          .eq('id', toText(exportData.report.raw.id));
+      } else {
+        await supabase
+          .from('reports')
+          .insert({ ...reportPayload, created_at: new Date().toISOString() });
+      }
+
+      downloadCampaignReportPdf(exportData);
+
+      await fetchCampaignDetail();
+    } catch (error) {
+      console.error('Complete campaign error:', error);
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Failed to complete campaign and generate report.'
+      );
+    } finally {
+      setIsCompleting(false);
+    }
+  };
+
   useEffect(() => {
     fetchCampaignDetail();
 
@@ -323,7 +382,14 @@ export default function CampaignDetailPage() {
               Created by {campaign.createdByName || 'Unknown'}
             </p>
           </div>
-          <StatusBadge status={campaign.status} />
+          <div className="flex items-center gap-3">
+            <StatusBadge status={campaign.status} />
+            {campaign.status !== 'completed' && (
+              <Button size="sm" disabled={isCompleting} onClick={handleCompleteCampaign}>
+                {isCompleting ? 'Completing…' : 'Complete Campaign'}
+              </Button>
+            )}
+          </div>
         </div>
       </section>
 
