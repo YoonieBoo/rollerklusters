@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import webpush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase/server';
+import { pushLineMessage } from '@/lib/line';
 
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
@@ -20,6 +21,7 @@ type CreatorProfileForScoring = {
   scholarship_student?: boolean | null;
   follower_count?: number | string | null;
   manual_follower_count?: number | string | null;
+  line_user_id?: string | null;
 };
 
 const toStringArray = (value: unknown): string[] => {
@@ -182,7 +184,7 @@ export async function POST(request: NextRequest) {
       supabaseAdmin
         .from('creator_profiles')
         .select(
-          'user_id, platform, content_categories, content_types, interested_content_types, is_scholarship_student, scholarship_student, follower_count, manual_follower_count'
+          'user_id, platform, content_categories, content_types, interested_content_types, is_scholarship_student, scholarship_student, follower_count, manual_follower_count, line_user_id'
         )
         .in('user_id', creatorsWithId.map((c) => c.id)),
     ]);
@@ -193,6 +195,20 @@ export async function POST(request: NextRequest) {
       creatorsWithId.map(async (creator) => {
         const profile = profileByUserId.get(creator.id) ?? {};
         const matchScore = computeMatchScore(profile, briefRow ?? null, resolvedCampaignName);
+
+        // Fires regardless of which path below actually creates the
+        // engagement record — browser push only reaches a creator if
+        // they've enabled it (most never do), so LINE is the more
+        // reliable channel once a creator has connected it.
+        const lineUserId = (profile as CreatorProfileForScoring).line_user_id;
+        if (lineUserId) {
+          const lineText = resolvedCampaignName
+            ? `You've been invited to a new campaign: ${resolvedCampaignName}. Open RollerKluster to view the brief and respond.`
+            : "You've been invited to a new campaign. Open RollerKluster to view the brief and respond.";
+          pushLineMessage(lineUserId, lineText).catch((err) =>
+            console.warn('LINE invite push failed:', err)
+          );
+        }
 
         // Prefer the ecosystem API so push notification fires correctly
         if (accessToken) {
